@@ -1,4 +1,4 @@
-# Multi-Tenancy in FormForge
+# Multi-Tenancy in AppForge
 
 How tenant isolation works in this application, as implemented by Epic 12 (Stories 12.1–12.7)
 and specified by `_bmad-output/planning-artifacts/architecture.md` §7.
@@ -28,7 +28,7 @@ were introduced.
 | `{tenant_schema}_datasets` | That tenant's Dataset Manager `VIEW` namespace (replaces the formerly global `datasets` schema) |
 
 The three `public` tables are **pinned explicitly** in the EF model
-(`ToTable(name, schema: "public")` in `FormForgeDbContext.OnModelCreating`) so they resolve
+(`ToTable(name, schema: "public")` in `AppForgeDbContext.OnModelCreating`) so they resolve
 correctly no matter what `search_path` the current connection carries.
 
 ---
@@ -73,7 +73,7 @@ Because `users` is per-tenant, login cannot do one global `SELECT * FROM users W
       hit  -> verify BCrypt, issue platform-super-admin token (no refresh token). TERMINAL.
 2. public.tenant_user_index WHERE email = @email        (+ Include(Tenant))
       hit  -> LoginAgainstTenantSchemaAsync: re-validate schema_name via SafeIdentifier,
-              reject non-Active tenants, open a FormForgeDbContext whose connection
+              reject non-Active tenants, open a AppForgeDbContext whose connection
               SearchPath = that tenant's schema, verify credentials against ITS users table,
               issue a JWT carrying tenantId.
 3. public.users  (legacy / pre-12.3 path, unchanged)
@@ -130,7 +130,7 @@ expiration *and* a 5-minute absolute expiration — without the absolute one, a 
 traffic would never expire its entry and suspension would never take effect.
 
 `ITenantContext` itself is deliberately dumb and **Scoped** — one instance per request, matching
-`FormForgeDbContext`'s lifetime. Both `TenantId` and `SchemaName` are null for a no-tenant request;
+`AppForgeDbContext`'s lifetime. Both `TenantId` and `SchemaName` are null for a no-tenant request;
 callers must read that as "no tenant", not as an error.
 
 ---
@@ -141,7 +141,7 @@ callers must read that as "no tenant", not as an error.
 targeting is done entirely through the **connection's `search_path`**, resolved at
 **connection-open time** — never at DbContext or factory construction.
 
-That timing matters: `TenantContextMiddleware` resolves `FormForgeDbContext` to look up the
+That timing matters: `TenantContextMiddleware` resolves `AppForgeDbContext` to look up the
 `tenants` row *before* it calls `Set()`, in the same request scope. If the schema were captured at
 construction it would be null forever. Because EF Core opens a fresh connection per query under
 implicit connection management, every later query passes back through the same hook and sees the
@@ -161,7 +161,7 @@ When no tenant is resolved the path is plain `public` — never a redundant `pub
 **no other fallback exists**.
 
 > **A subtle bug that is worth not reintroducing:** `TenantSchemaConnectionInterceptor` rebuilds
-> the connection string from the *originally configured* `"formforge"` string captured once at
+> the connection string from the *originally configured* `"appforge"` string captured once at
 > construction, never from `connection.ConnectionString` at open time. EF Core reuses the same
 > `NpgsqlConnection` object across open/close cycles, and Npgsql's default
 > `Persist Security Info=false` strips the password after the first successful open — reading it
@@ -198,7 +198,7 @@ POST /api/admin/tenants                       (platform-super-admin only)
   |
   |-- ITenantOnboardingService.OnboardTenantAsync          (Story 12.7)
   |     1. CREATE SCHEMA "{schema}_datasets"
-  |     2. formforge_preview grants scoped to "{schema}" (bulk GRANT SELECT, then the same
+  |     2. appforge_preview grants scoped to "{schema}" (bulk GRANT SELECT, then the same
   |        guarded per-table REVOKE list and column-level users grant the migrations apply
   |        to public — never GRANT ... IN SCHEMA public any more)
   |     3. seed the first user + UserRole against the seeded tenant-admin role, in-schema
@@ -305,7 +305,7 @@ These are documented deferrals, not oversights. Sources:
 **The "fresh DI scope loses the tenant" class of bug — now fixed in both known places:**
 
 Both `PermissionService` and `ProvisioningBackgroundService` are Singletons that called
-`IServiceScopeFactory.CreateScope()` and then used that scope's `FormForgeDbContext`. A fresh
+`IServiceScopeFactory.CreateScope()` and then used that scope's `AppForgeDbContext`. A fresh
 scope gets its own *unset* `ITenantContext`, so `TenantSchemaConnectionInterceptor` silently
 resolved `search_path` to `public`. Each is fixed by a different mechanism, because they get the
 tenant from different places:
@@ -324,7 +324,7 @@ tenant from different places:
   disposed — so the fix is the one Decision 7.7 specifies: `ProvisioningJob` gained
   `TenantId`/`TenantSchema`, `ProvisioningService` (now **Scoped**) stamps them at enqueue time,
   and the consumer replays them onto its per-job scope before resolving anything. Because
-  `FormForgeDbContext`, `DbConnectionFactory` and `DdlEmitter` all read `ITenantContext`, that one
+  `AppForgeDbContext`, `DbConnectionFactory` and `DdlEmitter` all read `ITenantContext`, that one
   call redirects the whole DDL pipeline. `ProvisioningRecoveryService`'s startup scan now sweeps
   `public` **plus every Active tenant's schema** (one scope per target, one tenant's failure
   logged without aborting the rest) — previously it could only ever see `public`'s Pending rows.
@@ -359,7 +359,7 @@ tenant from different places:
   orphaned** — only the tenant row is flagged, there is no schema cleanup path.
 - Tenant creation writes **no audit-log entry**, despite being the highest-privilege mutation in
   the system. `Tenant.CreatedBy` is the only trail.
-- `AuthService`'s tenant-login path builds an ad hoc `NpgsqlConnection` + `FormForgeDbContext` per
+- `AuthService`'s tenant-login path builds an ad hoc `NpgsqlConnection` + `AppForgeDbContext` per
   login. Distinct connection strings mean **Npgsql pools one pool per tenant schema** rather than
   sharing the DI-managed pool. No demonstrated failure yet; the real fix is a pooled per-schema
   DbContext factory.
@@ -374,12 +374,12 @@ tenant from different places:
 **Backend — tenancy core**
 
 ```
-src/FormForge.Api/Domain/Entities/
+src/AppForge.Api/Domain/Entities/
   Tenant.cs                          tenants row
   TenantUserIndexEntry.cs            email -> tenant routing
   PlatformAdmin.cs                   platform-super-admin account store
 
-src/FormForge.Api/Features/Tenancy/
+src/AppForge.Api/Features/Tenancy/
   ITenantContext.cs / TenantContext.cs        request-scoped resolved tenant
   TenantContextMiddleware.cs                  JWT claim -> ITenantContext, 401 gates
   TenantLookupCache.cs                        (SchemaName, Status) cache, 5-min TTL
@@ -390,22 +390,22 @@ src/FormForge.Api/Features/Tenancy/
   TenantEndpoints.cs                          GET/POST /api/admin/tenants
   Dtos/, Validators/
 
-src/FormForge.Api/Infrastructure/Persistence/
+src/AppForge.Api/Infrastructure/Persistence/
   TenantSchemaConnectionInterceptor.cs        EF search_path
   DbConnectionFactory.cs                      Dapper search_path
   PreviewConnectionFactory.cs                 dataset-preview search_path
-  FormForgeDbContext.cs                       public-schema pins in OnModelCreating
+  AppForgeDbContext.cs                       public-schema pins in OnModelCreating
   Migrations/…AddTenants, …AddTenantUserIndex, …AddPlatformAdmins,
              …AddTenantErrorStatus, …PinPlatformTablesToPublicSchema
 
-src/FormForge.Api/Features/Auth/
+src/AppForge.Api/Features/Auth/
   AuthService.cs                              3-stage login, tenant-prefixed refresh cookie
   JwtTokenService.cs                          tenantId claim, platform-admin token path
 
-src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs
+src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs
   RequirePlatformSuperAdmin(), DenyPlatformSuperAdmin()
 
-src/FormForge.Api/Program.cs
+src/AppForge.Api/Program.cs
   :113-121  interceptor wiring    :233-256  tenancy DI    :589-608  bootstrap admin
   :678      middleware order      :736-741  /api/admin/tenants group
 ```
@@ -420,11 +420,11 @@ web/src/features/admin/tenants/{TenantsPage,CreateTenantForm,useTenantsQuery,ten
 **Tests**
 
 ```
-src/FormForge.Api.Tests/Features/Tenancy/
+src/AppForge.Api.Tests/Features/Tenancy/
   TenantContextMiddlewareTests, TenantEndpointsIntegrationTests, TenantIntegrationTests,
   TenantOnboardingServiceTests, TenantProvisioningServiceTests,
   TenantProvisioningRecoveryServiceTests, TenantSchemaRoutingIntegrationTests
-src/FormForge.Api.Tests/Features/Auth/
+src/AppForge.Api.Tests/Features/Auth/
   AuthServiceRefreshTenantTests, TenantAwareLoginIntegrationTests
 ```
 

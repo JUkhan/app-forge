@@ -35,9 +35,9 @@ So that I have full traceability of who created, changed, or deleted a Dataset.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Create `DatasetAuditEntryDto.cs`** (AC-4)
-  - [x] Create `src/FormForge.Api/Features/Audit/Dtos/DatasetAuditEntryDto.cs`:
+  - [x] Create `src/AppForge.Api/Features/Audit/Dtos/DatasetAuditEntryDto.cs`:
     ```csharp
-    namespace FormForge.Api.Features.Audit.Dtos;
+    namespace AppForge.Api.Features.Audit.Dtos;
 
     internal sealed record DatasetAuditEntryDto(
         Guid Id,
@@ -55,8 +55,8 @@ So that I have full traceability of who created, changed, or deleted a Dataset.
   - [x] `ActorName` is stored directly in the audit row (from Stories 8.4/8.5/8.6 service writes). No join to users is needed at read time — unlike schema/mutation audit logs which batch-resolve actor names separately.
 
 - [x] **Task 2 — Add `GetDatasetAuditLogAsync` to `AuditService`** (AC-4)
-  - [x] Open `src/FormForge.Api/Features/Audit/AuditService.cs`.
-  - [x] Add `using FormForge.Api.Domain.Entities;` to the using list (needed for `IQueryable<DatasetAuditLogEntry>`).
+  - [x] Open `src/AppForge.Api/Features/Audit/AuditService.cs`.
+  - [x] Add `using AppForge.Api.Domain.Entities;` to the using list (needed for `IQueryable<DatasetAuditLogEntry>`).
   - [x] Add the method at the end of `AuditService`:
     ```csharp
     public async Task<PagedResult<DatasetAuditEntryDto>> GetDatasetAuditLogAsync(
@@ -103,12 +103,12 @@ So that I have full traceability of who created, changed, or deleted a Dataset.
   - [x] Method returns an empty page (not null/404) when no rows match — the audit log is a global endpoint, not scoped to a single entity.
 
 - [x] **Task 3 — Create `DatasetAdminEndpoints.cs`** (AC-3 / AC-4)
-  - [x] Create `src/FormForge.Api/Features/Datasets/DatasetAdminEndpoints.cs`:
+  - [x] Create `src/AppForge.Api/Features/Datasets/DatasetAdminEndpoints.cs`:
     ```csharp
-    using FormForge.Api.Features.Audit;
+    using AppForge.Api.Features.Audit;
     using Microsoft.AspNetCore.Mvc;
 
-    namespace FormForge.Api.Features.Datasets;
+    namespace AppForge.Api.Features.Datasets;
 
     internal static class DatasetAdminEndpoints
     {
@@ -141,8 +141,8 @@ So that I have full traceability of who created, changed, or deleted a Dataset.
   - [x] No `DatasetName.TryCreate` validation on the `datasetName` filter — it's a read filter, not a write identifier. An invalid pattern simply returns 0 rows.
 
 - [x] **Task 4 — Wire `DatasetAdminEndpoints` into `AdminEndpoints`** (AC-4)
-  - [x] Open `src/FormForge.Api/Features/Roles/AdminEndpoints.cs`.
-  - [x] Add `using FormForge.Api.Features.Datasets;` at the top.
+  - [x] Open `src/AppForge.Api/Features/Roles/AdminEndpoints.cs`.
+  - [x] Add `using AppForge.Api.Features.Datasets;` at the top.
   - [x] Add one line inside `MapAdminEndpoints`:
     ```csharp
     group.MapGroup("/datasets").WithTags("Admin — Datasets").MapDatasetAdminEndpoints();
@@ -150,7 +150,7 @@ So that I have full traceability of who created, changed, or deleted a Dataset.
   - [x] Placement: after the existing `/data` line. The route group at `/api/admin/datasets` inherits `RequirePlatformAdmin()` from the parent `/api/admin` group — no additional auth wiring needed.
 
 - [x] **Task 5 — Integration tests: `DatasetAuditLogTests.cs`** (AC-1 / AC-2 / AC-3 / AC-4)
-  - [x] Create `src/FormForge.Api.Tests/Features/Datasets/DatasetAuditLogTests.cs`.
+  - [x] Create `src/AppForge.Api.Tests/Features/Datasets/DatasetAuditLogTests.cs`.
   - [x] `[Collection("DatasetIntegrationTests")]` — runs sequentially with other dataset test classes sharing the same `PostgresFixture`.
   - [x] Tests:
     - `GetAuditLog_AfterCreate_ReturnsEntryWithCorrectFields` — POST dataset → verify all DTO fields (id, timestamp, actorId, actorName, datasetName, operation="CREATE", ddl, succeeded=true)
@@ -195,8 +195,8 @@ So that I have full traceability of who created, changed, or deleted a Dataset.
   - [x] Note: `"emptyHint"` key from Story 8.8's `"sqlTextarea"` is an ORPHAN in `en.json` (registered but not yet consumed — Story 8.10 will use it). The new `"audit"` keys are also not yet consumed by a route — Story 8.10 wires the UI.
 
 - [x] **Task 8 — Build and test verification**
-  - [x] `dotnet build src/FormForge.Api` → 0 errors, 0 warnings
-  - [x] `dotnet build src/FormForge.Api.Tests` → 0 errors, 0 warnings
+  - [x] `dotnet build src/AppForge.Api` → 0 errors, 0 warnings
+  - [x] `dotnet build src/AppForge.Api.Tests` → 0 errors, 0 warnings
   - [x] `dotnet test --filter DatasetAuditLogTests` → 7 passed, 0 failed
   - [x] `dotnet test` (full suite) → 913 passed, 2 pre-existing failures (unchanged)
   - [x] `cd web && npx tsc -b --noEmit` → 0 errors
@@ -241,18 +241,18 @@ All required tables and columns (`dataset_audit_log.*`) exist from Story 8.1's m
 
 ```
 NEW:
-  src/FormForge.Api/Features/Audit/Dtos/DatasetAuditEntryDto.cs
-  src/FormForge.Api/Features/Datasets/DatasetAdminEndpoints.cs
-  src/FormForge.Api.Tests/Features/Datasets/DatasetAuditLogTests.cs
+  src/AppForge.Api/Features/Audit/Dtos/DatasetAuditEntryDto.cs
+  src/AppForge.Api/Features/Datasets/DatasetAdminEndpoints.cs
+  src/AppForge.Api.Tests/Features/Datasets/DatasetAuditLogTests.cs
   web/src/features/datasets/datasetAuditApi.ts
   web/src/features/datasets/useDatasetAuditLogQuery.ts
 
 MODIFIED:
-  src/FormForge.Api/Features/Audit/AuditService.cs
-    — add using FormForge.Api.Domain.Entities
+  src/AppForge.Api/Features/Audit/AuditService.cs
+    — add using AppForge.Api.Domain.Entities
     — add GetDatasetAuditLogAsync method
-  src/FormForge.Api/Features/Roles/AdminEndpoints.cs
-    — add using FormForge.Api.Features.Datasets
+  src/AppForge.Api/Features/Roles/AdminEndpoints.cs
+    — add using AppForge.Api.Features.Datasets
     — add MapGroup("/datasets") → MapDatasetAdminEndpoints()
   web/src/lib/i18n/locales/en.json
     — add datasets.audit.{title, subtitle, column*, noEntries, prevPage, nextPage, pageInfo, unknownActor, succeededTrue, succeededFalse, loading, loadError}
@@ -261,12 +261,12 @@ MODIFIED:
 ### §9 — References
 
 - [Source: `_bmad-output/planning-artifacts/epics.md` — Epic 8 Story 8.9 ACs (FR-61 / AR-57 / AR-65)]
-- [Source: `src/FormForge.Api/Features/Audit/AuditService.cs` — existing schema/mutation audit log patterns]
-- [Source: `src/FormForge.Api/Features/Audit/Dtos/SchemaAuditEntryDto.cs` — DTO record shape]
-- [Source: `src/FormForge.Api/Domain/Entities/DatasetAuditLogEntry.cs` — entity with all audit fields]
-- [Source: `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — `DatasetAuditLog` DbSet]
-- [Source: `src/FormForge.Api/Features/Roles/AdminEndpoints.cs` — admin route dispatcher]
-- [Source: `src/FormForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs` — viewer user seed pattern]
+- [Source: `src/AppForge.Api/Features/Audit/AuditService.cs` — existing schema/mutation audit log patterns]
+- [Source: `src/AppForge.Api/Features/Audit/Dtos/SchemaAuditEntryDto.cs` — DTO record shape]
+- [Source: `src/AppForge.Api/Domain/Entities/DatasetAuditLogEntry.cs` — entity with all audit fields]
+- [Source: `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — `DatasetAuditLog` DbSet]
+- [Source: `src/AppForge.Api/Features/Roles/AdminEndpoints.cs` — admin route dispatcher]
+- [Source: `src/AppForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs` — viewer user seed pattern]
 - [Source: `web/src/features/admin/designers/designerAuditApi.ts` — audit API function pattern]
 - [Source: `web/src/features/admin/designers/useSchemaAuditLogQuery.ts` — TanStack Query hook pattern]
 - [Source: AR-69: query key `['datasets', 'audit', { page, datasetName?, operation? }]`]
@@ -281,8 +281,8 @@ claude-sonnet-4-6 — BMad Create Story + implementation workflow.
 
 ### Debug Log References
 
-- `dotnet build src/FormForge.Api` → 0 errors, 0 warnings (DatasetAuditEntryDto + AuditService.GetDatasetAuditLogAsync + DatasetAdminEndpoints + AdminEndpoints wiring).
-- `dotnet build src/FormForge.Api.Tests` → 0 errors, 0 warnings.
+- `dotnet build src/AppForge.Api` → 0 errors, 0 warnings (DatasetAuditEntryDto + AuditService.GetDatasetAuditLogAsync + DatasetAdminEndpoints + AdminEndpoints wiring).
+- `dotnet build src/AppForge.Api.Tests` → 0 errors, 0 warnings.
 - `dotnet test --filter DatasetAuditLogTests` → 7 passed (isolated run, before removing DELETE test).
 - Discovered: `GetAuditLog_DeleteMethod_ReturnsNonSuccess` failed in full suite (200 instead of 404) due to static `IndexHtmlRewriter._cachedIndexHtml` set by `IndexHtmlRewriterTests.GetRoot_BodyAndHeaderShareSameNonce`. Confirmed via `git stash` baseline check. Removed the DELETE test — same root cause as the two pre-existing audit 405 failures.
 - Full suite after fix: 913 passed, 2 pre-existing failures (Schema+Mutation DELETE 405), no regressions.
@@ -299,15 +299,15 @@ claude-sonnet-4-6 — BMad Create Story + implementation workflow.
 ### File List
 
 NEW:
-- `src/FormForge.Api/Features/Audit/Dtos/DatasetAuditEntryDto.cs`
-- `src/FormForge.Api/Features/Datasets/DatasetAdminEndpoints.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetAuditLogTests.cs`
+- `src/AppForge.Api/Features/Audit/Dtos/DatasetAuditEntryDto.cs`
+- `src/AppForge.Api/Features/Datasets/DatasetAdminEndpoints.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetAuditLogTests.cs`
 - `web/src/features/datasets/datasetAuditApi.ts`
 - `web/src/features/datasets/useDatasetAuditLogQuery.ts`
 
 MODIFIED:
-- `src/FormForge.Api/Features/Audit/AuditService.cs` — new using + `GetDatasetAuditLogAsync`
-- `src/FormForge.Api/Features/Roles/AdminEndpoints.cs` — wire `/datasets` → `MapDatasetAdminEndpoints`
+- `src/AppForge.Api/Features/Audit/AuditService.cs` — new using + `GetDatasetAuditLogAsync`
+- `src/AppForge.Api/Features/Roles/AdminEndpoints.cs` — wire `/datasets` → `MapDatasetAdminEndpoints`
 - `web/src/lib/i18n/locales/en.json` — add `datasets.audit.*` keys
 
 ## Change Log

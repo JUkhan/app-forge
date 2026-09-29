@@ -90,7 +90,7 @@ so that the row and its backing PostgreSQL VIEW are updated atomically with roll
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Add `UpdateDatasetOutcome` enum and result type to `DatasetService.cs`** (AC-1 through AC-11)
-  - [x] At the top of `src/FormForge.Api/Features/Datasets/DatasetService.cs`, add alongside `CreateDatasetOutcome`:
+  - [x] At the top of `src/AppForge.Api/Features/Datasets/DatasetService.cs`, add alongside `CreateDatasetOutcome`:
     ```csharp
     internal enum UpdateDatasetOutcome { Success, NotFound, ConcurrencyConflict, NameConflict, InvalidQuery }
 
@@ -295,7 +295,7 @@ so that the row and its backing PostgreSQL VIEW are updated atomically with roll
   - [x] **IMPORTANT**: The `conn` and `tx` must be opened **before** the Dapper SELECT (Step B), so all operations share the same connection object. The connection should be opened once at the top of `UpdateAsync`, used for the SELECT and then the transaction, then disposed in `finally`. See §1 for the connection lifecycle pattern.
 
 - [x] **Task 4 — Add `ReplaceAsync` and `RenameAsync` to `DatasetViewManager`** (AC-2, AC-3, AC-4)
-  - [x] In `src/FormForge.Api/Features/Datasets/DatasetViewManager.cs`, add:
+  - [x] In `src/AppForge.Api/Features/Datasets/DatasetViewManager.cs`, add:
 
     ```csharp
     internal static string BuildReplaceViewDdl(DatasetName name, string effectiveQuery) =>
@@ -346,7 +346,7 @@ so that the row and its backing PostgreSQL VIEW are updated atomically with roll
     ```
 
 - [x] **Task 5 — Replace the PUT stub in `DatasetEndpoints.cs`** (all ACs)
-  - [x] In `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs`, replace the stub PUT handler:
+  - [x] In `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs`, replace the stub PUT handler:
     ```csharp
     group.MapPut("/{id:guid}", async (
         Guid id,
@@ -431,7 +431,7 @@ so that the row and its backing PostgreSQL VIEW are updated atomically with roll
     ```
 
 - [x] **Task 7 — Integration tests: `DatasetUpdateTests.cs`** (AC-1 through AC-11)
-  - [x] Create `src/FormForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs`
   - [x] Use the same `PostgresFixture` + `WebApplicationFactory<Program>` pattern as `DatasetViewLifecycleTests.cs`
   - [x] `InitializeAsync`: migrate, TRUNCATE `custom_dataset, dataset_audit_log, role_permissions, user_roles, roles, refresh_tokens, users RESTART IDENTITY CASCADE`, reseed admin role + user, drop any leftover `datasets` schema VIEWs with a safe cleanup query, login for JWT
   - [x] **Test 1 — AC-1: Version mismatch → 409 DATASET_CONCURRENCY_CONFLICT**
@@ -672,15 +672,15 @@ The `"datasets.concurrencyConflict"` key added to `en.json` is consumed by the f
 
 **Modified files:**
 ```
-src/FormForge.Api/Features/Datasets/DatasetService.cs
+src/AppForge.Api/Features/Datasets/DatasetService.cs
   — add UpdateDatasetOutcome enum, UpdateDatasetResult record, extend IDatasetService,
     implement UpdateAsync, add CurrentDatasetRow private record, add LoggerMessage methods
 
-src/FormForge.Api/Features/Datasets/DatasetViewManager.cs
+src/AppForge.Api/Features/Datasets/DatasetViewManager.cs
   — add BuildReplaceViewDdl, BuildRenameViewDdl static helpers,
     ReplaceAsync and RenameAsync async methods, LoggerMessage methods
 
-src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs
+src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs
   — replace the PUT /{id:guid} stub with the real handler
 
 web/src/lib/i18n/locales/en.json
@@ -689,7 +689,7 @@ web/src/lib/i18n/locales/en.json
 
 **New files:**
 ```
-src/FormForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs   ← NEW (10 tests)
+src/AppForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs   ← NEW (10 tests)
 ```
 
 **No new EF Core migrations** — all required columns (`version`, `updated_at`, `updated_by`) exist on `custom_dataset` from Story 8.1.
@@ -702,15 +702,15 @@ src/FormForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs   ← NEW (10 te
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.3 — AR-59: Transactional View Lifecycle (CREATE OR REPLACE / ALTER RENAME)]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.4 — AR-60: Optimistic Concurrency (version compare-and-swap, 409 on mismatch)]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.9 — AR-65: Dataset API contract, DATASET_CONCURRENCY_CONFLICT 409]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetService.cs` — CreateAsync pattern, disposal pattern, audit pattern]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetViewManager.cs` — CreateAsync and BuildCreateViewDdl as models for ReplaceAsync/RenameAsync]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — POST handler as model for PUT handler; InvalidDatasetName helper reused]
-- [Source: `src/FormForge.Api/Features/Datasets/Dtos/UpdateDatasetRequest.cs` — existing record shape (all nullable except Version)]
-- [Source: `src/FormForge.Api/Features/Datasets/Dtos/DatasetDto.cs` — existing response DTO reused]
-- [Source: `src/FormForge.Api/Domain/Entities/CustomDataset.cs` — entity fields: UpdatedAt, UpdatedBy already present]
-- [Source: `src/FormForge.Api/Domain/Entities/DatasetAuditLogEntry.cs` — PreviousValues field used for UPDATE audit]
-- [Source: `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — CustomDataset mapping (updated_at, updated_by columns confirmed)]
-- [Source: `src/FormForge.Api.Tests/Features/Datasets/DatasetViewLifecycleTests.cs` — helper methods: ReseedAdminRoleAsync, SeedAdminUserAsync, LoginAsync, OpenRawAsync]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetService.cs` — CreateAsync pattern, disposal pattern, audit pattern]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetViewManager.cs` — CreateAsync and BuildCreateViewDdl as models for ReplaceAsync/RenameAsync]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — POST handler as model for PUT handler; InvalidDatasetName helper reused]
+- [Source: `src/AppForge.Api/Features/Datasets/Dtos/UpdateDatasetRequest.cs` — existing record shape (all nullable except Version)]
+- [Source: `src/AppForge.Api/Features/Datasets/Dtos/DatasetDto.cs` — existing response DTO reused]
+- [Source: `src/AppForge.Api/Domain/Entities/CustomDataset.cs` — entity fields: UpdatedAt, UpdatedBy already present]
+- [Source: `src/AppForge.Api/Domain/Entities/DatasetAuditLogEntry.cs` — PreviousValues field used for UPDATE audit]
+- [Source: `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — CustomDataset mapping (updated_at, updated_by columns confirmed)]
+- [Source: `src/AppForge.Api.Tests/Features/Datasets/DatasetViewLifecycleTests.cs` — helper methods: ReseedAdminRoleAsync, SeedAdminUserAsync, LoginAsync, OpenRawAsync]
 - [Source: Story 8.3 review finding — deferred: UpdateDatasetRequest.Version minimum-value guard → resolved in §4]
 - [Source: Story 8.4 §7 — FluentValidation filter prohibition applies equally to PUT endpoint]
 
@@ -774,14 +774,14 @@ UPDATE + VIEW-DDL transaction, disposed in an outer `finally`.
 ### File List
 
 **Modified:**
-- `src/FormForge.Api/Features/Datasets/DatasetService.cs`
-- `src/FormForge.Api/Features/Datasets/DatasetViewManager.cs`
-- `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs`
+- `src/AppForge.Api/Features/Datasets/DatasetService.cs`
+- `src/AppForge.Api/Features/Datasets/DatasetViewManager.cs`
+- `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs`
 - `web/src/lib/i18n/locales/en.json`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetNameValidationTests.cs` (one test updated for the now-implemented PUT)
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetNameValidationTests.cs` (one test updated for the now-implemented PUT)
 
 **New:**
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs` (10 tests)
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs` (10 tests)
 
 ### Change Log
 

@@ -30,7 +30,7 @@ so that DDL statements cannot be constructed with unsafe input.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Enhance `SafeIdentifier` to expose failure reason** (AC: 1, 2)
-  - [x] Add `internal enum SafeIdentifierError { InvalidPattern, ReservedKeyword }` inside `SafeIdentifier.cs` (same file, same namespace `FormForge.Api.Features.Designer`)
+  - [x] Add `internal enum SafeIdentifierError { InvalidPattern, ReservedKeyword }` inside `SafeIdentifier.cs` (same file, same namespace `AppForge.Api.Features.Designer`)
   - [x] Add an overload (keep the existing 3-param signature unchanged for `FieldKeyValidator` compatibility):
     ```csharp
     public static bool TryCreate(
@@ -89,7 +89,7 @@ so that DDL statements cannot be constructed with unsafe input.
   - [x] **DO NOT** change `CreateDesigner_InvalidDesignerId_Returns422_IdentifierInvalid` (the `[Theory]` for charset/length failures) — it correctly asserts `IDENTIFIER_INVALID`.
 
 - [x] **Task 6 — Add `FieldKeyValidatorTests.cs`** (AC: 3)
-  - [x] Create `src/FormForge.Api.Tests/Features/Designer/FieldKeyValidatorTests.cs` — unit tests that do NOT need a DB:
+  - [x] Create `src/AppForge.Api.Tests/Features/Designer/FieldKeyValidatorTests.cs` — unit tests that do NOT need a DB:
     - `Validate_NullRoot_ReturnsValid` — `FieldKeyValidator.Validate(null).IsValid == true`.
     - `Validate_ComponentMissingFieldKey_ReturnsFieldKeyMissing` — JSON node for a `"Text Input"` component with no `properties.fieldKey` → error code `FIELD_KEY_MISSING`.
     - `Validate_ComponentInvalidFieldKey_ReturnsFieldKeyInvalid` — fieldKey `"Has-Dash"` → error code `FIELD_KEY_INVALID`.
@@ -104,13 +104,13 @@ so that DDL statements cannot be constructed with unsafe input.
 
 The foundation for Story 5.1 was partially built during Epic 3 (Designer stories). You MUST read and understand these files before touching anything:
 
-- **`src/FormForge.Api/Features/Designer/SafeIdentifier.cs`** — already implements the 3-param `TryCreate(raw, out result, out error)` with the correct regex and reserved-keyword check. Located in `Features/Designer/` NOT in `Domain/ValueTypes/` (architecture doc describes the intended final location; actual code landed in the feature folder during Story 3.2 implementation). DO NOT move it.
-- **`src/FormForge.Api/Features/Designer/PgReservedKeywords.cs`** — complete PostgreSQL 17 reserved keyword list plus pg_* prefix block plus system-column collision list (`id`, `created_at`, etc.). DO NOT recreate.
-- **`src/FormForge.Api/Features/Designer/FieldKeyValidator.cs`** — already uses `SafeIdentifier.TryCreate` for fieldKey validation. Uses the 3-param overload. DO NOT break its compilation.
-- **`src/FormForge.Api/Features/Designer/DesignerService.cs:80-83`** — `CreateAsync` already calls `SafeIdentifier.TryCreate` and returns `CreateDesignerOutcome.IdentifierInvalid` for ALL failures (both regex and reserved keyword). This is the GAP to fix.
-- **`src/FormForge.Api/Features/Designer/DesignerEndpoints.cs:87-95`** — maps `IdentifierInvalid` to `code: "IDENTIFIER_INVALID"`. Currently uses one code for BOTH failure types. Needs the new branch.
-- **`src/FormForge.Api.Tests/Features/Designer/SafeIdentifierTests.cs`** — tests the 3-param overload with 27 [InlineData] cases. The new 4-param overload needs its own tests.
-- **`src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs:159-177`** — `CreateDesigner_ReservedPgKeyword_Returns422_IdentifierInvalid` currently asserts `IDENTIFIER_INVALID` but must be updated to assert `IDENTIFIER_RESERVED_KEYWORD` (that's the AC-2 gap).
+- **`src/AppForge.Api/Features/Designer/SafeIdentifier.cs`** — already implements the 3-param `TryCreate(raw, out result, out error)` with the correct regex and reserved-keyword check. Located in `Features/Designer/` NOT in `Domain/ValueTypes/` (architecture doc describes the intended final location; actual code landed in the feature folder during Story 3.2 implementation). DO NOT move it.
+- **`src/AppForge.Api/Features/Designer/PgReservedKeywords.cs`** — complete PostgreSQL 17 reserved keyword list plus pg_* prefix block plus system-column collision list (`id`, `created_at`, etc.). DO NOT recreate.
+- **`src/AppForge.Api/Features/Designer/FieldKeyValidator.cs`** — already uses `SafeIdentifier.TryCreate` for fieldKey validation. Uses the 3-param overload. DO NOT break its compilation.
+- **`src/AppForge.Api/Features/Designer/DesignerService.cs:80-83`** — `CreateAsync` already calls `SafeIdentifier.TryCreate` and returns `CreateDesignerOutcome.IdentifierInvalid` for ALL failures (both regex and reserved keyword). This is the GAP to fix.
+- **`src/AppForge.Api/Features/Designer/DesignerEndpoints.cs:87-95`** — maps `IdentifierInvalid` to `code: "IDENTIFIER_INVALID"`. Currently uses one code for BOTH failure types. Needs the new branch.
+- **`src/AppForge.Api.Tests/Features/Designer/SafeIdentifierTests.cs`** — tests the 3-param overload with 27 [InlineData] cases. The new 4-param overload needs its own tests.
+- **`src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs:159-177`** — `CreateDesigner_ReservedPgKeyword_Returns422_IdentifierInvalid` currently asserts `IDENTIFIER_INVALID` but must be updated to assert `IDENTIFIER_RESERVED_KEYWORD` (that's the AC-2 gap).
 
 ### The One Real Gap This Story Fixes
 
@@ -118,7 +118,7 @@ AC-2 requires `code: "IDENTIFIER_RESERVED_KEYWORD"` for reserved-keyword rejecti
 
 ### File Location Convention — Feature Folder, Not Domain Layer
 
-The architecture doc describes `Domain/ValueTypes/SafeIdentifier.cs` as the intended path. The actual implementation landed in `Features/Designer/SafeIdentifier.cs` during Story 3.2. Follow the actual code, not the architecture doc. Any new Epic 5 feature that needs `SafeIdentifier` imports it from `FormForge.Api.Features.Designer`.
+The architecture doc describes `Domain/ValueTypes/SafeIdentifier.cs` as the intended path. The actual implementation landed in `Features/Designer/SafeIdentifier.cs` during Story 3.2. Follow the actual code, not the architecture doc. Any new Epic 5 feature that needs `SafeIdentifier` imports it from `AppForge.Api.Features.Designer`.
 
 ### FieldKeyValidator Must Not Be Broken
 
@@ -172,7 +172,7 @@ No frontend changes are required for this story beyond the new i18n key. The exi
 - `response.Content.ReadAsStringAsync()` then `Assert.Contains("IDENTIFIER_RESERVED_KEYWORD", body, StringComparison.Ordinal)`
 - `[IClassFixture<PostgresFixture>]` + `IAsyncLifetime` — the test class already has both wired
 
-**FieldKeyValidatorTests.cs new file:** Use `JsonNode.Parse(...)` to build test inputs. No fixture, no DB. Follow the same namespace pattern `FormForge.Api.Tests.Features.Designer` (same folder as the other Designer tests).
+**FieldKeyValidatorTests.cs new file:** Use `JsonNode.Parse(...)` to build test inputs. No fixture, no DB. Follow the same namespace pattern `AppForge.Api.Tests.Features.Designer` (same folder as the other Designer tests).
 
 ### Test Count Baseline and Estimate
 
@@ -187,16 +187,16 @@ No frontend changes are required for this story beyond the new i18n key. The exi
 ### Project Structure Notes
 
 **Backend modified files:**
-- `src/FormForge.Api/Features/Designer/SafeIdentifier.cs` — add `SafeIdentifierError` enum and 4-param `TryCreate` overload
-- `src/FormForge.Api/Features/Designer/DesignerService.cs` — add `IdentifierReservedKeyword` to `CreateDesignerOutcome` enum; update `CreateAsync` to use 4-param overload and set the new outcome
-- `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs` — add `IdentifierReservedKeyword` branch in `CreateDesignerHandler` switch
+- `src/AppForge.Api/Features/Designer/SafeIdentifier.cs` — add `SafeIdentifierError` enum and 4-param `TryCreate` overload
+- `src/AppForge.Api/Features/Designer/DesignerService.cs` — add `IdentifierReservedKeyword` to `CreateDesignerOutcome` enum; update `CreateAsync` to use 4-param overload and set the new outcome
+- `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs` — add `IdentifierReservedKeyword` branch in `CreateDesignerHandler` switch
 
 **Backend new files:**
-- `src/FormForge.Api.Tests/Features/Designer/FieldKeyValidatorTests.cs`
+- `src/AppForge.Api.Tests/Features/Designer/FieldKeyValidatorTests.cs`
 
 **Backend modified tests:**
-- `src/FormForge.Api.Tests/Features/Designer/SafeIdentifierTests.cs` — add 3 new [Fact] methods for the 4-param overload
-- `src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` — rename + update 1 test; add 1 new test
+- `src/AppForge.Api.Tests/Features/Designer/SafeIdentifierTests.cs` — add 3 new [Fact] methods for the 4-param overload
+- `src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` — rename + update 1 test; add 1 new test
 
 **Frontend modified files:**
 - `web/src/lib/i18n/locales/en.json` — add `"identifierReservedKeyword"` key to the `designers` block
@@ -211,12 +211,12 @@ No frontend changes are required for this story beyond the new i18n key. The exi
 - **Architecture — identifier sanitization:** `architecture.md:263-267` (Decision 1.1 — regex, reserved keyword list, defense in depth, SafeIdentifier value type)
 - **Architecture — backend folder structure:** `architecture.md:985-1107` (Feature folders, Domain/ValueTypes, test structure)
 - **Architecture — error codes:** `architecture.md:503` (`designerId` path param OpenAPI pattern)
-- **Existing `SafeIdentifier`:** `src/FormForge.Api/Features/Designer/SafeIdentifier.cs`
-- **Existing `PgReservedKeywords`:** `src/FormForge.Api/Features/Designer/PgReservedKeywords.cs`
-- **Existing `FieldKeyValidator`:** `src/FormForge.Api/Features/Designer/FieldKeyValidator.cs` (uses 3-param overload — must not break)
-- **Existing service gap:** `src/FormForge.Api/Features/Designer/DesignerService.cs:80-83` (both failure types collapse to `IdentifierInvalid`)
-- **Existing endpoint gap:** `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs:87-95` (one code for both failures)
-- **Existing reserved-keyword test to update:** `src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs:159-177`
+- **Existing `SafeIdentifier`:** `src/AppForge.Api/Features/Designer/SafeIdentifier.cs`
+- **Existing `PgReservedKeywords`:** `src/AppForge.Api/Features/Designer/PgReservedKeywords.cs`
+- **Existing `FieldKeyValidator`:** `src/AppForge.Api/Features/Designer/FieldKeyValidator.cs` (uses 3-param overload — must not break)
+- **Existing service gap:** `src/AppForge.Api/Features/Designer/DesignerService.cs:80-83` (both failure types collapse to `IdentifierInvalid`)
+- **Existing endpoint gap:** `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs:87-95` (one code for both failures)
+- **Existing reserved-keyword test to update:** `src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs:159-177`
 - **i18n pattern:** `architecture.md:608-612` (dot-notation, `en.json` location)
 - **FR-23 (designerId validation):** `_bmad-output/planning-artifacts/epics.md` Epic 5 overview
 - **NFR-6 (SQL injection defense):** Epic 5 NFRs covered by SafeIdentifier
@@ -229,9 +229,9 @@ claude-opus-4-7[1m] (Claude Code)
 
 ### Debug Log References
 
-- `dotnet build src/FormForge.Api/FormForge.Api.csproj` — clean (0 warnings, 0 errors) after the SafeIdentifier + DesignerService + DesignerEndpoints edits.
-- `dotnet test src/FormForge.Api.Tests/FormForge.Api.Tests.csproj --filter "FullyQualifiedName~Features.Designer"` — 92/92 passed (Designer feature subset).
-- `dotnet test src/FormForge.Api.Tests/FormForge.Api.Tests.csproj` — 316/316 passed (full backend suite). Matches the spec estimate of 306 baseline + 10 new tests exactly.
+- `dotnet build src/AppForge.Api/AppForge.Api.csproj` — clean (0 warnings, 0 errors) after the SafeIdentifier + DesignerService + DesignerEndpoints edits.
+- `dotnet test src/AppForge.Api.Tests/AppForge.Api.Tests.csproj --filter "FullyQualifiedName~Features.Designer"` — 92/92 passed (Designer feature subset).
+- `dotnet test src/AppForge.Api.Tests/AppForge.Api.Tests.csproj` — 316/316 passed (full backend suite). Matches the spec estimate of 306 baseline + 10 new tests exactly.
 - `npm run type-check` (web/) — clean.
 - `npm run lint` (web/) — 32 errors total, all pre-existing (Story 3.6 `react-hooks/set-state-in-effect` at `designer.$designerId.tsx:175` + the route-file `react-refresh/only-export-components` cluster). Zero net new lint errors from this story.
 
@@ -247,16 +247,16 @@ claude-opus-4-7[1m] (Claude Code)
 ### File List
 
 **Modified (backend production):**
-- `src/FormForge.Api/Features/Designer/SafeIdentifier.cs` — added `SafeIdentifierError` enum + 4-param `TryCreate` overload; original 3-param overload preserved as a one-line delegation to the new method.
-- `src/FormForge.Api/Features/Designer/DesignerService.cs` — added `IdentifierReservedKeyword` to `CreateDesignerOutcome`; updated `CreateAsync` to call the 4-param overload and route the outcome based on `failureCode`.
-- `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs` — added `CreateDesignerOutcome.IdentifierReservedKeyword` switch branch before the existing `IdentifierInvalid` branch in `CreateDesignerHandler`; emits `IDENTIFIER_RESERVED_KEYWORD` + `designers.identifierReservedKeyword` message key.
+- `src/AppForge.Api/Features/Designer/SafeIdentifier.cs` — added `SafeIdentifierError` enum + 4-param `TryCreate` overload; original 3-param overload preserved as a one-line delegation to the new method.
+- `src/AppForge.Api/Features/Designer/DesignerService.cs` — added `IdentifierReservedKeyword` to `CreateDesignerOutcome`; updated `CreateAsync` to call the 4-param overload and route the outcome based on `failureCode`.
+- `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs` — added `CreateDesignerOutcome.IdentifierReservedKeyword` switch branch before the existing `IdentifierInvalid` branch in `CreateDesignerHandler`; emits `IDENTIFIER_RESERVED_KEYWORD` + `designers.identifierReservedKeyword` message key.
 
 **Modified (backend tests):**
-- `src/FormForge.Api.Tests/Features/Designer/SafeIdentifierTests.cs` — added 3 new `[Fact]` methods (`TryCreate_InvalidPattern_SetsErrorCodeInvalidPattern`, `TryCreate_ReservedKeyword_SetsErrorCodeReservedKeyword`, `TryCreate_ValidIdentifier_ErrorCodeIsNull`) for the 4-param overload; existing 3-param `[Theory]` cases unchanged.
-- `src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` — renamed `CreateDesigner_ReservedPgKeyword_Returns422_IdentifierInvalid` → `..._IdentifierReservedKeyword`, swapped assertion to `IDENTIFIER_RESERVED_KEYWORD`, added new `CreateDesigner_InvalidPattern_Returns422_IdentifierInvalid` Fact that also asserts `DoesNotContain("IDENTIFIER_RESERVED_KEYWORD", ...)` to lock the two-code distinction.
+- `src/AppForge.Api.Tests/Features/Designer/SafeIdentifierTests.cs` — added 3 new `[Fact]` methods (`TryCreate_InvalidPattern_SetsErrorCodeInvalidPattern`, `TryCreate_ReservedKeyword_SetsErrorCodeReservedKeyword`, `TryCreate_ValidIdentifier_ErrorCodeIsNull`) for the 4-param overload; existing 3-param `[Theory]` cases unchanged.
+- `src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` — renamed `CreateDesigner_ReservedPgKeyword_Returns422_IdentifierInvalid` → `..._IdentifierReservedKeyword`, swapped assertion to `IDENTIFIER_RESERVED_KEYWORD`, added new `CreateDesigner_InvalidPattern_Returns422_IdentifierInvalid` Fact that also asserts `DoesNotContain("IDENTIFIER_RESERVED_KEYWORD", ...)` to lock the two-code distinction.
 
 **New (backend tests):**
-- `src/FormForge.Api.Tests/Features/Designer/FieldKeyValidatorTests.cs` — 6 pure in-memory `JsonNode.Parse(...)` tests covering null-root, missing fieldKey, invalid fieldKey, reserved-keyword fieldKey (asserts `FIELD_KEY_INVALID` not `FIELD_KEY_RESERVED_KEYWORD` per v1 design), collision, and valid schema cases.
+- `src/AppForge.Api.Tests/Features/Designer/FieldKeyValidatorTests.cs` — 6 pure in-memory `JsonNode.Parse(...)` tests covering null-root, missing fieldKey, invalid fieldKey, reserved-keyword fieldKey (asserts `FIELD_KEY_INVALID` not `FIELD_KEY_RESERVED_KEYWORD` per v1 design), collision, and valid schema cases.
 
 **Modified (frontend):**
 - `web/src/lib/i18n/locales/en.json` — added `"identifierReservedKeyword"` key under the `designers` block, immediately after `identifierInvalid`.
@@ -267,6 +267,6 @@ claude-opus-4-7[1m] (Claude Code)
 
 ### Review Findings
 
-- [x] [Review][Patch] No 4-param overload test for `pg_*`-prefix input producing `ReservedKeyword` errorCode [`src/FormForge.Api.Tests/Features/Designer/SafeIdentifierTests.cs`] — existing `TryCreate_ReservedKeywords_Fail` [Theory] covers `pg_*` through the 3-param overload, but no test asserts that a `pg_`-prefixed input (e.g. `"pg_toast"`) sets `errorCode == SafeIdentifierError.ReservedKeyword` through the new 4-param overload. Add one `[InlineData]` to `TryCreate_ReservedKeyword_SetsErrorCodeReservedKeyword` or a new `[Fact]`.
-- [x] [Review][Patch] Stale comment in `[Theory]` test claims reserved-keyword failures produce `IDENTIFIER_INVALID` [`src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs`] — the unchanged `CreateDesigner_InvalidDesignerId_Returns422_IdentifierInvalid` [Theory] retains a comment "Structural failures (regex/length/empty) and semantic failures (reserved keyword) both flow through SafeIdentifier … IDENTIFIER_INVALID" which is now false after Story 5.1. The InlineData inputs are all regex failures so the assertion is correct, but the comment misleads future readers. Update the comment to reflect that reserved keywords now produce `IDENTIFIER_RESERVED_KEYWORD`.
-- [x] [Review][Defer] `"Has-Bad-Chars"` test input exercises uppercase-start failure first; hyphen never evaluated [`src/FormForge.Api.Tests/Features/Designer/SafeIdentifierTests.cs:TryCreate_InvalidPattern_SetsErrorCodeInvalidPattern`] — deferred, pre-existing
+- [x] [Review][Patch] No 4-param overload test for `pg_*`-prefix input producing `ReservedKeyword` errorCode [`src/AppForge.Api.Tests/Features/Designer/SafeIdentifierTests.cs`] — existing `TryCreate_ReservedKeywords_Fail` [Theory] covers `pg_*` through the 3-param overload, but no test asserts that a `pg_`-prefixed input (e.g. `"pg_toast"`) sets `errorCode == SafeIdentifierError.ReservedKeyword` through the new 4-param overload. Add one `[InlineData]` to `TryCreate_ReservedKeyword_SetsErrorCodeReservedKeyword` or a new `[Fact]`.
+- [x] [Review][Patch] Stale comment in `[Theory]` test claims reserved-keyword failures produce `IDENTIFIER_INVALID` [`src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs`] — the unchanged `CreateDesigner_InvalidDesignerId_Returns422_IdentifierInvalid` [Theory] retains a comment "Structural failures (regex/length/empty) and semantic failures (reserved keyword) both flow through SafeIdentifier … IDENTIFIER_INVALID" which is now false after Story 5.1. The InlineData inputs are all regex failures so the assertion is correct, but the comment misleads future readers. Update the comment to reflect that reserved keywords now produce `IDENTIFIER_RESERVED_KEYWORD`.
+- [x] [Review][Defer] `"Has-Bad-Chars"` test input exercises uppercase-start failure first; hyphen never evaluated [`src/AppForge.Api.Tests/Features/Designer/SafeIdentifierTests.cs:TryCreate_InvalidPattern_SetsErrorCodeInvalidPattern`] — deferred, pre-existing

@@ -65,20 +65,20 @@ Then the response shape is HTTP 422 with `code: "VERSION_NOT_PUBLISHED"` (establ
 ## Tasks / Subtasks
 
 - [x] Task 1: EF Core — add at-most-one-Published partial unique index
-  - [x] Add filtered index to `FormForgeDbContext.OnModelCreating()` under `ComponentSchemaVersion` entity: `.HasIndex(v => v.DesignerId).HasFilter("(status = 'Published')").IsUnique().HasDatabaseName("uq_one_published_per_designer")`
-  - [x] Generate migration: `dotnet ef migrations add AddPublishedVersionUniqueIndex -p src/FormForge.Api -s src/FormForge.Api`
+  - [x] Add filtered index to `AppForgeDbContext.OnModelCreating()` under `ComponentSchemaVersion` entity: `.HasIndex(v => v.DesignerId).HasFilter("(status = 'Published')").IsUnique().HasDatabaseName("uq_one_published_per_designer")`
+  - [x] Generate migration: `dotnet ef migrations add AddPublishedVersionUniqueIndex -p src/AppForge.Api -s src/AppForge.Api`
   - [x] Verify generated migration SQL is `CREATE UNIQUE INDEX uq_one_published_per_designer ON component_schema_versions (designer_id) WHERE (status = 'Published')`
 
 - [x] Task 2: Domain event declaration
-  - [x] Add `internal sealed record SchemaPublished(string DesignerId, int Version);` to `src/FormForge.Api/Infrastructure/EventBus/IDomainEventBus.cs` (co-located with existing event records)
+  - [x] Add `internal sealed record SchemaPublished(string DesignerId, int Version);` to `src/AppForge.Api/Infrastructure/EventBus/IDomainEventBus.cs` (co-located with existing event records)
 
 - [x] Task 3: DTO + Validator
-  - [x] Create `src/FormForge.Api/Features/Designer/Dtos/UpdateVersionStatusRequest.cs` — single `string Status` property
-  - [x] Create `src/FormForge.Api/Features/Designer/Validators/UpdateVersionStatusRequestValidator.cs` — reject empty status and any value not in `["Published", "Archived"]`; `WithMessage("Status must be 'Published' or 'Archived'.")`
+  - [x] Create `src/AppForge.Api/Features/Designer/Dtos/UpdateVersionStatusRequest.cs` — single `string Status` property
+  - [x] Create `src/AppForge.Api/Features/Designer/Validators/UpdateVersionStatusRequestValidator.cs` — reject empty status and any value not in `["Published", "Archived"]`; `WithMessage("Status must be 'Published' or 'Archived'.")`
 
 - [x] Task 4: Service layer — outcome types + implementation
   - [x] Add `UpdateVersionStatusOutcome` enum and `UpdateVersionStatusResult` record to `DesignerService.cs`
-  - [x] Inject `IDomainEventBus` into `DesignerService` constructor (alongside existing `FormForgeDbContext db`)
+  - [x] Inject `IDomainEventBus` into `DesignerService` constructor (alongside existing `AppForgeDbContext db`)
   - [x] Add `UpdateVersionStatusAsync` to `IDesignerService` interface
   - [x] Implement `UpdateVersionStatusAsync` in `DesignerService` (see Dev Notes for algorithm)
 
@@ -128,7 +128,7 @@ Then the response shape is HTTP 422 with `code: "VERSION_NOT_PUBLISHED"` (establ
 
 ### At-Most-One-Published Invariant — Partial Unique Index
 
-The DB must enforce the "at most one Published version per Designer" invariant to prevent concurrent publishes from violating it. Add a **filtered unique index** in `FormForgeDbContext.OnModelCreating()` inside the `ComponentSchemaVersion` entity block:
+The DB must enforce the "at most one Published version per Designer" invariant to prevent concurrent publishes from violating it. Add a **filtered unique index** in `AppForgeDbContext.OnModelCreating()` inside the `ComponentSchemaVersion` entity block:
 
 ```csharp
 // In the ComponentSchemaVersion entity configuration block (line ~131-153):
@@ -140,7 +140,7 @@ e.HasIndex(v => v.DesignerId)
 
 After adding this, run:
 ```
-dotnet ef migrations add AddPublishedVersionUniqueIndex -p src/FormForge.Api -s src/FormForge.Api
+dotnet ef migrations add AddPublishedVersionUniqueIndex -p src/AppForge.Api -s src/AppForge.Api
 ```
 
 The generated Up method should emit something like:
@@ -170,7 +170,7 @@ The schema registry (Story 5.x) will subscribe to this event to evict its cache 
 Add `IDomainEventBus` dependency:
 
 ```csharp
-internal sealed class DesignerService(FormForgeDbContext db, IDomainEventBus eventBus) : IDesignerService
+internal sealed class DesignerService(AppForgeDbContext db, IDomainEventBus eventBus) : IDesignerService
 ```
 
 `DesignerService` is registered as `Scoped`; `IDomainEventBus` (`InProcessEventBus`) is `Singleton`. This is a legal dependency — Scoped can take Singleton. No `Program.cs` change needed for the bus itself; it's already registered.
@@ -288,8 +288,8 @@ public async Task<UpdateVersionStatusResult> UpdateVersionStatusAsync(
 ### UpdateVersionStatusRequest DTO
 
 ```csharp
-// src/FormForge.Api/Features/Designer/Dtos/UpdateVersionStatusRequest.cs
-namespace FormForge.Api.Features.Designer.Dtos;
+// src/AppForge.Api/Features/Designer/Dtos/UpdateVersionStatusRequest.cs
+namespace AppForge.Api.Features.Designer.Dtos;
 
 internal sealed record UpdateVersionStatusRequest(string Status);
 ```
@@ -297,11 +297,11 @@ internal sealed record UpdateVersionStatusRequest(string Status);
 ### UpdateVersionStatusRequestValidator
 
 ```csharp
-// src/FormForge.Api/Features/Designer/Validators/UpdateVersionStatusRequestValidator.cs
+// src/AppForge.Api/Features/Designer/Validators/UpdateVersionStatusRequestValidator.cs
 using FluentValidation;
-using FormForge.Api.Features.Designer.Dtos;
+using AppForge.Api.Features.Designer.Dtos;
 
-namespace FormForge.Api.Features.Designer.Validators;
+namespace AppForge.Api.Features.Designer.Validators;
 
 internal sealed class UpdateVersionStatusRequestValidator : AbstractValidator<UpdateVersionStatusRequest>
 {
@@ -629,19 +629,19 @@ From Story 3.6:
 ### Project Structure — Files Changed
 
 **Backend — new**
-- `src/FormForge.Api/Features/Designer/Dtos/UpdateVersionStatusRequest.cs`
-- `src/FormForge.Api/Features/Designer/Validators/UpdateVersionStatusRequestValidator.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/[timestamp]_AddPublishedVersionUniqueIndex.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/[timestamp]_AddPublishedVersionUniqueIndex.Designer.cs`
+- `src/AppForge.Api/Features/Designer/Dtos/UpdateVersionStatusRequest.cs`
+- `src/AppForge.Api/Features/Designer/Validators/UpdateVersionStatusRequestValidator.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/[timestamp]_AddPublishedVersionUniqueIndex.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/[timestamp]_AddPublishedVersionUniqueIndex.Designer.cs`
 
 **Backend — modified**
-- `src/FormForge.Api/Infrastructure/EventBus/IDomainEventBus.cs` (add `SchemaPublished` record)
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` (add filtered index to ComponentSchemaVersion entity)
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` (auto-updated by EF CLI)
-- `src/FormForge.Api/Features/Designer/DesignerService.cs` (add `IDomainEventBus` dep, new outcome/result types, new service method)
-- `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs` (add route, handler, new problem helpers; make `VersionNotPublishedProblem` internal)
-- `src/FormForge.Api/Program.cs` (add `IValidator<UpdateVersionStatusRequest>` registration)
-- `src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` (10 new tests, extend `DesignerResponseDto` with `PublishedAt`, add 2 new helpers)
+- `src/AppForge.Api/Infrastructure/EventBus/IDomainEventBus.cs` (add `SchemaPublished` record)
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` (add filtered index to ComponentSchemaVersion entity)
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` (auto-updated by EF CLI)
+- `src/AppForge.Api/Features/Designer/DesignerService.cs` (add `IDomainEventBus` dep, new outcome/result types, new service method)
+- `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs` (add route, handler, new problem helpers; make `VersionNotPublishedProblem` internal)
+- `src/AppForge.Api/Program.cs` (add `IValidator<UpdateVersionStatusRequest>` registration)
+- `src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` (10 new tests, extend `DesignerResponseDto` with `PublishedAt`, add 2 new helpers)
 
 **Frontend — modified**
 - `web/src/features/designer/designerApi.ts` (fix `publishVersion` + `archiveVersion` stubs)
@@ -702,20 +702,20 @@ From Story 3.6:
 ### File List
 
 **Backend — new**
-- `src/FormForge.Api/Features/Designer/Dtos/UpdateVersionStatusRequest.cs`
-- `src/FormForge.Api/Features/Designer/Validators/UpdateVersionStatusRequestValidator.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260523235900_AddPublishedVersionUniqueIndex.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260523235900_AddPublishedVersionUniqueIndex.Designer.cs`
+- `src/AppForge.Api/Features/Designer/Dtos/UpdateVersionStatusRequest.cs`
+- `src/AppForge.Api/Features/Designer/Validators/UpdateVersionStatusRequestValidator.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260523235900_AddPublishedVersionUniqueIndex.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260523235900_AddPublishedVersionUniqueIndex.Designer.cs`
 
 **Backend — modified**
-- `src/FormForge.Api/Infrastructure/EventBus/IDomainEventBus.cs` (added `SchemaPublished` record)
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` (filtered unique index + named-index overload for the existing non-unique index)
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` (EF auto-updated for the new index)
-- `src/FormForge.Api/Features/Designer/DesignerService.cs` (added IDomainEventBus dep, UpdateVersionStatusOutcome/Result, UpdateVersionStatusAsync with two-phase commit, top-level PublishedAt in ToResponse)
-- `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs` (added PUT /status route, UpdateVersionStatusHandler, VersionNotFoundProblem/PublishConflictProblem/VersionNotPublishedProblem helpers)
-- `src/FormForge.Api/Features/Designer/Dtos/DesignerResponse.cs` (added top-level `PublishedAt`)
-- `src/FormForge.Api/Program.cs` (registered `IValidator<UpdateVersionStatusRequest>`)
-- `src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` (10 new tests; PutVersionStatusAsync/CreateVersionViaApiAsync helpers; PublishedAt on DesignerResponseDto)
+- `src/AppForge.Api/Infrastructure/EventBus/IDomainEventBus.cs` (added `SchemaPublished` record)
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` (filtered unique index + named-index overload for the existing non-unique index)
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` (EF auto-updated for the new index)
+- `src/AppForge.Api/Features/Designer/DesignerService.cs` (added IDomainEventBus dep, UpdateVersionStatusOutcome/Result, UpdateVersionStatusAsync with two-phase commit, top-level PublishedAt in ToResponse)
+- `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs` (added PUT /status route, UpdateVersionStatusHandler, VersionNotFoundProblem/PublishConflictProblem/VersionNotPublishedProblem helpers)
+- `src/AppForge.Api/Features/Designer/Dtos/DesignerResponse.cs` (added top-level `PublishedAt`)
+- `src/AppForge.Api/Program.cs` (registered `IValidator<UpdateVersionStatusRequest>`)
+- `src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` (10 new tests; PutVersionStatusAsync/CreateVersionViaApiAsync helpers; PublishedAt on DesignerResponseDto)
 
 **Frontend — modified**
 - `web/src/features/designer/designerApi.ts` (publishVersion/archiveVersion now PUT /status, return ComponentSchemaDto)
@@ -738,16 +738,16 @@ From Story 3.6:
 
 **Patches** (unambiguous fixes):
 
-- [x] [Review][Patch] **Add SchemaPublished event-firing tests (AC-1, AR-7)** [src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs] — AR-7 / AC-1's most architecturally important side-effect is untested. Register a recording `IDomainEventBus` fake in the test fixture; assert `SchemaPublished(designerId, version)` is published on (i) Draft→Published, (ii) Archived→Published, and that no event fires on AC-4 same-status no-op.
+- [x] [Review][Patch] **Add SchemaPublished event-firing tests (AC-1, AR-7)** [src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs] — AR-7 / AC-1's most architecturally important side-effect is untested. Register a recording `IDomainEventBus` fake in the test fixture; assert `SchemaPublished(designerId, version)` is published on (i) Draft→Published, (ii) Archived→Published, and that no event fires on AC-4 same-status no-op.
 - [x] [Review][Patch] **Wire `publishMutation.onError` / `archiveMutation.onError` to surface backend `messageKey`** [web/src/routes/_app/designer.library.tsx] — both mutations swallow 409 `PUBLISH_CONFLICT`, 404 `VERSION_NOT_FOUND`, and 422s into `t('errors.genericError')`. The `designers.publishConflict` / `designers.versionNotFound` keys are added to en.json but never read. Reuse the Story 3.6 `ApiError.messageKey` decoder pattern.
-- [x] [Review][Patch] **Add DB `CHECK` constraint pinning status casing** [src/FormForge.Api/Infrastructure/Persistence/Migrations/20260523235900_AddPublishedVersionUniqueIndex.cs] — partial unique index filter `(status = 'Published')` is case-sensitive; in-memory demote `string.Equals(v.Status, "Published", Ordinal)` is also case-sensitive. A lower-case `"published"` row (manual SQL, future enum-serializer change, import) silently bypasses both, violating FR-13. Add `CHECK (status IN ('Draft','Published','Archived'))` in the same migration's Up; drop in Down.
-- [x] [Review][Patch] **Add AC-2 Draft → Archived integration test** [src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs] — AC-2 precondition is "Published OR Draft", but the only Archive test covers Published→Archived. Add `ArchiveVersion_DraftVersion_Returns200WithArchivedStatus`.
-- [x] [Review][Patch] **AC-5 handler pre-check + strengthened test assertion (resolves D1)** [src/FormForge.Api/Features/Designer/DesignerEndpoints.cs + DesignerIntegrationTests.cs:763-773] — add `StatusInvalidProblem()` helper returning 422 with `code: "STATUS_INVALID"`, `messageKey: "designers.statusInvalid"`. In `UpdateVersionStatusHandler`, after `ArgumentNullException.ThrowIfNull(request)` and before calling the service, if `request.Status == "Draft"`, return `StatusInvalidProblem()`. Strengthen the Draft test to assert `code == "STATUS_INVALID"` (parsed from the RFC 7807 envelope). Add `designers.statusInvalid` to `en.json`. Unknown statuses ("foo") still go through the validator and return `VALIDATION_FAILED` — that test stays as-is.
-- [x] [Review][Patch] **Add unauthenticated 401 test** [src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs] — `PutVersionStatusAsync` has a `token.Length > 0` branch but no test exercises the empty-token path. Add `UpdateVersionStatus_Unauthenticated_Returns401`. Validates auth-pipeline regression detection.
-- [x] [Review][Patch] **AC-4 no-write verification** [src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs:833-848] — `PublishVersion_AlreadyPublished_Returns200NoWrite` only asserts 200 + status. Snapshot the version row's `UpdatedAt` (or schema's `UpdatedAt`) before the second PUT, assert unchanged after. Event-no-fire assertion piggybacks on the SchemaPublished fake added in the first patch.
-- [x] [Review][Patch] **AC-1 auto-demote test should assert `v1.PublishedAt` preserved (resolves D3)** [src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs:86] — `PublishVersion_ExistingPublishedPresent_AutoDemotesOldToArchived` checks `v1Body.Status == "Archived"` but never inspects `PublishedAt`. Per D3 (preserve-on-Archive), assert `v1Body.PublishedAt != null` to pin that the demote loop preserves history.
+- [x] [Review][Patch] **Add DB `CHECK` constraint pinning status casing** [src/AppForge.Api/Infrastructure/Persistence/Migrations/20260523235900_AddPublishedVersionUniqueIndex.cs] — partial unique index filter `(status = 'Published')` is case-sensitive; in-memory demote `string.Equals(v.Status, "Published", Ordinal)` is also case-sensitive. A lower-case `"published"` row (manual SQL, future enum-serializer change, import) silently bypasses both, violating FR-13. Add `CHECK (status IN ('Draft','Published','Archived'))` in the same migration's Up; drop in Down.
+- [x] [Review][Patch] **Add AC-2 Draft → Archived integration test** [src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs] — AC-2 precondition is "Published OR Draft", but the only Archive test covers Published→Archived. Add `ArchiveVersion_DraftVersion_Returns200WithArchivedStatus`.
+- [x] [Review][Patch] **AC-5 handler pre-check + strengthened test assertion (resolves D1)** [src/AppForge.Api/Features/Designer/DesignerEndpoints.cs + DesignerIntegrationTests.cs:763-773] — add `StatusInvalidProblem()` helper returning 422 with `code: "STATUS_INVALID"`, `messageKey: "designers.statusInvalid"`. In `UpdateVersionStatusHandler`, after `ArgumentNullException.ThrowIfNull(request)` and before calling the service, if `request.Status == "Draft"`, return `StatusInvalidProblem()`. Strengthen the Draft test to assert `code == "STATUS_INVALID"` (parsed from the RFC 7807 envelope). Add `designers.statusInvalid` to `en.json`. Unknown statuses ("foo") still go through the validator and return `VALIDATION_FAILED` — that test stays as-is.
+- [x] [Review][Patch] **Add unauthenticated 401 test** [src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs] — `PutVersionStatusAsync` has a `token.Length > 0` branch but no test exercises the empty-token path. Add `UpdateVersionStatus_Unauthenticated_Returns401`. Validates auth-pipeline regression detection.
+- [x] [Review][Patch] **AC-4 no-write verification** [src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs:833-848] — `PublishVersion_AlreadyPublished_Returns200NoWrite` only asserts 200 + status. Snapshot the version row's `UpdatedAt` (or schema's `UpdatedAt`) before the second PUT, assert unchanged after. Event-no-fire assertion piggybacks on the SchemaPublished fake added in the first patch.
+- [x] [Review][Patch] **AC-1 auto-demote test should assert `v1.PublishedAt` preserved (resolves D3)** [src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs:86] — `PublishVersion_ExistingPublishedPresent_AutoDemotesOldToArchived` checks `v1Body.Status == "Archived"` but never inspects `PublishedAt`. Per D3 (preserve-on-Archive), assert `v1Body.PublishedAt != null` to pin that the demote loop preserves history.
 - [x] [Review][Patch] **Show `Publish v{row.latestVersion}` in row-menu button label (resolves D2)** [web/src/routes/_app/designer.library.tsx] — makes which version is about to be published visible to the user, narrowing the stale-data UX gap. Also add `designer.library.publishVersionLabel` i18n key (e.g., `"Publish v{{version}}"`) for the formatted string.
-- [x] [Review][Patch] **Document `PublishedAt` semantics on `DesignerResponse` + `ComponentSchemaDto` (supports D3)** [src/FormForge.Api/Features/Designer/Dtos/DesignerResponse.cs + web/src/types/designer.ts] — XML doc / TSDoc comment on the `PublishedAt` field: "Timestamp of the most recent publish for this designer's currently-Published version, or for an Archived version, when it was last published. Filter `status == 'Published'` to identify the currently-published version; do not infer it from `PublishedAt != null`."
+- [x] [Review][Patch] **Document `PublishedAt` semantics on `DesignerResponse` + `ComponentSchemaDto` (supports D3)** [src/AppForge.Api/Features/Designer/Dtos/DesignerResponse.cs + web/src/types/designer.ts] — XML doc / TSDoc comment on the `PublishedAt` field: "Timestamp of the most recent publish for this designer's currently-Published version, or for an Archived version, when it was last published. Filter `status == 'Published'` to identify the currently-published version; do not infer it from `PublishedAt != null`."
 
 **Deferred** (real, not blocking this story):
 

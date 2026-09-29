@@ -60,7 +60,7 @@ So that I can view a complete entry.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Extend `DynamicQueryBuilder.cs`** (AC: 1, 4, 5, 7)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
   - **Change `AppendSelectColumns` from `private static` to `internal static`** — allows `BuildGetByIdQuery` and `BuildGetChildrenQuery` to call it without duplicating the column-list logic. No behavioral change.
   - **Add `BuildFkColumnName(string parentTableName)` → `string`**:
     ```csharp
@@ -87,7 +87,7 @@ So that I can view a complete entry.
     - `parameters.Add("p_parent_id", parentId)`
 
 - [x] **Task 2 — Implement `GET /{id:guid}` handler in `DynamicDataEndpoints.cs`** (AC: 1–8)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
   - Register the route inside `MapDynamicDataEndpoints`, after the existing `MapGet("/", ...)`:
     ```csharp
     group.MapGet("/{id:guid}", GetRecordHandler)
@@ -102,7 +102,7 @@ So that I can view a complete entry.
     internal static async Task<IResult> GetRecordHandler(
         string designerId,
         Guid id,
-        FormForgeDbContext db,
+        AppForgeDbContext db,
         ISchemaRegistry schemaRegistry,
         DbConnectionFactory connectionFactory,
         CancellationToken ct,
@@ -193,7 +193,7 @@ So that I can view a complete entry.
   - **Rate limiting**: inherited from the group (`RequireRateLimiting("data-read")`). Do NOT add `.RequireRateLimiting(...)` to the individual handler.
 
 - [x] **Task 3 — Unit tests for new query builder methods** (AC: 1, 4, 7)
-  - [x] Modify `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
+  - [x] Modify `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
   - Add to the existing test class:
     - `BuildGetByIdQuery_GeneratesSelectWhereId` — verify SELECT list contains system + user columns, FROM clause, `WHERE "id" = @p_id`, no ORDER BY or LIMIT/OFFSET
     - `BuildGetByIdQuery_ParameterContainsId` — verify `parameters.Get<Guid>("p_id")` equals the supplied Guid
@@ -203,7 +203,7 @@ So that I can view a complete entry.
   - Estimated: +5 unit tests → running total ~439
 
 - [x] **Task 4 — Integration tests** (AC: 1–8)
-  - [x] Create `src/FormForge.Api.Tests/Features/DynamicCrud/GetRecordIntegrationTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/DynamicCrud/GetRecordIntegrationTests.cs`
   - Class signature: `[Collection("DynamicCrudTests")] public sealed class GetRecordIntegrationTests : IClassFixture<PostgresFixture>, IAsyncLifetime`
   - Also add `[Collection("DynamicCrudTests")]` to `DynamicCrudIntegrationTests` — prevents parallel execution between the two test classes against overlapping containers
   - Same `InitializeAsync`/`DisposeAsync` pattern as `DynamicCrudIntegrationTests` (TRUNCATE → drop dynamic tables → seed roles → seed users → create `_client`)
@@ -277,7 +277,7 @@ So that I can view a complete entry.
 
 ### Review Findings
 
-- [x] [Review][Decision → Patch] `"children"` fieldKey collision — reserved `children` in `PgReservedKeywords.cs` (FormForge system section) so `FieldKeyValidator` rejects it at schema-save time, preventing the response-dict overwrite. `PgReservedKeywords.cs` updated with explanatory comment.
+- [x] [Review][Decision → Patch] `"children"` fieldKey collision — reserved `children` in `PgReservedKeywords.cs` (AppForge system section) so `FieldKeyValidator` rejects it at schema-save time, preventing the response-dict overwrite. `PgReservedKeywords.cs` updated with explanatory comment.
 
 - [x] [Review][Patch] Child schema query lacks `Status = "Published"` filter — added `&& v.Status == "Published"` to the child EF query in `GetRecordHandler` so unpublished drafts are never selected as the child schema [`DynamicDataEndpoints.cs`:child schema EF query]
 
@@ -354,7 +354,7 @@ Changing `private static` to `internal static` only widens accessibility within 
 
 | New file | Path |
 |---|---|
-| `GetRecordIntegrationTests.cs` | `src/FormForge.Api.Tests/Features/DynamicCrud/GetRecordIntegrationTests.cs` |
+| `GetRecordIntegrationTests.cs` | `src/AppForge.Api.Tests/Features/DynamicCrud/GetRecordIntegrationTests.cs` |
 | `recordApi.ts` | `web/src/features/data-entry/recordApi.ts` |
 | `useRecord.ts` | `web/src/features/data-entry/useRecord.ts` |
 
@@ -426,15 +426,15 @@ private async Task<Guid> InsertRowAsync(string tableName, string title, bool isD
 
 ### References
 
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`] — existing `ListRecordsHandler` — mirror for `GetRecordHandler`; reuse `Problems` inner class; add `RecordNotFound`
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`] — add new methods; make `AppendSelectColumns` internal
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicRecord.cs`] — `DynamicRecord(IReadOnlyDictionary<string, object?> values)`; `DynamicRecordJsonConverter` applies recursively to nested DynamicRecords via `JsonSerializer.Serialize`
-- [Source: `src/FormForge.Api/Features/SchemaRegistry/SchemaRegistryEntry.cs`] — `ChildRepeaterDesignerIds: IReadOnlyList<string>` — the list of child Repeater table designer IDs
-- [Source: `src/FormForge.Api/Features/SchemaRegistry/RootElementParser.cs`] — `ParseFull(string? rootElementJson)` → `(Columns, ChildRepeaterIds)` — reuse for child schema parsing
-- [Source: `src/FormForge.Api/Features/Designer/SafeIdentifier.cs`] — validate both `designerId` (route) and each child designer ID from the schema registry
-- [Source: `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs:BuildFkColumnName`] — `$"parent_{parentTableName[..Math.Min(parentTableName.Length, 53)]}_id"` — **must match exactly**
-- [Source: `src/FormForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs`] — `CreateOpenConnectionAsync(CancellationToken)` — open once, reuse for all Dapper calls
-- [Source: `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs`] — copy all helper methods and DTOs into `GetRecordIntegrationTests`; add `[Collection("DynamicCrudTests")]` to the existing class
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`] — existing `ListRecordsHandler` — mirror for `GetRecordHandler`; reuse `Problems` inner class; add `RecordNotFound`
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`] — add new methods; make `AppendSelectColumns` internal
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicRecord.cs`] — `DynamicRecord(IReadOnlyDictionary<string, object?> values)`; `DynamicRecordJsonConverter` applies recursively to nested DynamicRecords via `JsonSerializer.Serialize`
+- [Source: `src/AppForge.Api/Features/SchemaRegistry/SchemaRegistryEntry.cs`] — `ChildRepeaterDesignerIds: IReadOnlyList<string>` — the list of child Repeater table designer IDs
+- [Source: `src/AppForge.Api/Features/SchemaRegistry/RootElementParser.cs`] — `ParseFull(string? rootElementJson)` → `(Columns, ChildRepeaterIds)` — reuse for child schema parsing
+- [Source: `src/AppForge.Api/Features/Designer/SafeIdentifier.cs`] — validate both `designerId` (route) and each child designer ID from the schema registry
+- [Source: `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs:BuildFkColumnName`] — `$"parent_{parentTableName[..Math.Min(parentTableName.Length, 53)]}_id"` — **must match exactly**
+- [Source: `src/AppForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs`] — `CreateOpenConnectionAsync(CancellationToken)` — open once, reuse for all Dapper calls
+- [Source: `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs`] — copy all helper methods and DTOs into `GetRecordIntegrationTests`; add `[Collection("DynamicCrudTests")]` to the existing class
 - [Source: `web/src/features/data-entry/recordListApi.ts`] — import `DynamicRecord` from here; do NOT duplicate the interface
 - [Architecture: AR-46 Option C] — system columns camelCase, user fieldKeys verbatim; `DynamicRecordJsonConverter` handles nested child records automatically
 - [Architecture: AR-4] — `SafeIdentifier` mandatory for every dynamic SQL identifier (parent designerId + each child designerId)
@@ -478,15 +478,15 @@ Opus 4.7 (1M context) — `claude-opus-4-7[1m]`
 ### File List
 
 **New files:**
-- `src/FormForge.Api.Tests/Features/DynamicCrud/GetRecordIntegrationTests.cs`
+- `src/AppForge.Api.Tests/Features/DynamicCrud/GetRecordIntegrationTests.cs`
 - `web/src/features/data-entry/recordApi.ts`
 - `web/src/features/data-entry/useRecord.ts`
 
 **Modified files:**
-- `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
-- `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
-- `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
-- `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs`
+- `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
+- `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
+- `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
+- `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs`
 
 ## Change Log
 

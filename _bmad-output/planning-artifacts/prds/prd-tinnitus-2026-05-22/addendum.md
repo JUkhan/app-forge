@@ -1,4 +1,4 @@
-# Addendum — FormForge
+# Addendum — AppForge
 
 *Technical depth, existing asset details, and options-considered content that belongs in downstream documents (architecture, solution design) rather than the PRD itself.*
 
@@ -181,5 +181,5 @@ The PRD defers backup strategy to the operational runbook. Recommendations for t
 
 **Tenant identification — JWT claim (chosen) vs. subdomain (deferred):**
 - JWT claim: one application origin serves all tenants; no DNS wildcard/cert provisioning, no per-tenant CORS origin management. Simpler for this phase's admin-provisioned-only onboarding model.
-- Subdomain (e.g. `acme.formforge.app`): more "enterprise SaaS" feel, supports pre-login tenant branding, but adds DNS/cert infrastructure and per-tenant CORS handling that isn't justified without a self-service signup flow to route.
+- Subdomain (e.g. `acme.appforge.app`): more "enterprise SaaS" feel, supports pre-login tenant branding, but adds DNS/cert infrastructure and per-tenant CORS handling that isn't justified without a self-service signup flow to route.
 - Revisit subdomain routing if/when self-service signup (currently a non-goal, §5) is prioritized.

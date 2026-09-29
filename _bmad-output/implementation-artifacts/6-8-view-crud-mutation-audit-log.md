@@ -53,10 +53,10 @@ so that I have full traceability of who changed data and when.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Create `MutationAuditEntryDto.cs`** (AC: 1)
-  - [x] Create `src/FormForge.Api/Features/Audit/Dtos/MutationAuditEntryDto.cs`
+  - [x] Create `src/AppForge.Api/Features/Audit/Dtos/MutationAuditEntryDto.cs`
 
   ```csharp
-  namespace FormForge.Api.Features.Audit.Dtos;
+  namespace AppForge.Api.Features.Audit.Dtos;
 
   // Story 6.8 — paginated mutation audit log row shape. Mirrors SchemaAuditEntryDto
   // but for CRUD operations. previousValues/newValues are JSONB string snapshots —
@@ -75,7 +75,7 @@ so that I have full traceability of who changed data and when.
   ```
 
 - [x] **Task 2 — Extend `AuditService.cs`** (AC: 1, 3, 4, 5)
-  - [x] Modify `src/FormForge.Api/Features/Audit/AuditService.cs`
+  - [x] Modify `src/AppForge.Api/Features/Audit/AuditService.cs`
   - Add `GetMutationAuditLogAsync` after the existing `GetSchemaAuditLogAsync` method:
 
   ```csharp
@@ -138,12 +138,12 @@ so that I have full traceability of who changed data and when.
 
   **Add the missing using** at the top of `AuditService.cs`:
   ```csharp
-  // Already present: using FormForge.Api.Features.Audit.Dtos;
+  // Already present: using AppForge.Api.Features.Audit.Dtos;
   // No new using needed — MutationAuditEntryDto is in the same Dtos namespace.
   ```
 
 - [x] **Task 3 — Extend `AuditEndpoints.cs`** (AC: 1, 3, 4, 5, 6)
-  - [x] Modify `src/FormForge.Api/Features/Audit/AuditEndpoints.cs`
+  - [x] Modify `src/AppForge.Api/Features/Audit/AuditEndpoints.cs`
   - Add `GetMutationAuditLogHandler` after `GetSchemaAuditLogHandler`:
 
   ```csharp
@@ -177,14 +177,14 @@ so that I have full traceability of who changed data and when.
   ```
 
 - [x] **Task 4 — Create `DataAdminEndpoints.cs`** (AC: 1, 2, 6)
-  - [x] Create `src/FormForge.Api/Features/DynamicCrud/DataAdminEndpoints.cs`
+  - [x] Create `src/AppForge.Api/Features/DynamicCrud/DataAdminEndpoints.cs`
 
   ```csharp
-  using FormForge.Api.Common;
-  using FormForge.Api.Features.Audit;
-  using FormForge.Api.Features.Audit.Dtos;
+  using AppForge.Api.Common;
+  using AppForge.Api.Features.Audit;
+  using AppForge.Api.Features.Audit.Dtos;
 
-  namespace FormForge.Api.Features.DynamicCrud;
+  namespace AppForge.Api.Features.DynamicCrud;
 
   // Story 6.8 — admin read-only endpoints for dynamic data tables.
   // Mounted under /api/admin/data (RequirePlatformAdmin + "admin" rate limit
@@ -207,11 +207,11 @@ so that I have full traceability of who changed data and when.
   ```
 
 - [x] **Task 5 — Update `AdminEndpoints.cs`** (AC: 1, 6)
-  - [x] Modify `src/FormForge.Api/Features/Roles/AdminEndpoints.cs`
+  - [x] Modify `src/AppForge.Api/Features/Roles/AdminEndpoints.cs`
   - Add the `/data` group and required using:
 
   ```csharp
-  using FormForge.Api.Features.DynamicCrud;  // add this
+  using AppForge.Api.Features.DynamicCrud;  // add this
   // ...existing usings...
 
   internal static RouteGroupBuilder MapAdminEndpoints(this RouteGroupBuilder group)
@@ -228,7 +228,7 @@ so that I have full traceability of who changed data and when.
   ```
 
 - [x] **Task 6 — Integration tests** (AC: 1–6)
-  - [x] Create `src/FormForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs`
   - Class pattern: same as `SchemaAuditLogIntegrationTests` — `IClassFixture<PostgresFixture>`, `IAsyncLifetime`
   - **InitializeAsync**: TRUNCATE `mutation_audit_log` and all static tables; drop dynamic tables loop; `ReseedSystemRolesAsync` + `SeedTestUsersAsync`
   - **DO NOT** use `[Collection("DynamicCrudTests")]` — this test class only touches `mutation_audit_log` via direct EF inserts, not dynamic tables. It should be isolated from the DynamicCrud test collection. Use no `[Collection]` attribute (runs independently).
@@ -284,7 +284,7 @@ so that I have full traceability of who changed data and when.
       string? newValues = null, string? previousValues = null)
   {
       using var scope = _factory!.Services.CreateScope();
-      var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+      var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
       db.MutationAuditLog.Add(new MutationAuditLogEntry
       {
           DesignerId    = designerId,
@@ -506,7 +506,7 @@ Do NOT add another `services.AddScoped<AuditService>()` in `Program.cs`. The ser
 ### §4 — Route registration path: `AdminEndpoints.cs` is in `Features/Roles/`
 
 This is unintuitive but correct — `AdminEndpoints.cs` is the top-level admin dispatcher in `Features/Roles/`. When adding the `/data` group:
-1. Add `using FormForge.Api.Features.DynamicCrud;` at the top of `AdminEndpoints.cs`
+1. Add `using AppForge.Api.Features.DynamicCrud;` at the top of `AdminEndpoints.cs`
 2. Add `group.MapGroup("/data").WithTags("Admin — Data").MapDataAdminEndpoints();`
 
 `DataAdminEndpoints.cs` should be in `Features/DynamicCrud/` (same feature as the existing CRUD handlers) but the registration call is in `Features/Roles/AdminEndpoints.cs`.
@@ -563,9 +563,9 @@ The route file `routes/_app/admin/data.$designerId.audit.tsx` follows TanStack R
 **New files:**
 | File | Path |
 |---|---|
-| `MutationAuditEntryDto.cs` | `src/FormForge.Api/Features/Audit/Dtos/MutationAuditEntryDto.cs` |
-| `DataAdminEndpoints.cs` | `src/FormForge.Api/Features/DynamicCrud/DataAdminEndpoints.cs` |
-| `MutationAuditLogIntegrationTests.cs` | `src/FormForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs` |
+| `MutationAuditEntryDto.cs` | `src/AppForge.Api/Features/Audit/Dtos/MutationAuditEntryDto.cs` |
+| `DataAdminEndpoints.cs` | `src/AppForge.Api/Features/DynamicCrud/DataAdminEndpoints.cs` |
+| `MutationAuditLogIntegrationTests.cs` | `src/AppForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs` |
 | `mutationAuditApi.ts` | `web/src/features/admin/data/mutationAuditApi.ts` |
 | `useMutationAuditLogQuery.ts` | `web/src/features/admin/data/useMutationAuditLogQuery.ts` |
 | `MutationAuditLogView.tsx` | `web/src/features/admin/data/MutationAuditLogView.tsx` |
@@ -578,7 +578,7 @@ The route file `routes/_app/admin/data.$designerId.audit.tsx` follows TanStack R
 | `AuditEndpoints.cs` | Add `GetMutationAuditLogHandler` |
 | `AdminEndpoints.cs` | Add `/data` group + `using` statement |
 
-**No changes to:** `Program.cs` (no new DI registration), `FormForgeDbContext.cs` (EF mapping already exists), any EF migration files, `DynamicQueryBuilder.cs`, `DynamicDataEndpoints.cs`.
+**No changes to:** `Program.cs` (no new DI registration), `AppForgeDbContext.cs` (EF mapping already exists), any EF migration files, `DynamicQueryBuilder.cs`, `DynamicDataEndpoints.cs`.
 
 ---
 
@@ -640,18 +640,18 @@ Claude Opus 4.7 (claude-opus-4-7[1m])
 ### File List
 
 **New files:**
-- `src/FormForge.Api/Features/Audit/Dtos/MutationAuditEntryDto.cs`
-- `src/FormForge.Api/Features/DynamicCrud/DataAdminEndpoints.cs`
-- `src/FormForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs`
+- `src/AppForge.Api/Features/Audit/Dtos/MutationAuditEntryDto.cs`
+- `src/AppForge.Api/Features/DynamicCrud/DataAdminEndpoints.cs`
+- `src/AppForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs`
 - `web/src/features/admin/data/mutationAuditApi.ts`
 - `web/src/features/admin/data/useMutationAuditLogQuery.ts`
 - `web/src/features/admin/data/MutationAuditLogView.tsx`
 - `web/src/routes/_app/admin/data.$designerId.audit.tsx`
 
 **Modified files:**
-- `src/FormForge.Api/Features/Audit/AuditService.cs` — added `GetMutationAuditLogAsync`
-- `src/FormForge.Api/Features/Audit/AuditEndpoints.cs` — added `GetMutationAuditLogHandler`
-- `src/FormForge.Api/Features/Roles/AdminEndpoints.cs` — added `/data` group registration + `using FormForge.Api.Features.DynamicCrud;`
+- `src/AppForge.Api/Features/Audit/AuditService.cs` — added `GetMutationAuditLogAsync`
+- `src/AppForge.Api/Features/Audit/AuditEndpoints.cs` — added `GetMutationAuditLogHandler`
+- `src/AppForge.Api/Features/Roles/AdminEndpoints.cs` — added `/data` group registration + `using AppForge.Api.Features.DynamicCrud;`
 - `web/src/lib/i18n/locales/en.json` — added `admin.data.audit.*` translation namespace
 - `web/src/routeTree.gen.ts` — auto-regenerated by `vite build` after new route file was added
 
@@ -661,17 +661,17 @@ Claude Opus 4.7 (claude-opus-4-7[1m])
 
 ### Review Findings
 
-- [x] [Review][Patch] AC-5 clamping paths untested — no test passes `page=0` or `pageSize=101` to verify the clamped values appear in the response envelope [`src/FormForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs`]
-- [x] [Review][Patch] AC-1: null actorId → actorName=null branch untested — `InsertMutationAuditRowAsync` always receives a non-null actorId; add a test inserting a row with `ActorId = null` and asserting `actorName == null` in the response [`src/FormForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs`]
-- [x] [Review][Patch] AC-1: deleted-actor → actorName=null branch untested — no test seeds a row whose `actorId` is absent from the `users` table to verify the left-join fallback produces `actorName = null` [`src/FormForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs`]
-- [x] [Review][Defer] Double clamping in handler and service [`src/FormForge.Api/Features/Audit/AuditEndpoints.cs`, `AuditService.cs`] — deferred, pre-existing pattern (mirrors `GetSchemaAuditLogAsync`)
-- [x] [Review][Defer] Separate COUNT + data queries exposes a TOCTOU window on `total` [`src/FormForge.Api/Features/Audit/AuditService.cs`] — deferred, pre-existing EF pagination pattern across all paginated endpoints
-- [x] [Review][Defer] `MutationAuditEntryDto` is `internal` but exposed via `Produces<>` — OpenAPI schema blind to it [`src/FormForge.Api/Features/Audit/Dtos/MutationAuditEntryDto.cs`] — deferred, consistent with `SchemaAuditEntryDto` pattern
+- [x] [Review][Patch] AC-5 clamping paths untested — no test passes `page=0` or `pageSize=101` to verify the clamped values appear in the response envelope [`src/AppForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs`]
+- [x] [Review][Patch] AC-1: null actorId → actorName=null branch untested — `InsertMutationAuditRowAsync` always receives a non-null actorId; add a test inserting a row with `ActorId = null` and asserting `actorName == null` in the response [`src/AppForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs`]
+- [x] [Review][Patch] AC-1: deleted-actor → actorName=null branch untested — no test seeds a row whose `actorId` is absent from the `users` table to verify the left-join fallback produces `actorName = null` [`src/AppForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs`]
+- [x] [Review][Defer] Double clamping in handler and service [`src/AppForge.Api/Features/Audit/AuditEndpoints.cs`, `AuditService.cs`] — deferred, pre-existing pattern (mirrors `GetSchemaAuditLogAsync`)
+- [x] [Review][Defer] Separate COUNT + data queries exposes a TOCTOU window on `total` [`src/AppForge.Api/Features/Audit/AuditService.cs`] — deferred, pre-existing EF pagination pattern across all paginated endpoints
+- [x] [Review][Defer] `MutationAuditEntryDto` is `internal` but exposed via `Produces<>` — OpenAPI schema blind to it [`src/AppForge.Api/Features/Audit/Dtos/MutationAuditEntryDto.cs`] — deferred, consistent with `SchemaAuditEntryDto` pattern
 - [x] [Review][Defer] No typed error surface in `mutationAuditApi.ts` — all errors collapse to generic `loadError` [`web/src/features/admin/data/mutationAuditApi.ts`] — deferred, pre-existing across all API clients
 - [x] [Review][Defer] Inline styles throughout `MutationAuditLogView.tsx` — inconsistent with codebase Tailwind direction [`web/src/features/admin/data/MutationAuditLogView.tsx`] — deferred, intentional: mirrors `SchemaAuditLogView.tsx` template exactly
 - [x] [Review][Defer] `operation` field typed as raw `string` rather than discriminated union [`web/src/features/admin/data/mutationAuditApi.ts`] — deferred, improvement opportunity; spec-compliant
-- [x] [Review][Defer] No `Produces(StatusCodes.Status403Forbidden)` on route — OpenAPI omits 403 response [`src/FormForge.Api/Features/DynamicCrud/DataAdminEndpoints.cs`] — deferred, systemic pre-existing across all admin endpoints
-- [x] [Review][Defer] `actorIds` IN clause grows up to 100 UUIDs per page (bounded by pageSize max) [`src/FormForge.Api/Features/Audit/AuditService.cs`] — deferred, pre-existing pattern mirrors `GetSchemaAuditLogAsync`
-- [x] [Review][Defer] AC-2 test only verifies DELETE → 405, not PUT/POST [`src/FormForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs`] — deferred, spec notes 405 is guaranteed by construction; one verb confirms the mechanism
+- [x] [Review][Defer] No `Produces(StatusCodes.Status403Forbidden)` on route — OpenAPI omits 403 response [`src/AppForge.Api/Features/DynamicCrud/DataAdminEndpoints.cs`] — deferred, systemic pre-existing across all admin endpoints
+- [x] [Review][Defer] `actorIds` IN clause grows up to 100 UUIDs per page (bounded by pageSize max) [`src/AppForge.Api/Features/Audit/AuditService.cs`] — deferred, pre-existing pattern mirrors `GetSchemaAuditLogAsync`
+- [x] [Review][Defer] AC-2 test only verifies DELETE → 405, not PUT/POST [`src/AppForge.Api.Tests/Features/Audit/MutationAuditLogIntegrationTests.cs`] — deferred, spec notes 405 is guaranteed by construction; one verb confirms the mechanism
 - [x] [Review][Defer] No TanStack Router `beforeLoad` auth guard on route [`web/src/routes/_app/admin/data.$designerId.audit.tsx`] — deferred, pre-existing pattern; `_app` layout handles auth
 

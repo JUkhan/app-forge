@@ -127,10 +127,10 @@ So that unauthorized callers receive HTTP 403, the admin health endpoint is prot
 
 ### Task 1 — `IDomainEventBus` interface and domain event records
 
-Create `src/FormForge.Api/Infrastructure/EventBus/IDomainEventBus.cs`:
+Create `src/AppForge.Api/Infrastructure/EventBus/IDomainEventBus.cs`:
 
 ```csharp
-namespace FormForge.Api.Infrastructure.EventBus;
+namespace AppForge.Api.Infrastructure.EventBus;
 
 internal interface IDomainEventBus
 {
@@ -154,12 +154,12 @@ internal sealed record MenuBindingCreated(string DesignerId);
 
 ### Task 2 — `InProcessEventBus`
 
-Create `src/FormForge.Api/Infrastructure/EventBus/InProcessEventBus.cs`:
+Create `src/AppForge.Api/Infrastructure/EventBus/InProcessEventBus.cs`:
 
 ```csharp
 using System.Collections.Concurrent;
 
-namespace FormForge.Api.Infrastructure.EventBus;
+namespace AppForge.Api.Infrastructure.EventBus;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
     Justification = "Registered via DI.")]
@@ -209,10 +209,10 @@ internal sealed class InProcessEventBus : IDomainEventBus
 
 ### Task 3 — `EffectivePermissions` and `CrudFlags`
 
-Create `src/FormForge.Api/Features/Permissions/EffectivePermissions.cs`:
+Create `src/AppForge.Api/Features/Permissions/EffectivePermissions.cs`:
 
 ```csharp
-namespace FormForge.Api.Features.Permissions;
+namespace AppForge.Api.Features.Permissions;
 
 internal readonly record struct CrudFlags(bool CanCreate, bool CanRead, bool CanUpdate, bool CanDelete);
 
@@ -234,10 +234,10 @@ internal sealed record EffectivePermissions(
 
 ### Task 4 — `IPermissionService`
 
-Create `src/FormForge.Api/Features/Permissions/IPermissionService.cs`:
+Create `src/AppForge.Api/Features/Permissions/IPermissionService.cs`:
 
 ```csharp
-namespace FormForge.Api.Features.Permissions;
+namespace AppForge.Api.Features.Permissions;
 
 internal interface IPermissionService
 {
@@ -252,16 +252,16 @@ internal interface IPermissionService
 
 ### Task 5 — `PermissionService`
 
-Create `src/FormForge.Api/Features/Permissions/PermissionService.cs`:
+Create `src/AppForge.Api/Features/Permissions/PermissionService.cs`:
 
 ```csharp
 using System.Collections.Concurrent;
-using FormForge.Api.Infrastructure.EventBus;
-using FormForge.Api.Infrastructure.Persistence;
+using AppForge.Api.Infrastructure.EventBus;
+using AppForge.Api.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
-namespace FormForge.Api.Features.Permissions;
+namespace AppForge.Api.Features.Permissions;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
     Justification = "Registered via DI.")]
@@ -338,7 +338,7 @@ internal sealed class PermissionService : IPermissionService
     private async Task<EffectivePermissions> ComputePermissionsAsync(Guid userId, CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
 
         var roleIds = await db.UserRoles
             .Where(ur => ur.UserId == userId)
@@ -434,10 +434,10 @@ internal sealed class PermissionService : IPermissionService
 
 ### Task 6 — DTOs
 
-Create `src/FormForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs`:
+Create `src/AppForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs`:
 
 ```csharp
-namespace FormForge.Api.Features.Permissions.Dtos;
+namespace AppForge.Api.Features.Permissions.Dtos;
 
 internal sealed record CrudFlagsResponse(bool CanCreate, bool CanRead, bool CanUpdate, bool CanDelete);
 
@@ -455,13 +455,13 @@ internal sealed record PermissionsResponse(
 
 ### Task 7 — `PermissionsEndpoints`
 
-Create `src/FormForge.Api/Features/Permissions/PermissionsEndpoints.cs`:
+Create `src/AppForge.Api/Features/Permissions/PermissionsEndpoints.cs`:
 
 ```csharp
 using System.Security.Claims;
-using FormForge.Api.Features.Permissions.Dtos;
+using AppForge.Api.Features.Permissions.Dtos;
 
-namespace FormForge.Api.Features.Permissions;
+namespace AppForge.Api.Features.Permissions;
 
 internal static class PermissionsEndpoints
 {
@@ -522,10 +522,10 @@ internal static class PermissionsEndpoints
 
 ### Task 8 — `DynamicDataEndpoints` stub
 
-Create `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`:
+Create `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`:
 
 ```csharp
-namespace FormForge.Api.Features.DynamicCrud;
+namespace AppForge.Api.Features.DynamicCrud;
 
 // Registered in Program.cs under /api/data/{designerId}. Story 3.x populates CRUD handlers.
 internal static class DynamicDataEndpoints
@@ -542,11 +542,11 @@ internal static class DynamicDataEndpoints
 
 ### Task 9 — Update `RouteGroupExtensions`: add `RequirePermission`
 
-Modify `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs`.
+Modify `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs`.
 
 Add using at top:
 ```csharp
-using FormForge.Api.Features.Permissions;
+using AppForge.Api.Features.Permissions;
 ```
 
 Add to the `RouteGroupExtensions` class body:
@@ -618,20 +618,20 @@ Add to the `RouteGroupExtensions` class body:
 
 ### Task 10 — Update `UserService`: publish `UserRoleAssignmentChanged`
 
-Modify `src/FormForge.Api/Features/Users/UserService.cs`:
+Modify `src/AppForge.Api/Features/Users/UserService.cs`:
 
 **1. Add using:**
 ```csharp
-using FormForge.Api.Infrastructure.EventBus;
+using AppForge.Api.Infrastructure.EventBus;
 ```
 
 **2. Change primary constructor signature** from:
 ```csharp
-internal sealed class UserService(FormForgeDbContext db) : IUserService
+internal sealed class UserService(AppForgeDbContext db) : IUserService
 ```
 to:
 ```csharp
-internal sealed class UserService(FormForgeDbContext db, IDomainEventBus bus) : IUserService
+internal sealed class UserService(AppForgeDbContext db, IDomainEventBus bus) : IUserService
 ```
 
 **3. Replace the deferred TODO comment and return** (current lines 123–126):
@@ -655,20 +655,20 @@ with:
 
 ### Task 11 — Update `RoleService`: publish `RolePermissionsChanged`
 
-Modify `src/FormForge.Api/Features/Roles/RoleService.cs`:
+Modify `src/AppForge.Api/Features/Roles/RoleService.cs`:
 
 **1. Add using:**
 ```csharp
-using FormForge.Api.Infrastructure.EventBus;
+using AppForge.Api.Infrastructure.EventBus;
 ```
 
 **2. Change primary constructor signature** from:
 ```csharp
-internal sealed class RoleService(FormForgeDbContext db) : IRoleService
+internal sealed class RoleService(AppForgeDbContext db) : IRoleService
 ```
 to:
 ```csharp
-internal sealed class RoleService(FormForgeDbContext db, IDomainEventBus bus) : IRoleService
+internal sealed class RoleService(AppForgeDbContext db, IDomainEventBus bus) : IRoleService
 ```
 
 **3. In `UpdateRoleAsync`, add publish call** immediately before `return new UpdateRoleResult(UpdateRoleOutcome.Success)`:
@@ -699,12 +699,12 @@ The complete final block of `UpdateRoleAsync` becomes:
 
 **Add usings** after existing using block:
 ```csharp
-using FormForge.Api.Features.DynamicCrud;
-using FormForge.Api.Features.Permissions;
-using FormForge.Api.Infrastructure.EventBus;
+using AppForge.Api.Features.DynamicCrud;
+using AppForge.Api.Features.Permissions;
+using AppForge.Api.Infrastructure.EventBus;
 ```
 
-**Add `AddMemoryCache`** directly after `builder.Services.AddDbContext<FormForgeDbContext>(...);`:
+**Add `AddMemoryCache`** directly after `builder.Services.AddDbContext<AppForgeDbContext>(...);`:
 ```csharp
 builder.Services.AddMemoryCache();
 ```
@@ -803,7 +803,7 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 
 ### Task 13 — Integration tests
 
-Create `src/FormForge.Api.Tests/Features/Permissions/PermissionsIntegrationTests.cs`.
+Create `src/AppForge.Api.Tests/Features/Permissions/PermissionsIntegrationTests.cs`.
 
 Follow the exact same structure as `UserRoleIntegrationTests.cs` and `RoleIntegrationTests.cs`: shared `WebApplicationFactory<Program>` with Testcontainers, `HandleCookies = false` in `WebApplicationFactoryClientOptions`, TRUNCATE cleanup per test.
 
@@ -865,11 +865,11 @@ Seed data via `DbContext` obtained from `factory.Services.CreateScope()`. Obtain
 Generated by `/bmad-code-review` (2026-05-23) — three parallel reviewers: Blind Hunter, Edge Case Hunter, Acceptance Auditor.
 
 - [x] [Review][Decision→Patch] 403 body shape — chose to update spec (option B): AC-3 example above now shows the full ProblemDetails envelope with the four required keys at the root level. Consumers read `body.code` / `body.messageKey`.
-- [x] [Review][Patch] Widen bare `PostgresException` SqlState filter to include 23503/23505 [`src/FormForge.Api/Features/Users/UserService.cs:135`]
-- [x] [Review][Patch] `GetCrudFlagsAsync` whitespace guard: `ThrowIfNullOrEmpty` → `ThrowIfNullOrWhiteSpace` [`src/FormForge.Api/Features/Permissions/PermissionService.cs:99`]
-- [x] [Review][Patch] `PermissionsEndpoints.GetMyPermissionsHandler` rebuild dict with `OrdinalIgnoreCase` (matches source comparer) [`src/FormForge.Api/Features/Permissions/PermissionsEndpoints.cs:38-45`]
-- [x] [Review][Patch] Add AC-6 integration test: `UpdateRoleAsync` busts cache of users holding the role [`src/FormForge.Api.Tests/Features/Permissions/PermissionsIntegrationTests.cs::GetMyPermissions_CacheBustedAfterRolePermissionsUpdated`]
-- [x] [Review][Defer] Residual cache stale-write windows (cache-commit→version-check + mid-compute role-eviction) — TTL-bounded to 30 s; deep fix needs REPEATABLE READ snapshot or per-user compute lock [`src/FormForge.Api/Features/Permissions/PermissionService.cs:78-92`] — deferred, bounded by TTL
+- [x] [Review][Patch] Widen bare `PostgresException` SqlState filter to include 23503/23505 [`src/AppForge.Api/Features/Users/UserService.cs:135`]
+- [x] [Review][Patch] `GetCrudFlagsAsync` whitespace guard: `ThrowIfNullOrEmpty` → `ThrowIfNullOrWhiteSpace` [`src/AppForge.Api/Features/Permissions/PermissionService.cs:99`]
+- [x] [Review][Patch] `PermissionsEndpoints.GetMyPermissionsHandler` rebuild dict with `OrdinalIgnoreCase` (matches source comparer) [`src/AppForge.Api/Features/Permissions/PermissionsEndpoints.cs:38-45`]
+- [x] [Review][Patch] Add AC-6 integration test: `UpdateRoleAsync` busts cache of users holding the role [`src/AppForge.Api.Tests/Features/Permissions/PermissionsIntegrationTests.cs::GetMyPermissions_CacheBustedAfterRolePermissionsUpdated`]
+- [x] [Review][Defer] Residual cache stale-write windows (cache-commit→version-check + mid-compute role-eviction) — TTL-bounded to 30 s; deep fix needs REPEATABLE READ snapshot or per-user compute lock [`src/AppForge.Api/Features/Permissions/PermissionService.cs:78-92`] — deferred, bounded by TTL
 - [x] [Review][Defer] Spec drift from review patches (cache key shape, OrdinalIgnoreCase, ILogger/try-catch in bus, version-race plumbing, SERIALIZABLE txn in Story 2.5 carryover) — doc-only cleanup; spec should be updated to match shipped code — deferred, doc cleanup
 - [x] [Review][Defer] No AC-3 integration test against `/api/data/{designerId}` 403 contract — DynamicDataEndpoints currently has no handlers to test against; Story 3.x's first endpoint owns this — deferred, no surface yet
 - [x] [Review][Defer] `_userVersions` ConcurrentDictionary grows unbounded — cannot clean from OnEntryEvicted without breaking version-counter invariant; needs background reaper or size cap — deferred, slow leak
@@ -909,30 +909,30 @@ Story 2.6 does not change the DB schema. All tables read by `PermissionService` 
 ### File List
 
 **New files:**
-- `src/FormForge.Api/Infrastructure/EventBus/IDomainEventBus.cs`
-- `src/FormForge.Api/Infrastructure/EventBus/InProcessEventBus.cs`
-- `src/FormForge.Api/Features/Permissions/EffectivePermissions.cs`
-- `src/FormForge.Api/Features/Permissions/IPermissionService.cs`
-- `src/FormForge.Api/Features/Permissions/PermissionService.cs`
-- `src/FormForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs`
-- `src/FormForge.Api/Features/Permissions/PermissionsEndpoints.cs`
-- `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
-- `src/FormForge.Api.Tests/Features/Permissions/PermissionsIntegrationTests.cs`
+- `src/AppForge.Api/Infrastructure/EventBus/IDomainEventBus.cs`
+- `src/AppForge.Api/Infrastructure/EventBus/InProcessEventBus.cs`
+- `src/AppForge.Api/Features/Permissions/EffectivePermissions.cs`
+- `src/AppForge.Api/Features/Permissions/IPermissionService.cs`
+- `src/AppForge.Api/Features/Permissions/PermissionService.cs`
+- `src/AppForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs`
+- `src/AppForge.Api/Features/Permissions/PermissionsEndpoints.cs`
+- `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
+- `src/AppForge.Api.Tests/Features/Permissions/PermissionsIntegrationTests.cs`
 
 **Modified files:**
-- `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs` — add `RequirePermission` on `RouteHandlerBuilder`
-- `src/FormForge.Api/Features/Users/UserService.cs` — add `IDomainEventBus bus` param, publish `UserRoleAssignmentChanged`
-- `src/FormForge.Api/Features/Roles/RoleService.cs` — add `IDomainEventBus bus` param, publish `RolePermissionsChanged` in `UpdateRoleAsync`
-- `src/FormForge.Api/Program.cs` — `AddMemoryCache`, register bus + service, `data-write`/`data-read` rate limits, `/api/users` + `/api/data/{designerId}` groups, `/health` auth guard
-- `src/FormForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckEndpointsTests.cs` — replace anonymous-503 test with 401-on-anonymous test (AR-25 changes `/health` to require platform-admin)
+- `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs` — add `RequirePermission` on `RouteHandlerBuilder`
+- `src/AppForge.Api/Features/Users/UserService.cs` — add `IDomainEventBus bus` param, publish `UserRoleAssignmentChanged`
+- `src/AppForge.Api/Features/Roles/RoleService.cs` — add `IDomainEventBus bus` param, publish `RolePermissionsChanged` in `UpdateRoleAsync`
+- `src/AppForge.Api/Program.cs` — `AddMemoryCache`, register bus + service, `data-write`/`data-read` rate limits, `/api/users` + `/api/data/{designerId}` groups, `/health` auth guard
+- `src/AppForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckEndpointsTests.cs` — replace anonymous-503 test with 401-on-anonymous test (AR-25 changes `/health` to require platform-admin)
 
 ### Previous Story Intelligence
 
 From Story 2.5 (done, all 117 tests passing after code review patches):
-- `UserService` current constructor: `(FormForgeDbContext db)` — Task 10 changes to `(FormForgeDbContext db, IDomainEventBus bus)`
+- `UserService` current constructor: `(AppForgeDbContext db)` — Task 10 changes to `(AppForgeDbContext db, IDomainEventBus bus)`
 - `UserService.AssignRolesAsync` line 123–126 has the deferred TODO comment — Task 10 replaces it with the actual publish call
 - `AssignRolesOutcome` already has `LastAdminLockout` and `Conflict` (added in 2.5 code review) — no changes needed to the enum
-- `RoleService` current constructor: `(FormForgeDbContext db)` — Task 11 changes to `(FormForgeDbContext db, IDomainEventBus bus)`
+- `RoleService` current constructor: `(AppForgeDbContext db)` — Task 11 changes to `(AppForgeDbContext db, IDomainEventBus bus)`
 - Both `UserService` and `RoleService` use C# 12 primary constructors — adding a parameter to the primary constructor signature is the correct approach, not adding a separate `private readonly` field declaration
 - `CA1812 [SuppressMessage]` required on `InProcessEventBus` and `PermissionService` (both `internal sealed class` registered via DI)
 - TRUNCATE order for test cleanup: `role_permissions, user_roles, roles, refresh_tokens, users RESTART IDENTITY CASCADE`

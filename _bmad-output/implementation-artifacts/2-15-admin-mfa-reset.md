@@ -93,9 +93,9 @@ Per the epics AC (AC-1): also revoke all active refresh tokens so the user canno
 
 ### Task 1: `UserDetailResponse` — Add `MfaEnabled`
 
-**`src/FormForge.Api/Features/Users/Dtos/UserDetailResponse.cs`** (UPDATE — add `MfaEnabled` as last field):
+**`src/AppForge.Api/Features/Users/Dtos/UserDetailResponse.cs`** (UPDATE — add `MfaEnabled` as last field):
 ```csharp
-namespace FormForge.Api.Features.Users.Dtos;
+namespace AppForge.Api.Features.Users.Dtos;
 
 internal sealed record UserRoleItem(Guid Id, string Name);
 
@@ -213,7 +213,7 @@ public async Task<AdminMfaResetResult> ResetUserMfaAsync(Guid userId, Cancellati
 }
 ```
 
-**No new `using` needed** — `UserService.cs` already has `Microsoft.EntityFrameworkCore`, `FormForge.Api.Domain.Entities`, and `FormForge.Api.Infrastructure.Persistence`. The `ExecuteDeleteAsync` extension is part of `Microsoft.EntityFrameworkCore` (EF Core 7+).
+**No new `using` needed** — `UserService.cs` already has `Microsoft.EntityFrameworkCore`, `AppForge.Api.Domain.Entities`, and `AppForge.Api.Infrastructure.Persistence`. The `ExecuteDeleteAsync` extension is part of `Microsoft.EntityFrameworkCore` (EF Core 7+).
 
 ---
 
@@ -415,7 +415,7 @@ const onResetMfa = async () => {
 
 ```csharp
 // MFA setup helpers — mirrors AuthIntegrationTests pattern (Story 2.13/2.14)
-// OtpNet is already referenced in FormForge.Api.Tests.csproj (added in Story 2.13).
+// OtpNet is already referenced in AppForge.Api.Tests.csproj (added in Story 2.13).
 // Add `using OtpNet;` at the top if not already present; check existing usings first.
 
 private async Task<MfaEnrolResponseDto> EnrolMfaAsync(string bearerToken)
@@ -466,7 +466,7 @@ public async Task ResetMfa_Returns200AndClearsMfaState()
 
     // Verify DB state: mfa_enabled=false, mfa_secret=null, backup codes deleted
     using var scope = _factory!.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+    var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
     var viewer = await db.Users.FirstAsync(u => u.Id == _viewerUserId);
     Assert.False(viewer.MfaEnabled);
     Assert.Null(viewer.MfaSecretProtected);
@@ -493,7 +493,7 @@ public async Task ResetMfa_RevokesAllRefreshTokens()
 
     // Verify no active refresh tokens remain for the viewer
     using var scope = _factory!.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+    var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
     var liveTokens = await db.RefreshTokens
         .CountAsync(rt => rt.UserId == _viewerUserId && rt.RevokedAt == null);
     Assert.Equal(0, liveTokens);
@@ -533,7 +533,7 @@ public async Task ResetMfa_UserWithMfaDisabled_IsIdempotent()
 
 **`using` additions for `UserAdminIntegrationTests.cs`:**
 ```csharp
-using OtpNet; // already in FormForge.Api.Tests.csproj from Story 2.13
+using OtpNet; // already in AppForge.Api.Tests.csproj from Story 2.13
 using System.Net.Http.Headers; // check if already present; add if not
 ```
 
@@ -587,20 +587,20 @@ None — all changes are modifications to existing files.
 
 | File | Change |
 |---|---|
-| `src/FormForge.Api/Features/Users/Dtos/UserDetailResponse.cs` | Add `bool MfaEnabled` as last positional parameter |
-| `src/FormForge.Api/Features/Users/UserService.cs` | Add `AdminMfaResetOutcome` enum + `AdminMfaResetResult` record + `IUserService` method + `ResetUserMfaAsync` implementation + update `GetUserAsync` projection + update `CreateUserAsync` inline construction |
-| `src/FormForge.Api/Features/Users/UserEndpoints.cs` | Register `DELETE /{id:guid}/mfa` endpoint; add `ResetUserMfaHandler` |
+| `src/AppForge.Api/Features/Users/Dtos/UserDetailResponse.cs` | Add `bool MfaEnabled` as last positional parameter |
+| `src/AppForge.Api/Features/Users/UserService.cs` | Add `AdminMfaResetOutcome` enum + `AdminMfaResetResult` record + `IUserService` method + `ResetUserMfaAsync` implementation + update `GetUserAsync` projection + update `CreateUserAsync` inline construction |
+| `src/AppForge.Api/Features/Users/UserEndpoints.cs` | Register `DELETE /{id:guid}/mfa` endpoint; add `ResetUserMfaHandler` |
 | `web/src/features/admin/users/types.ts` | Add `mfaEnabled: boolean` to `UserDetail` |
 | `web/src/features/admin/users/userMutations.ts` | Add `useResetMfaMutation` |
 | `web/src/routes/_app/admin/users.$userId.tsx` | Add Dialog imports, mutation, state, "Reset MFA" button, confirmation dialog |
 | `web/src/lib/i18n/locales/en.json` | 7 new keys in `admin.users` |
-| `src/FormForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs` | MFA helpers + 5 new tests |
+| `src/AppForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs` | MFA helpers + 5 new tests |
 
 ### Files to Leave Untouched
 
-- `src/FormForge.Api/Features/Auth/MfaService.cs` — no MFA service changes needed; reset is a direct DB operation owned by `UserService`
-- `src/FormForge.Api/Program.cs` — no new DI registrations (no new services/validators)
-- `src/FormForge.Api/Features/Roles/AdminEndpoints.cs` — route group unchanged
+- `src/AppForge.Api/Features/Auth/MfaService.cs` — no MFA service changes needed; reset is a direct DB operation owned by `UserService`
+- `src/AppForge.Api/Program.cs` — no new DI registrations (no new services/validators)
+- `src/AppForge.Api/Features/Roles/AdminEndpoints.cs` — route group unchanged
 - `web/src/routes/_app/admin/users.tsx` (list page) — MFA status is a detail-only concept
 - `web/src/features/admin/users/useUsersQuery.ts` / `useUserDetailQuery.ts` — queries unchanged; React Query cache invalidation via `invalidateAllUsers` handles refetch
 - All migrations — no DB schema changes; the `mfa_backup_codes` and `users` tables are already set up by the Stories 2.13 migrations
@@ -612,17 +612,17 @@ None — all changes are modifications to existing files.
 
 - [Source: `_bmad-output/planning-artifacts/epics.md` — Story 2.15 AC, lines 863–889]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` — Decision 2.12 line 459: admin reset spec]
-- [Source: `src/FormForge.Api/Features/Users/UserService.cs` — `DeactivateUserAsync` transaction pattern + `ExecuteUpdateAsync` for token revoke; `GetUserAsync` projection to extend]
-- [Source: `src/FormForge.Api/Features/Users/UserEndpoints.cs` — existing handler patterns, `UserNotFoundProblem()` helper, `MapUserAdminEndpoints` registration style]
-- [Source: `src/FormForge.Api/Features/Users/Dtos/UserDetailResponse.cs` — current record shape to extend]
+- [Source: `src/AppForge.Api/Features/Users/UserService.cs` — `DeactivateUserAsync` transaction pattern + `ExecuteUpdateAsync` for token revoke; `GetUserAsync` projection to extend]
+- [Source: `src/AppForge.Api/Features/Users/UserEndpoints.cs` — existing handler patterns, `UserNotFoundProblem()` helper, `MapUserAdminEndpoints` registration style]
+- [Source: `src/AppForge.Api/Features/Users/Dtos/UserDetailResponse.cs` — current record shape to extend]
 - [Source: `web/src/routes/_app/admin/users.$userId.tsx` — full component structure, state patterns, button placement]
 - [Source: `web/src/features/admin/users/userMutations.ts` — mutation shape, `invalidateAllUsers` helper, toast pattern]
 - [Source: `web/src/features/auth/httpClient.ts` — `httpClient.delete<T>` is already defined]
 - [Source: `web/src/components/ui/dialog.tsx` — exports: `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogFooter`, `DialogDescription`, `DialogClose`]
 - [Source: `web/src/routes/_app/settings.tsx` — Dialog open/onOpenChange pattern to mirror]
 - [Source: `web/src/lib/i18n/locales/en.json` — `admin.users` object at line 141; `roleAssignError` is the last key before the closing brace]
-- [Source: `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs` — `EnrolMfaAsync`/`ConfirmMfaEnrolAsync` helper pattern]
-- [Source: `src/FormForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs` — test class structure, seeding pattern, `LoginAsync` helper]
+- [Source: `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs` — `EnrolMfaAsync`/`ConfirmMfaEnrolAsync` helper pattern]
+- [Source: `src/AppForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs` — test class structure, seeding pattern, `LoginAsync` helper]
 
 ## Dev Agent Record
 
@@ -655,14 +655,14 @@ None — implementation followed the Dev Notes guidance directly with no blocker
 
 ### File List
 
-- `src/FormForge.Api/Features/Users/Dtos/UserDetailResponse.cs` (modified)
-- `src/FormForge.Api/Features/Users/UserService.cs` (modified)
-- `src/FormForge.Api/Features/Users/UserEndpoints.cs` (modified)
+- `src/AppForge.Api/Features/Users/Dtos/UserDetailResponse.cs` (modified)
+- `src/AppForge.Api/Features/Users/UserService.cs` (modified)
+- `src/AppForge.Api/Features/Users/UserEndpoints.cs` (modified)
 - `web/src/features/admin/users/types.ts` (modified)
 - `web/src/features/admin/users/userMutations.ts` (modified)
 - `web/src/routes/_app/admin/users.$userId.tsx` (modified)
 - `web/src/lib/i18n/locales/en.json` (modified)
-- `src/FormForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs` (modified)
+- `src/AppForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs` (modified)
 
 ### Change Log
 
@@ -678,11 +678,11 @@ Adversarial code review (Blind Hunter + Edge Case Hunter + Acceptance Auditor) o
 ### Patch (actionable)
 
 - [x] [Review][Patch] `onResetMfa` does not distinguish 404 — generic error + dialog left open on a deleted user [web/src/routes/_app/admin/users.$userId.tsx:115] — FIXED: added `ApiError && err.status === 404` branch surfacing `userNotFoundError`, mirroring the sibling handlers. — Sibling handlers `onDeactivate` (line 90) and `onReactivate` (line 107) branch on `err instanceof ApiError && err.status === 404` and surface `admin.users.userNotFoundError`. `onResetMfa` has a bare `catch {}` that always shows the generic `resetMfaError`, leaving the dialog open and inviting an infinite retry against a user that no longer exists. `ApiError` is already imported (line 29). Fix: add a 404 branch that sets the user-not-found message. Severity: Low.
-- [x] [Review][Patch] `ResetMfa_RevokesAllRefreshTokens` does not pin the "stamp, don't delete" constraint [src/FormForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs:705] — FIXED: added an assertion that the user's total refresh-token row count is `> 0` after reset, so a regression to `ExecuteDeleteAsync` would fail. — The test asserts `liveTokens == 0` (RevokedAt != null) but never asserts the token rows still exist, so it would not catch a regression from `ExecuteUpdateAsync(RevokedAt)` to `ExecuteDeleteAsync`. Production code is correct (`RevokeActiveRefreshTokensAsync` stamps `RevokedAt`); add an assertion that the user's total refresh-token row count is unchanged (> 0) to guard the audit-trail-survival constraint. Severity: Low (optional, test hardening).
+- [x] [Review][Patch] `ResetMfa_RevokesAllRefreshTokens` does not pin the "stamp, don't delete" constraint [src/AppForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs:705] — FIXED: added an assertion that the user's total refresh-token row count is `> 0` after reset, so a regression to `ExecuteDeleteAsync` would fail. — The test asserts `liveTokens == 0` (RevokedAt != null) but never asserts the token rows still exist, so it would not catch a regression from `ExecuteUpdateAsync(RevokedAt)` to `ExecuteDeleteAsync`. Production code is correct (`RevokeActiveRefreshTokensAsync` stamps `RevokedAt`); add an assertion that the user's total refresh-token row count is unchanged (> 0) to guard the audit-trail-survival constraint. Severity: Low (optional, test hardening).
 
 ### Deferred
 
-- [x] [Review][Defer] MFA login session gate can be orphaned mid-session by the post-eviction callback firing on `EvictionReason.Replaced` [src/FormForge.Api/Features/Auth/MfaService.cs:174] — deferred, pre-existing (Story 2.14 session machinery, not introduced by 2.15). On every wrong-code attempt `VerifyMfaLoginCoreAsync` re-`Set`s the session entry; MemoryCache fires the *old* entry's post-eviction callback with reason `Replaced`, which runs `SessionGates.TryRemove(token)` and drops the per-token serialization semaphore while the session is still alive. A subsequent pair of concurrent verifies bearing a valid TOTP can then acquire two different semaphores (the gate is recreated via `GetOrAdd`), defeating the single-use serialization the gate exists to provide and permitting a narrow TOTP double-mint window. Pre-existing for the first-failure case in both old/new code; the bundled 2.14 change widens it to every failure by routing the re-`Set` through `SessionCacheOptions`. Suggested fix in a follow-up: have the post-eviction callback ignore `EvictionReason.Replaced` (a replaced entry means the session is still live, so the gate must survive). Severity: Medium, exploitability very low (requires a prior failed attempt + precisely-timed concurrent valid submissions).
+- [x] [Review][Defer] MFA login session gate can be orphaned mid-session by the post-eviction callback firing on `EvictionReason.Replaced` [src/AppForge.Api/Features/Auth/MfaService.cs:174] — deferred, pre-existing (Story 2.14 session machinery, not introduced by 2.15). On every wrong-code attempt `VerifyMfaLoginCoreAsync` re-`Set`s the session entry; MemoryCache fires the *old* entry's post-eviction callback with reason `Replaced`, which runs `SessionGates.TryRemove(token)` and drops the per-token serialization semaphore while the session is still alive. A subsequent pair of concurrent verifies bearing a valid TOTP can then acquire two different semaphores (the gate is recreated via `GetOrAdd`), defeating the single-use serialization the gate exists to provide and permitting a narrow TOTP double-mint window. Pre-existing for the first-failure case in both old/new code; the bundled 2.14 change widens it to every failure by routing the re-`Set` through `SessionCacheOptions`. Suggested fix in a follow-up: have the post-eviction callback ignore `EvictionReason.Replaced` (a replaced entry means the session is still live, so the gate must survive). Severity: Medium, exploitability very low (requires a prior failed attempt + precisely-timed concurrent valid submissions).
 
 ### Dismissed (false positives / handled / in-spec)
 

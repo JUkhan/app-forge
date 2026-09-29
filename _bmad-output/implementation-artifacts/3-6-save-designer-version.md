@@ -413,7 +413,7 @@ The file `web/src/components/designer/__tests__/fieldKeyValidation.test.ts` alre
 
 ### Project Structure Notes
 
-Backend files follow vertical feature slicing under `src/FormForge.Api/Features/Designer/`:
+Backend files follow vertical feature slicing under `src/AppForge.Api/Features/Designer/`:
 ```
 Features/Designer/
 ├── DesignerEndpoints.cs       ← add SaveVersionHandler + MapPost("/{designerId}/versions", ...)
@@ -451,16 +451,16 @@ web/src/
 - Architecture: §1.1 Identifier Sanitization (line 263), §1.2 Component→PG Mapping (line 269), §4.6 Module Structure (line 776)
 - Story 3.4 deferred items: `3-4-configure-component-properties.md` (fieldKey collision + save-blocking, deferred to 3.6)
 - Story 3.5 dev notes: `3-5-designer-live-preview.md` (pattern for how DesignerResponse is used in component preview)
-- `SafeIdentifier.cs` — `src/FormForge.Api/Features/Designer/SafeIdentifier.cs` (reuse for fieldKey regex + reserved keyword check)
-- `DesignerService.cs` — `src/FormForge.Api/Features/Designer/DesignerService.cs` (reuse `ToResponse` helper; pattern for concurrent-save race handling)
-- `DesignerEndpoints.cs` — `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs` (add new handler; follow exact same auth/filter/Produces pattern)
-- `DesignerIntegrationTests.cs` — `src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` (extend with new tests; reuse `CreateDesignerViaApiAsync` helper, `DesignerResponseDto` record)
+- `SafeIdentifier.cs` — `src/AppForge.Api/Features/Designer/SafeIdentifier.cs` (reuse for fieldKey regex + reserved keyword check)
+- `DesignerService.cs` — `src/AppForge.Api/Features/Designer/DesignerService.cs` (reuse `ToResponse` helper; pattern for concurrent-save race handling)
+- `DesignerEndpoints.cs` — `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs` (add new handler; follow exact same auth/filter/Produces pattern)
+- `DesignerIntegrationTests.cs` — `src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` (extend with new tests; reuse `CreateDesignerViaApiAsync` helper, `DesignerResponseDto` record)
 - `designer.$designerId.tsx` — `web/src/routes/_app/designer.$designerId.tsx` (save mutation at lines 110–144; handleSave at 149–155)
 - `designerApi.ts` — `web/src/features/designer/designerApi.ts` (saveVersion stub at lines 29–33)
 - `fieldKeyValidation.ts` — `web/src/components/designer/fieldKeyValidation.ts` (add below existing isValidFieldKey)
 - `PropertyInspector.tsx` — `web/src/components/designer/PropertyInspector.tsx` (type strings with spaces confirmed at lines 528/575/622/670/697/808/849/946/989)
 - `en.json` — `web/src/lib/i18n/locales/en.json` (designer.canvas section at line 157)
-- `Program.cs` — `src/FormForge.Api/Program.cs` line 129 (validator registration pattern)
+- `Program.cs` — `src/AppForge.Api/Program.cs` line 129 (validator registration pattern)
 
 ## Dev Agent Record
 
@@ -470,7 +470,7 @@ Claude Opus 4.7 (claude-opus-4-7[1m]) via bmad-dev-story workflow
 
 ### Debug Log References
 
-- Backend build: `dotnet build src/FormForge.Api/FormForge.Api.csproj` — 0 errors, 0 warnings
+- Backend build: `dotnet build src/AppForge.Api/AppForge.Api.csproj` — 0 errors, 0 warnings
 - Backend test (Designer slice): `dotnet test --filter "FullyQualifiedName~Designer"` — 64/64 passed (9 new SaveVersion tests)
 - Backend test (full): `dotnet test` — 216/216 passed, no regressions
 - Frontend build: `pnpm run build` — clean, 463 KB index chunk
@@ -496,15 +496,15 @@ Claude Opus 4.7 (claude-opus-4-7[1m]) via bmad-dev-story workflow
 ### File List
 
 **Backend — new**
-- `src/FormForge.Api/Features/Designer/Dtos/SaveVersionRequest.cs`
-- `src/FormForge.Api/Features/Designer/Validators/SaveVersionRequestValidator.cs`
-- `src/FormForge.Api/Features/Designer/FieldKeyValidator.cs`
+- `src/AppForge.Api/Features/Designer/Dtos/SaveVersionRequest.cs`
+- `src/AppForge.Api/Features/Designer/Validators/SaveVersionRequestValidator.cs`
+- `src/AppForge.Api/Features/Designer/FieldKeyValidator.cs`
 
 **Backend — modified**
-- `src/FormForge.Api/Features/Designer/DesignerService.cs` (SaveVersionOutcome enum, SaveVersionResult record, IDesignerService.SaveVersionAsync, DesignerService.SaveVersionAsync impl)
-- `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs` (MapPost route + SaveVersionHandler + FieldKeyValidationProblem + VersionConflictProblem)
-- `src/FormForge.Api/Program.cs` (validator registration)
-- `src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` (9 new SaveVersion tests + MinimalStackRoot helper)
+- `src/AppForge.Api/Features/Designer/DesignerService.cs` (SaveVersionOutcome enum, SaveVersionResult record, IDesignerService.SaveVersionAsync, DesignerService.SaveVersionAsync impl)
+- `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs` (MapPost route + SaveVersionHandler + FieldKeyValidationProblem + VersionConflictProblem)
+- `src/AppForge.Api/Program.cs` (validator registration)
+- `src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` (9 new SaveVersion tests + MinimalStackRoot helper)
 
 **Frontend — modified**
 - `web/src/features/designer/designerApi.ts` (saveVersion stub → createVersion)
@@ -520,19 +520,19 @@ Claude Opus 4.7 (claude-opus-4-7[1m]) via bmad-dev-story workflow
 
 Adversarial code review run 2026-05-23 against commit 693b601. Three parallel layers (Blind Hunter / Edge Case Hunter / Acceptance Auditor) raised 46 raw findings; after dedup + triage: **0 decision-needed, 10 patches, 2 deferred, 34 dismissed as noise / spec-prescribed / pre-existing**.
 
-- [x] [Review][Patch] `GetValue<string>()` crashes on non-string `type`/`id` JSON → 500 instead of 422 [src/FormForge.Api/Features/Designer/FieldKeyValidator.cs:56-57]
-- [x] [Review][Patch] Non-object `rootElement` (string/number/array) bypasses validation and is persisted as junk [src/FormForge.Api/Features/Designer/Validators/SaveVersionRequestValidator.cs:16]
+- [x] [Review][Patch] `GetValue<string>()` crashes on non-string `type`/`id` JSON → 500 instead of 422 [src/AppForge.Api/Features/Designer/FieldKeyValidator.cs:56-57]
+- [x] [Review][Patch] Non-object `rootElement` (string/number/array) bypasses validation and is persisted as junk [src/AppForge.Api/Features/Designer/Validators/SaveVersionRequestValidator.cs:16]
 - [x] [Review][Patch] AC-2 banner shows only generic message; per-element errors from `collectFieldKeyErrors` are discarded [web/src/routes/_app/designer.$designerId.tsx:160-164,202-207]
 - [x] [Review][Patch] `fieldKeyError` banner stays stale after user fixes the issue without clicking Save again [web/src/routes/_app/designer.$designerId.tsx:34,137,162]
 - [x] [Review][Patch] 422 `FIELD_KEY_INVALID` envelope from server (e.g., PG-reserved that client missed) renders as raw `"API error 422: FIELD_KEY_INVALID"` instead of an i18n message [web/src/routes/_app/designer.$designerId.tsx:172-175]
-- [x] [Review][Patch] Unbounded recursion in `Walk` / `walk` → uncatchable stack overflow on adversarial deeply-nested input [src/FormForge.Api/Features/Designer/FieldKeyValidator.cs:101-110, web/src/components/designer/fieldKeyValidation.ts:54]
-- [x] [Review][Patch] `.Include(s => s.Versions)` loads all version rows just to compute Max → NFR-2 risk as version count grows [src/FormForge.Api/Features/Designer/DesignerService.cs:175-189]
-- [x] [Review][Patch] Backend integration tests don't exercise `Repeater Field` (input-bearing inside a Repeater container) — only Text Input / Number Input are covered, leaving the spec's emphasised Repeater-vs-Repeater-Field distinction untested at the API boundary [src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs]
-- [x] [Review][Patch] Whitespace-only fieldKey ("   ") flows into the regex-invalid path and renders as `invalid field key: "   "` instead of the clearer "missing" code [src/FormForge.Api/Features/Designer/FieldKeyValidator.cs:68, web/src/components/designer/fieldKeyValidation.ts:42]
-- [x] [Review][Patch] `FieldKeyValidationResult.HasCollision` is dead code (never read) [src/FormForge.Api/Features/Designer/FieldKeyValidator.cs:125-126]
+- [x] [Review][Patch] Unbounded recursion in `Walk` / `walk` → uncatchable stack overflow on adversarial deeply-nested input [src/AppForge.Api/Features/Designer/FieldKeyValidator.cs:101-110, web/src/components/designer/fieldKeyValidation.ts:54]
+- [x] [Review][Patch] `.Include(s => s.Versions)` loads all version rows just to compute Max → NFR-2 risk as version count grows [src/AppForge.Api/Features/Designer/DesignerService.cs:175-189]
+- [x] [Review][Patch] Backend integration tests don't exercise `Repeater Field` (input-bearing inside a Repeater container) — only Text Input / Number Input are covered, leaving the spec's emphasised Repeater-vs-Repeater-Field distinction untested at the API boundary [src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs]
+- [x] [Review][Patch] Whitespace-only fieldKey ("   ") flows into the regex-invalid path and renders as `invalid field key: "   "` instead of the clearer "missing" code [src/AppForge.Api/Features/Designer/FieldKeyValidator.cs:68, web/src/components/designer/fieldKeyValidation.ts:42]
+- [x] [Review][Patch] `FieldKeyValidationResult.HasCollision` is dead code (never read) [src/AppForge.Api/Features/Designer/FieldKeyValidator.cs:125-126]
 
-- [x] [Review][Defer] VersionConflict 409 path has no integration test and the constraint-name (`uq_component_schema_versions_designer_version`) is string-coupled — a migration rename silently turns 409 → 500 [src/FormForge.Api/Features/Designer/DesignerService.cs:215-223] — deferred, pre-existing pattern shared with `CreateAsync`
-- [x] [Review][Defer] No request-body size limit on POST `/api/designers/{id}/versions` — Kestrel defaults bound the surface today but an explicit cap would protect against accidental huge-tree submissions [src/FormForge.Api/Features/Designer/DesignerEndpoints.cs:39-46] — deferred, broader API-hardening concern
+- [x] [Review][Defer] VersionConflict 409 path has no integration test and the constraint-name (`uq_component_schema_versions_designer_version`) is string-coupled — a migration rename silently turns 409 → 500 [src/AppForge.Api/Features/Designer/DesignerService.cs:215-223] — deferred, pre-existing pattern shared with `CreateAsync`
+- [x] [Review][Defer] No request-body size limit on POST `/api/designers/{id}/versions` — Kestrel defaults bound the surface today but an explicit cap would protect against accidental huge-tree submissions [src/AppForge.Api/Features/Designer/DesignerEndpoints.cs:39-46] — deferred, broader API-hardening concern
 
 ## Change Log
 

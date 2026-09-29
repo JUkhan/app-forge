@@ -12,9 +12,9 @@ So that I can validate correctness before the VIEW is persisted.
 
 1. **Given** the Dataset create/edit modal (Story 8.10) in either mode, **When** I click "Preview", **Then** a "Preview" button is present and active (per FR-72 AC-1).
 
-2. **Given** I click "Preview" in Custom Query Mode, **When** the request is sent to `POST /api/datasets/preview`, **Then** the server validates SELECT-only on the submitted `query`, appends `LIMIT 10`, applies `SET LOCAL statement_timeout = '{PreviewTimeoutSeconds}s'` (default 5 s from `DatasetManager:PreviewTimeoutSeconds`), and executes against PostgreSQL using the `formforge_preview` read-only connection pool (per FR-72 AC-3 / AR-63).
+2. **Given** I click "Preview" in Custom Query Mode, **When** the request is sent to `POST /api/datasets/preview`, **Then** the server validates SELECT-only on the submitted `query`, appends `LIMIT 10`, applies `SET LOCAL statement_timeout = '{PreviewTimeoutSeconds}s'` (default 5 s from `DatasetManager:PreviewTimeoutSeconds`), and executes against PostgreSQL using the `appforge_preview` read-only connection pool (per FR-72 AC-3 / AR-63).
 
-3. **Given** I click "Preview" in Query Builder Mode, **When** the request is sent to `POST /api/datasets/preview` with `builder_state`, **Then** the server generates SQL from `builder_state` via `DatasetSqlGenerator.Generate`, appends `LIMIT 10`, applies the statement timeout, and executes against the `formforge_preview` pool (per FR-72 AC-2 / AR-63).
+3. **Given** I click "Preview" in Query Builder Mode, **When** the request is sent to `POST /api/datasets/preview` with `builder_state`, **Then** the server generates SQL from `builder_state` via `DatasetSqlGenerator.Generate`, appends `LIMIT 10`, applies the statement timeout, and executes against the `appforge_preview` pool (per FR-72 AC-2 / AR-63).
 
 4. **Given** the preview returns results, **When** the UI renders them, **Then** column names appear as headers; up to 10 data rows are displayed (per FR-72 AC-4).
 
@@ -32,9 +32,9 @@ So that I can validate correctness before the VIEW is persisted.
 
 ### Task 1: Backend — Create `PreviewRequest` and `PreviewResultDto` (AC: 2, 3, 4)
 
-- [x] Create `src/FormForge.Api/Features/Datasets/Dtos/PreviewRequest.cs` (NEW):
+- [x] Create `src/AppForge.Api/Features/Datasets/Dtos/PreviewRequest.cs` (NEW):
   ```csharp
-  namespace FormForge.Api.Features.Datasets.Dtos;
+  namespace AppForge.Api.Features.Datasets.Dtos;
 
   internal sealed record PreviewRequest(
       bool IsCustomQuery,
@@ -42,9 +42,9 @@ So that I can validate correctness before the VIEW is persisted.
       string? BuilderState);
   ```
 
-- [x] Create `src/FormForge.Api/Features/Datasets/Dtos/PreviewResultDto.cs` (NEW):
+- [x] Create `src/AppForge.Api/Features/Datasets/Dtos/PreviewResultDto.cs` (NEW):
   ```csharp
-  namespace FormForge.Api.Features.Datasets.Dtos;
+  namespace AppForge.Api.Features.Datasets.Dtos;
 
   internal sealed record PreviewResultDto(
       IReadOnlyList<string> Columns,
@@ -55,11 +55,11 @@ So that I can validate correctness before the VIEW is persisted.
 
 ### Task 2: Backend — Create `IPreviewConnectionFactory` and `PreviewConnectionFactory` (AC: 2, 3)
 
-- [x] Create `src/FormForge.Api/Infrastructure/Persistence/IPreviewConnectionFactory.cs` (NEW — under `Infrastructure/Persistence` matching `DbConnectionFactory`):
+- [x] Create `src/AppForge.Api/Infrastructure/Persistence/IPreviewConnectionFactory.cs` (NEW — under `Infrastructure/Persistence` matching `DbConnectionFactory`):
   ```csharp
   using Npgsql;
 
-  namespace FormForge.Api.Infrastructure.Persistence;
+  namespace AppForge.Api.Infrastructure.Persistence;
 
   internal interface IPreviewConnectionFactory
   {
@@ -67,11 +67,11 @@ So that I can validate correctness before the VIEW is persisted.
   }
   ```
 
-- [x] Create `src/FormForge.Api/Infrastructure/Persistence/PreviewConnectionFactory.cs` (NEW):
+- [x] Create `src/AppForge.Api/Infrastructure/Persistence/PreviewConnectionFactory.cs` (NEW):
   ```csharp
   using Npgsql;
 
-  namespace FormForge.Api.Infrastructure.Persistence;
+  namespace AppForge.Api.Infrastructure.Persistence;
 
   [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
       Justification = "Registered via DI.")]
@@ -79,9 +79,9 @@ So that I can validate correctness before the VIEW is persisted.
       : IPreviewConnectionFactory
   {
       private string ConnectionString =>
-          configuration.GetConnectionString("formforge_preview")
+          configuration.GetConnectionString("appforge_preview")
           ?? throw new InvalidOperationException(
-              "Connection string 'formforge_preview' not configured.");
+              "Connection string 'appforge_preview' not configured.");
 
       public async Task<NpgsqlConnection> CreateOpenConnectionAsync(CancellationToken ct = default)
       {
@@ -99,20 +99,20 @@ So that I can validate correctness before the VIEW is persisted.
       }
   }
   ```
-  Connection string key is `"formforge_preview"` (matches the PostgreSQL role name).
+  Connection string key is `"appforge_preview"` (matches the PostgreSQL role name).
   `Maximum Pool Size=5` (per AR-63) is enforced via the connection string parameter — see Task 5.
 
 ---
 
 ### Task 3: Backend — Create `PreviewService` (AC: 2, 3, 5, 6, 7)
 
-- [x] Create `src/FormForge.Api/Features/Datasets/PreviewService.cs` (NEW):
+- [x] Create `src/AppForge.Api/Features/Datasets/PreviewService.cs` (NEW):
   ```csharp
-  using FormForge.Api.Features.Datasets.Dtos;
-  using FormForge.Api.Infrastructure.Persistence;
+  using AppForge.Api.Features.Datasets.Dtos;
+  using AppForge.Api.Infrastructure.Persistence;
   using Npgsql;
 
-  namespace FormForge.Api.Features.Datasets;
+  namespace AppForge.Api.Features.Datasets;
 
   internal interface IPreviewService
   {
@@ -223,7 +223,7 @@ So that I can validate correctness before the VIEW is persisted.
 
 ### Task 4: Backend — Replace 501 stub in `DatasetEndpoints.cs` (AC: 1–8)
 
-- [x] Modify `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` (MODIFY):
+- [x] Modify `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` (MODIFY):
   - [x] Replace lines 62-64 (the 501 stub):
     ```csharp
     // BEFORE:
@@ -276,28 +276,28 @@ So that I can validate correctness before the VIEW is persisted.
     .RequireDatasetManagement();
     ```
   - [x] **Do NOT move** the `/preview` registration — it must remain before `MapPost("/")`. The existing position (line 62) is already correct.
-  - [x] Add `using FormForge.Api.Features.Datasets.Dtos;` at the top of the file if not already present (check existing usings).
+  - [x] Add `using AppForge.Api.Features.Datasets.Dtos;` at the top of the file if not already present (check existing usings).
 
 ---
 
 ### Task 5: Backend — Register DI and add connection string config (AC: 2, 3)
 
-- [x] Modify `src/FormForge.Api/Program.cs` (MODIFY):
+- [x] Modify `src/AppForge.Api/Program.cs` (MODIFY):
   - [x] Search for where `IDatasetService` and `IDatasetAllowlist` are registered (e.g., `AddScoped<IDatasetService>`). Add immediately after:
     ```csharp
     builder.Services.AddSingleton<IPreviewConnectionFactory, PreviewConnectionFactory>();
     builder.Services.AddScoped<IPreviewService, PreviewService>();
     ```
 
-- [x] Modify `src/FormForge.Api/appsettings.Compose.json` (MODIFY):
-  - [x] Add the `formforge_preview` connection string alongside the existing `"formforge"` entry. `Maximum Pool Size=5` is set here per AR-63:
+- [x] Modify `src/AppForge.Api/appsettings.Compose.json` (MODIFY):
+  - [x] Add the `appforge_preview` connection string alongside the existing `"appforge"` entry. `Maximum Pool Size=5` is set here per AR-63:
     ```json
     "ConnectionStrings": {
-      "formforge": "Host=postgres;Port=5432;Database=formforge;Username=postgres;Password=postgres",
-      "formforge_preview": "Host=postgres;Port=5432;Database=formforge;Username=formforge_preview;Password=CHANGEME;Maximum Pool Size=5"
+      "appforge": "Host=postgres;Port=5432;Database=appforge;Username=postgres;Password=postgres",
+      "appforge_preview": "Host=postgres;Port=5432;Database=appforge;Username=appforge_preview;Password=CHANGEME;Maximum Pool Size=5"
     }
     ```
-  - [x] **Find the `formforge_preview` role password** before committing: check `docker-compose.yml` or the Aspire AppHost (`AppHost/Program.cs`) for where the role password is set post-migration (the migration creates the role but sets no password). Replace `CHANGEME` with the actual value. If the dev environment uses trust/peer auth, adjust accordingly.
+  - [x] **Find the `appforge_preview` role password** before committing: check `docker-compose.yml` or the Aspire AppHost (`AppHost/Program.cs`) for where the role password is set post-migration (the migration creates the role but sets no password). Replace `CHANGEME` with the actual value. If the dev environment uses trust/peer auth, adjust accordingly.
   - [x] If `appsettings.Development.json` is used for local-without-Docker runs, add the connection string there too.
 
 ---
@@ -495,7 +495,7 @@ So that I can validate correctness before the VIEW is persisted.
 
 ### Task 10: Backend — Tests (AC: 2, 3, 5, 6, 7, 8)
 
-- [x] Create `src/FormForge.Api.Tests/Features/Datasets/DatasetPreviewTests.cs` (NEW — integration tests):
+- [x] Create `src/AppForge.Api.Tests/Features/Datasets/DatasetPreviewTests.cs` (NEW — integration tests):
   - [x] **Test 1: `Post_Preview_CustomQuery_Returns200`** — POST `{ isCustomQuery: true, query: "SELECT 1 AS n" }` → 200, `columns == ["n"]`, `rows[0][0] == 1`.
   - [x] **Test 2: `Post_Preview_CustomQuery_DdlQuery_Returns422`** — POST `{ isCustomQuery: true, query: "DROP TABLE custom_dataset" }` → 422, `code == "DATASET_QUERY_INVALID"`.
   - [x] **Test 3: `Post_Preview_BuilderMode_ValidState_Returns200`** — POST `{ isCustomQuery: false, builderState: <valid state with one allowlisted table, one checked column> }` → 200, `columns` present.
@@ -503,7 +503,7 @@ So that I can validate correctness before the VIEW is persisted.
   - [x] **Test 5: `Post_Preview_IsReadOnly`** — record `COUNT(*)` of `custom_dataset` before POST `/preview`, then after; assert count is unchanged.
   - [x] **Test 6: `Post_Preview_NoPermission_Returns403`** — request authenticated as a user without `dataset-management` permission → 403.
 
-- [x] Create `src/FormForge.Api.Tests/Features/Datasets/PreviewServiceTests.cs` (NEW — unit tests, mock `IPreviewConnectionFactory`):
+- [x] Create `src/AppForge.Api.Tests/Features/Datasets/PreviewServiceTests.cs` (NEW — unit tests, mock `IPreviewConnectionFactory`):
   - [x] `ExecuteAsync_CustomQuery_EmptyQuery_ReturnsSqlError`
   - [x] `ExecuteAsync_CustomQuery_NonSelectQuery_ReturnsSqlError` (e.g., `"DELETE FROM foo"`)
   - [x] `ExecuteAsync_BuilderMode_NullBuilderState_ReturnsBuilderStateInvalid`
@@ -516,8 +516,8 @@ So that I can validate correctness before the VIEW is persisted.
 
 ### Task 11: Verify
 
-- [x] `dotnet build src/FormForge.Api` → 0 warnings / 0 errors
-- [x] `dotnet test src/FormForge.Api.Tests` → all new preview tests pass; pre-existing 2 audit 405 failures remain (do NOT reinvestigate)
+- [x] `dotnet build src/AppForge.Api` → 0 warnings / 0 errors
+- [x] `dotnet test src/AppForge.Api.Tests` → all new preview tests pass; pre-existing 2 audit 405 failures remain (do NOT reinvestigate)
 - [x] `npm run test` → frontend tests pass
 - [x] `npm run check` → TypeScript type-check passes; 0 new type errors; i18n-lint exits 0
 
@@ -527,7 +527,7 @@ So that I can validate correctness before the VIEW is persisted.
 
 ### 1. What Already Exists — Do NOT Redo
 
-- **`formforge_preview` role** — created by migration `20260602234849_CreateDatasetManagerFoundation.cs` (line 141). Granted SELECT on public tables, REVOKED on 14 internal tables. Verified by `DatasetMigrationTests.cs:220`. Only the connection string config is missing.
+- **`appforge_preview` role** — created by migration `20260602234849_CreateDatasetManagerFoundation.cs` (line 141). Granted SELECT on public tables, REVOKED on 14 internal tables. Verified by `DatasetMigrationTests.cs:220`. Only the connection string config is missing.
 - **501 stub** — `POST /api/datasets/preview` already registered in `DatasetEndpoints.cs` at lines 62-64, already positioned before `MapPost("/")`. Replace the lambda body only; do NOT move the registration.
 - **`DatasetSqlGenerator.Generate`** — already produces `ParameterizedSql` (with `$1,$2,…`) AND `Parameters` (`IReadOnlyList<object?>` in position order). Comment on line 16 explicitly says "Consumed by Story 11.3's preview endpoint." Use `ParameterizedSql` + `Parameters` for preview — NOT `ViewSql` (which inlines literals for VIEW DDL).
 - **`SqlSelectEnforcer.Validate(sql)`** — exact method name is `Validate`, not `IsSelectOnly`. Returns `SqlValidationResult` with `.IsValid` (bool) and `.ErrorMessage` (string?). Uses pgsqlparser (not PgQuery.NET — that package is fictional per memory note).
@@ -554,9 +554,9 @@ Follow `DbConnectionFactory` exactly:
 ```
 Host=postgres;...;Maximum Pool Size=5
 ```
-Npgsql's default pool is per-unique-connection-string, so a separate `formforge_preview` connection string gets its own 5-connection pool automatically.
+Npgsql's default pool is per-unique-connection-string, so a separate `appforge_preview` connection string gets its own 5-connection pool automatically.
 
-### 4. `formforge_preview` Role Password
+### 4. `appforge_preview` Role Password
 
 The migration (`20260602234849_CreateDatasetManagerFoundation.cs:141`) creates the role as `LOGIN NOINHERIT` but sets no password. Find where the password is initialized by checking:
 1. `docker-compose.yml` for an `initdb.d` script or env var
@@ -583,9 +583,9 @@ Story 8.10 built the dataset management UI. Read `web/src/routes/_app/admin/data
 
 `datasets_.$id.tsx` has `const { t } = useTranslation()` added by Story 11.2. Do not add it a second time. If Story 11.2 is not yet merged into the branch, add it once.
 
-### 9. Test: `formforge_preview` Role in Integration Tests
+### 9. Test: `appforge_preview` Role in Integration Tests
 
-Integration tests use the same Postgres instance as the main DB (provisioned with migrations). Since the migration creates `formforge_preview`, the role already exists in the test DB. The test connection string for `formforge_preview` must be configured in the test project's `appsettings.json` or test setup — check how `DatasetMigrationTests.cs` provisions its connection to understand the test DB setup pattern.
+Integration tests use the same Postgres instance as the main DB (provisioned with migrations). Since the migration creates `appforge_preview`, the role already exists in the test DB. The test connection string for `appforge_preview` must be configured in the test project's `appsettings.json` or test setup — check how `DatasetMigrationTests.cs` provisions its connection to understand the test DB setup pattern.
 
 ### 10. Deferred Items Not in This Story
 
@@ -596,18 +596,18 @@ Integration tests use the same Postgres instance as the main DB (provisioned wit
 ### Project Structure Notes
 
 **New files:**
-- `src/FormForge.Api/Features/Datasets/Dtos/PreviewRequest.cs`
-- `src/FormForge.Api/Features/Datasets/Dtos/PreviewResultDto.cs`
-- `src/FormForge.Api/Features/Datasets/PreviewService.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/IPreviewConnectionFactory.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/PreviewConnectionFactory.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetPreviewTests.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/PreviewServiceTests.cs`
+- `src/AppForge.Api/Features/Datasets/Dtos/PreviewRequest.cs`
+- `src/AppForge.Api/Features/Datasets/Dtos/PreviewResultDto.cs`
+- `src/AppForge.Api/Features/Datasets/PreviewService.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/IPreviewConnectionFactory.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/PreviewConnectionFactory.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetPreviewTests.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/PreviewServiceTests.cs`
 
 **Modified files:**
-- `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — replace 501 stub at lines 62-64
-- `src/FormForge.Api/Program.cs` — register `IPreviewConnectionFactory` (singleton) + `IPreviewService` (scoped)
-- `src/FormForge.Api/appsettings.Compose.json` — add `"formforge_preview"` connection string with `Maximum Pool Size=5`
+- `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — replace 501 stub at lines 62-64
+- `src/AppForge.Api/Program.cs` — register `IPreviewConnectionFactory` (singleton) + `IPreviewService` (scoped)
+- `src/AppForge.Api/appsettings.Compose.json` — add `"appforge_preview"` connection string with `Maximum Pool Size=5`
 - `web/src/features/datasets/datasetApi.ts` — add `PreviewDatasetPayload`, `PreviewResult`, `previewDataset`
 - `web/src/routes/_app/admin/datasets_.$id.tsx` — add Preview button + results panel
 - `web/src/routes/_app/admin/datasets.tsx` — add Preview button + results in custom query form
@@ -617,15 +617,15 @@ Integration tests use the same Postgres instance as the main DB (provisioned wit
 
 - Epics: `_bmad-output/planning-artifacts/epics.md` §Story 11.3 (FR-72 / AR-63)
 - Architecture: `_bmad-output/planning-artifacts/architecture.md` §AR-63 (preview pool + timeout execution), §AR-58 (permission gate), §6.13 (TanStack preview query key)
-- `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs:62-64` — 501 stub to replace
-- `src/FormForge.Api/Features/Datasets/DatasetSqlGenerator.cs:16,24-25` — `ParameterizedSql` + `Parameters` (for preview)
-- `src/FormForge.Api/Features/Datasets/SqlSelectEnforcer.cs` — `Validate(sql)` → `SqlValidationResult` (exact API)
-- `src/FormForge.Api/Features/Datasets/Dtos/BuilderStateDto.cs:135` — `BuilderStateSerializer.Deserialize`
-- `src/FormForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs` — connection factory pattern to replicate
-- `src/FormForge.Api/appsettings.json:27` — `DatasetManager:PreviewTimeoutSeconds` (default 5)
-- `src/FormForge.Api/appsettings.Compose.json` — existing connection strings (add `formforge_preview` here)
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetMigrationTests.cs:217-220` — `formforge_preview` role existence test
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260602234849_CreateDatasetManagerFoundation.cs:140-161` — role creation + GRANT/REVOKE script
+- `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs:62-64` — 501 stub to replace
+- `src/AppForge.Api/Features/Datasets/DatasetSqlGenerator.cs:16,24-25` — `ParameterizedSql` + `Parameters` (for preview)
+- `src/AppForge.Api/Features/Datasets/SqlSelectEnforcer.cs` — `Validate(sql)` → `SqlValidationResult` (exact API)
+- `src/AppForge.Api/Features/Datasets/Dtos/BuilderStateDto.cs:135` — `BuilderStateSerializer.Deserialize`
+- `src/AppForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs` — connection factory pattern to replicate
+- `src/AppForge.Api/appsettings.json:27` — `DatasetManager:PreviewTimeoutSeconds` (default 5)
+- `src/AppForge.Api/appsettings.Compose.json` — existing connection strings (add `appforge_preview` here)
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetMigrationTests.cs:217-220` — `appforge_preview` role existence test
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260602234849_CreateDatasetManagerFoundation.cs:140-161` — role creation + GRANT/REVOKE script
 - Memory: Pre-existing audit 405 test failures — 2 tests fail on clean tree, do NOT reinvestigate
 - Memory: pgsqlparser (not PgQuery.NET) — `SqlSelectEnforcer` already uses pgsqlparser; no new parser usage needed in this story
 
@@ -637,9 +637,9 @@ claude-opus-4-8 (1M context)
 
 ### Debug Log References
 
-- `dotnet build src/FormForge.Api` → 0 warnings / 0 errors (after fixing CA2007 `await using`,
+- `dotnet build src/AppForge.Api` → 0 warnings / 0 errors (after fixing CA2007 `await using`,
   CA2100 dynamic CommandText, EF1002 interpolated `ExecuteSqlRaw`).
-- `dotnet test src/FormForge.Api.Tests` → 1009 passed; only the 2 documented pre-existing
+- `dotnet test src/AppForge.Api.Tests` → 1009 passed; only the 2 documented pre-existing
   audit-405 failures remain (`SchemaAuditLogIntegrationTests` / `MutationAuditLogIntegrationTests`
   `*_DeleteVerb_Returns405`). New preview tests: 13 passed (filter `~Preview`).
 - `npx tsc -b --noEmit` → exit 0. `npm run lint:i18n` → exit 0 (no missing keys; one intentional
@@ -649,7 +649,7 @@ claude-opus-4-8 (1M context)
 ### Completion Notes List
 
 - **Backend**: `PreviewRequest`/`PreviewResultDto` DTOs, `IPreviewConnectionFactory` +
-  `PreviewConnectionFactory` (reads the dedicated `formforge_preview` pool), and `PreviewService`
+  `PreviewConnectionFactory` (reads the dedicated `appforge_preview` pool), and `PreviewService`
   (resolves SQL from custom query via `SqlSelectEnforcer.Validate` or from `builder_state` via
   `DatasetSqlGenerator.Generate` → `ParameterizedSql` + `Parameters`; executes inside a
   transaction scoped by `SET LOCAL statement_timeout`; classifies 57014 → Timeout, other Npgsql
@@ -662,12 +662,12 @@ claude-opus-4-8 (1M context)
   `DatasetService.GetByIdAsync`). A justified CA2100 suppression covers the dynamic CommandText
   (SELECT-only-validated / server-generated, values parameterized).
 - **Preview role password (resolved ops gap)**: investigation found NO existing mechanism sets
-  the `formforge_preview` role password anywhere (docker-compose, AppHost, and code all leave it
+  the `appforge_preview` role password anywhere (docker-compose, AppHost, and code all leave it
   unset; the migration documents that "ops/Aspire sets it via DATASET_PREVIEW_DB_PASSWORD" but
   nothing does). To make the connection string functional under Compose and honor that contract,
   added an idempotent startup step in `Program.cs` (right after `db.Database.Migrate()`) that
-  runs `ALTER ROLE formforge_preview … PASSWORD` from `DatasetManager:PreviewRolePassword` when
-  configured. `appsettings.Compose.json` now sets both the `formforge_preview` connection string
+  runs `ALTER ROLE appforge_preview … PASSWORD` from `DatasetManager:PreviewRolePassword` when
+  configured. `appsettings.Compose.json` now sets both the `appforge_preview` connection string
   (`Maximum Pool Size=5`) and that password. The step is skipped when no password is configured
   (integration tests point the preview pool at the test superuser connection string, so the role
   password is never needed there). `appsettings.Development.json` was intentionally NOT changed:
@@ -689,18 +689,18 @@ claude-opus-4-8 (1M context)
 ### File List
 
 **New (backend):**
-- `src/FormForge.Api/Features/Datasets/Dtos/PreviewRequest.cs`
-- `src/FormForge.Api/Features/Datasets/Dtos/PreviewResultDto.cs`
-- `src/FormForge.Api/Features/Datasets/PreviewService.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/IPreviewConnectionFactory.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/PreviewConnectionFactory.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetPreviewTests.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/PreviewServiceTests.cs`
+- `src/AppForge.Api/Features/Datasets/Dtos/PreviewRequest.cs`
+- `src/AppForge.Api/Features/Datasets/Dtos/PreviewResultDto.cs`
+- `src/AppForge.Api/Features/Datasets/PreviewService.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/IPreviewConnectionFactory.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/PreviewConnectionFactory.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetPreviewTests.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/PreviewServiceTests.cs`
 
 **Modified (backend):**
-- `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — replaced /preview 501 stub
-- `src/FormForge.Api/Program.cs` — DI registration + idempotent preview-role password step
-- `src/FormForge.Api/appsettings.Compose.json` — `formforge_preview` connection string + password
+- `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — replaced /preview 501 stub
+- `src/AppForge.Api/Program.cs` — DI registration + idempotent preview-role password step
+- `src/AppForge.Api/appsettings.Compose.json` — `appforge_preview` connection string + password
 
 **Modified (frontend):**
 - `web/src/features/datasets/datasetApi.ts` — `previewDataset` + types
@@ -718,15 +718,15 @@ claude-opus-4-8 (1M context)
 
 ### Review Findings
 
-- [x] [Review][Patch] Cache `ConnectionString` in constructor — re-reads `IConfiguration` on every call; late failure if key absent [`src/FormForge.Api/Infrastructure/Persistence/PreviewConnectionFactory.cs`]
-- [x] [Review][Patch] Validate `DatasetManager:PreviewTimeoutSeconds` — non-numeric value surfaces as SqlError; zero disables timeout entirely; fall back to 5 [`src/FormForge.Api/Features/Datasets/PreviewService.cs:77`]
+- [x] [Review][Patch] Cache `ConnectionString` in constructor — re-reads `IConfiguration` on every call; late failure if key absent [`src/AppForge.Api/Infrastructure/Persistence/PreviewConnectionFactory.cs`]
+- [x] [Review][Patch] Validate `DatasetManager:PreviewTimeoutSeconds` — non-numeric value surfaces as SqlError; zero disables timeout entirely; fall back to 5 [`src/AppForge.Api/Features/Datasets/PreviewService.cs:77`]
 - [x] [Review][Patch] Add `useEffect([builderState])` to clear stale preview results when canvas state changes [`web/src/routes/_app/admin/datasets_.$id.tsx`]
 - [x] [Review][Patch] Fix duplicate React keys in preview table headers — use `key={col + '-' + i}` [`web/src/routes/_app/admin/datasets.tsx`, `web/src/routes/_app/admin/datasets_.$id.tsx`]
-- [x] [Review][Patch] Strip trailing semicolon from custom query before subquery wrapping — `SELECT 1;` causes Postgres parse error [`src/FormForge.Api/Features/Datasets/PreviewService.cs:98`]
-- [x] [Review][Patch] Add null guard for `generated.ParameterizedSql` after `HasErrors` check — null-forgiving `!` could throw NullReferenceException on generator contract violation [`src/FormForge.Api/Features/Datasets/PreviewService.cs:68`]
-- [x] [Review][Patch] Add log statement in `_` wildcard of `PreviewOutcome` switch — silent 500 with no diagnostic [`src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs`]
+- [x] [Review][Patch] Strip trailing semicolon from custom query before subquery wrapping — `SELECT 1;` causes Postgres parse error [`src/AppForge.Api/Features/Datasets/PreviewService.cs:98`]
+- [x] [Review][Patch] Add null guard for `generated.ParameterizedSql` after `HasErrors` check — null-forgiving `!` could throw NullReferenceException on generator contract violation [`src/AppForge.Api/Features/Datasets/PreviewService.cs:68`]
+- [x] [Review][Patch] Add log statement in `_` wildcard of `PreviewOutcome` switch — silent 500 with no diagnostic [`src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs`]
 - [x] [Review][Patch] Fix `datasets.previewTimeout` i18n key wording to match AC-5 ("Preview query exceeded the time limit. Simplify the query or add filters.") [`web/src/lib/i18n/locales/en.json`]
-- [x] [Review][Patch] Add integration test for genuine Postgres execution error path — AC-6 gap (e.g. `SELECT * FROM nonexistent_table` → 422 with PG message) [`src/FormForge.Api.Tests/Features/Datasets/DatasetPreviewTests.cs`]
+- [x] [Review][Patch] Add integration test for genuine Postgres execution error path — AC-6 gap (e.g. `SELECT * FROM nonexistent_table` → 422 with PG message) [`src/AppForge.Api.Tests/Features/Datasets/DatasetPreviewTests.cs`]
 - [x] [Review][Defer] Rate limiting on `/preview` — shared "admin" 120 req/min bucket; preview-specific limit out of scope [`DatasetEndpoints.cs`] — deferred, pre-existing rate limit architecture
 - [x] [Review][Defer] `CommitAsync` on read-only transaction — dispose triggers implicit rollback; no correctness bug [`PreviewService.cs`] — deferred, pre-existing
 - [x] [Review][Defer] Hardcoded password in `appsettings.Compose.json` — dev-only file, by design [`appsettings.Compose.json`] — deferred, pre-existing

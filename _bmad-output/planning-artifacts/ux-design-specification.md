@@ -12,19 +12,19 @@ inputDocuments:
 scope: focused-token-spec
 ---
 
-# UX Design Specification — FormForge Theme Token System
+# UX Design Specification — AppForge Theme Token System
 
 **Author:** jukhan
 **Date:** 2026-05-31
 **Scope:** Semantic CSS-variable token system for three themes (Default Light, Slate Dark, Solarized), three regions (left menu, header, body), and five component groups (buttons, icon buttons, breadcrumbs, tabs, forms). Remediation of `dark:`-variant + hardcoded-color breakage.
 
-> **Workflow note.** This run used the *focused token spec* path of `bmad-create-ux-design`. Generic UX-discovery steps (audience, IA, emotional response, inspiration, user journeys) were intentionally skipped because FormForge already ships from Epic 7 — this is brownfield theming remediation, not greenfield product UX. The four relevant workflow steps are folded together below: **§2 Design-System Foundation (step 6)**, **§3 Visual Foundation / Tokens (step 8)**, **§5–6 Component & Region Strategy (step 11)**, **§7 Accessibility (step 13)**.
+> **Workflow note.** This run used the *focused token spec* path of `bmad-create-ux-design`. Generic UX-discovery steps (audience, IA, emotional response, inspiration, user journeys) were intentionally skipped because AppForge already ships from Epic 7 — this is brownfield theming remediation, not greenfield product UX. The four relevant workflow steps are folded together below: **§2 Design-System Foundation (step 6)**, **§3 Visual Foundation / Tokens (step 8)**, **§5–6 Component & Region Strategy (step 11)**, **§7 Accessibility (step 13)**.
 
 ---
 
 ## 1. Problem Statement & Current-State Findings
 
-FormForge's token *infrastructure already exists and is sound*; the breakage is in **how components consume it**.
+AppForge's token *infrastructure already exists and is sound*; the breakage is in **how components consume it**.
 
 **What already works (keep):**
 

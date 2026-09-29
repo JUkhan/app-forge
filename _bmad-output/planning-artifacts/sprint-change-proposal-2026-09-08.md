@@ -1,6 +1,6 @@
 ---
 workflowType: 'correct-course'
-project_name: 'FormForge (tinnitus)'
+project_name: 'AppForge (tinnitus)'
 user_name: 'jukhan'
 date: '2026-09-08'
 status: 'approved'
@@ -16,7 +16,7 @@ inputDocuments:
 
 ## 1. Issue Summary
 
-FormForge was designed and substantially implemented as a **single-tenant** platform. This was a deliberate, locked decision, not an oversight:
+AppForge was designed and substantially implemented as a **single-tenant** platform. This was a deliberate, locked decision, not an oversight:
 
 - PRD Decision Log #3: "Tenancy: Single-tenant — Simpler data model; stated requirement" (alternative considered and rejected: Multi-tenant).
 - PRD Non-Goals (§5, A10): "Single-tenant deployment."
@@ -41,7 +41,7 @@ This is not a greenfield change. ~100 story implementation-artifact files exist 
 | 5 — Dynamic Table Provisioning | `SafeIdentifier`, `DdlEmitter`, and `SchemaRegistry` all currently assume a single global `public` schema — become tenant-schema-qualified | **High** (highest structural risk — this is where cross-tenant table collisions would occur today) |
 | 6 — Generic CRUD Service & Data Entry | ~30 SQL-assembly methods in `DynamicQueryBuilder.cs` schema-qualify every table reference | **High** (mechanical but broad) |
 | 7 — UX Polish & Cross-Cutting Hardening | Largely unaffected; no per-tenant branding hook exists today (noted as a gap, not in this phase's scope) | Low |
-| 8 — Dataset Foundation & Custom Query | `DatasetAllowlist` and the `formforge_preview` DB role currently see every table in `public` — this is a **distinct, currently-real cross-tenant leak vector** once multiple tenants share the database, independent of which isolation model is chosen | **High** |
+| 8 — Dataset Foundation & Custom Query | `DatasetAllowlist` and the `appforge_preview` DB role currently see every table in `public` — this is a **distinct, currently-real cross-tenant leak vector** once multiple tenants share the database, independent of which isolation model is chosen | **High** |
 | 9–11 — Query Builder, Builder Config, SQL Generation | `DatasetSqlGenerator` builds unqualified `FROM "public"."<table>"` — same root cause as Epic 8 | **High** |
 | **New: Tenant Foundation & Provisioning** | New epic, inserted after Epic 2 | New (foundational — blocks all rework above) |
 
@@ -164,7 +164,7 @@ Inserted after Epic 2. **User outcome:** a platform-super-admin creates a tenant
 |---|---|---|
 | AR-57 | Single shared `datasets` schema | Provisioned per tenant (same step as T-2) |
 | AR-62 | `DatasetAllowlist` discovers every table in `public` | Scoped to `information_schema.tables WHERE table_schema = @tenantSchema` |
-| AR-63 | `formforge_preview` role: `GRANT SELECT ON ALL TABLES IN SCHEMA public` | Per-tenant-scoped grants, set at tenant provisioning time |
+| AR-63 | `appforge_preview` role: `GRANT SELECT ON ALL TABLES IN SCHEMA public` | Per-tenant-scoped grants, set at tenant provisioning time |
 | AR-61 | SELECT-only enforcement is the only defense | Unchanged, now backstopped by schema-scoped allowlist + role grants |
 | FR-70 | `DatasetSqlGenerator` builds `FROM "public"."<table>"` | `FROM "{tenantSchema}"."<table>"`, injected server-side, never client-supplied |
 

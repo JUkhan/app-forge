@@ -41,7 +41,7 @@ so that debugging is tractable without guesswork.
 **Then** it additionally carries `designerId`, `operation`, and a `sqlFingerprint` field containing the parameterized SQL with placeholders only (no parameter values, per FR-46 AC-3)
 
 > **Scope clarification:** No DDL or CRUD code exists in the API today — Epic 5 (Provisioning) introduces the first DDL emissions; Epic 6 (CRUD) introduces the first dynamic SQL. AC-3 is satisfied in this story by **shipping the helper API** that Epic 5 / Epic 6 will call. The helper:
-> - lives in `src/FormForge.Api/Common/Logging/SqlFingerprint.cs`
+> - lives in `src/AppForge.Api/Common/Logging/SqlFingerprint.cs`
 > - exposes `static string Fingerprint(string parameterizedSql)` that strips all literal string / numeric values and leaves only placeholders (`@p0`, `@designerId`, etc.) — and is covered by unit tests
 > - exposes `static IDisposable BeginDdlScope(ILogger logger, string designerId, string operation, string sqlFingerprint)` and an analogous `BeginCrudScope` that push the three required fields into the logger scope dictionary
 > Epic 5 / Epic 6 story files will reference this helper and assert the actual log emissions land.
@@ -76,12 +76,12 @@ so that debugging is tractable without guesswork.
   - [x] In `Directory.Packages.props`, add two new `<PackageVersion>` entries:
     - `Ulid` — pick latest stable at implementation time from https://www.nuget.org/packages/Ulid (Cysharp). As of May 2026, expect `1.3.x` or later. The package is `netstandard2.1`-targeted and works fine on `net10.0`.
     - `Microsoft.AspNetCore.Mvc.Testing` — pick latest stable `10.0.x` from https://www.nuget.org/packages/Microsoft.AspNetCore.Mvc.Testing matching the EF Core / OpenAPI `10.0.x` family already pinned.
-  - [x] Add `<PackageReference Include="Ulid" />` (no inline `Version=` per CPM) to `src/FormForge.Api/FormForge.Api.csproj`.
-  - [x] Add `<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />` to `src/FormForge.Api.Tests/FormForge.Api.Tests.csproj`.
+  - [x] Add `<PackageReference Include="Ulid" />` (no inline `Version=` per CPM) to `src/AppForge.Api/AppForge.Api.csproj`.
+  - [x] Add `<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />` to `src/AppForge.Api.Tests/AppForge.Api.Tests.csproj`.
   - [x] Run `dotnet restore` — confirm clean (no NU1605 / NU1010).
 
 - [x] **Task 2 — Add `CorrelationIdMiddleware` and `LogContextExtensions`** (AC: 1, 2)
-  - [ ] Create `src/FormForge.Api/Common/Logging/CorrelationIdMiddleware.cs`:
+  - [ ] Create `src/AppForge.Api/Common/Logging/CorrelationIdMiddleware.cs`:
     - `internal sealed class CorrelationIdMiddleware(RequestDelegate next, ILogger<CorrelationIdMiddleware> logger)`
     - On invocation:
       1. Read `X-Correlation-ID` request header. If present, validate via `Ulid.TryParse(value, out var ulid)` — accept only the 26-char ULID form. Reject (treat as missing) on any other input. **Do not** echo client-supplied non-ULID values back; this prevents log-injection.
@@ -92,7 +92,7 @@ so that debugging is tractable without guesswork.
     - Header name lookups use the framework constant `HeaderNames.XCorrelationId` if available; otherwise the literal `"X-Correlation-ID"`.
     - Use `StringComparison.Ordinal` everywhere (per `InvariantGlobalization=true`).
     - Class is `internal sealed` to satisfy CA1515 + CA1852.
-  - [ ] Create `src/FormForge.Api/Common/Logging/LogContextExtensions.cs`:
+  - [ ] Create `src/AppForge.Api/Common/Logging/LogContextExtensions.cs`:
     - `internal static class LogContextExtensions`
     - `public static string? GetCorrelationId(this HttpContext context)` — reads `HttpContext.Items["CorrelationId"]` and returns the ULID string (or null if outside the HTTP pipeline).
     - `public static IDisposable? BeginUserScope(this ILogger logger, ClaimsPrincipal user)` — when `user.Identity?.IsAuthenticated == true`, push `["userId"] = userId, ["roles"] = roles` into a scope. Returns null when unauthenticated. Used by the auth filter in Story 2.6 — not invoked anywhere yet in this story.
@@ -116,10 +116,10 @@ so that debugging is tractable without guesswork.
     ```
   - [ ] In `appsettings.json`, leave the existing `Logging.LogLevel` block intact (it does not conflict with the formatter selection — the formatter is chosen in code).
   - [ ] **Important:** Do NOT remove the existing `Logging.AddOpenTelemetry()` call in `ServiceDefaults/Extensions.cs:49-53`. The two consumers coexist — JSON console is for container stdout (visible to `docker compose logs`, Compose + prod); OTel logging exporter is for the Aspire Dashboard (dev). `IncludeScopes = true` on both ensures correlation IDs appear in both surfaces.
-  - [ ] Verify (manual): run `dotnet run --project src/FormForge.Api`, hit `GET /`, confirm the request log line(s) are valid JSON with `Scopes` array containing the correlation ID.
+  - [ ] Verify (manual): run `dotnet run --project src/AppForge.Api`, hit `GET /`, confirm the request log line(s) are valid JSON with `Scopes` array containing the correlation ID.
 
 - [x] **Task 4 — Add `SqlFingerprint` helper** (AC: 3)
-  - [ ] Create `src/FormForge.Api/Common/Logging/SqlFingerprint.cs`:
+  - [ ] Create `src/AppForge.Api/Common/Logging/SqlFingerprint.cs`:
     - `internal static class SqlFingerprint`
     - `public static string Fingerprint(string parameterizedSql)` — accepts SQL that already uses Dapper-style `@name` or `$n` placeholders, returns it unchanged. Its purpose is **defense in depth**: it strips inline string-literal patterns (`'...'`) and inline numeric literals via two regex passes — replacing each with `?` so a future caller who accidentally interpolates a value still produces a fingerprint. Both regexes are pre-compiled `[GeneratedRegex(...)]` partials (CA1515 / SYSLIB1045).
     - `public static IDisposable BeginDdlScope(ILogger logger, string designerId, string operation, string sqlFingerprint)` — opens a scope dictionary with keys `designerId`, `operation`, `sqlFingerprint`.
@@ -142,10 +142,10 @@ so that debugging is tractable without guesswork.
         };
     });
     ```
-  - [ ] Add `using FormForge.Api.Common.Logging;` to `Program.cs` so `GetCorrelationId()` resolves.
+  - [ ] Add `using AppForge.Api.Common.Logging;` to `Program.cs` so `GetCorrelationId()` resolves.
 
 - [x] **Task 6 — Fix `OTEL_EXPORTER_OTLP_ENDPOINT` URI validation in ServiceDefaults** (AC: 6, deferred from Story 1.1 code review)
-  - [ ] In `src/FormForge.ServiceDefaults/Extensions.cs`, replace `AddOpenTelemetryExporters` (lines 81–98) so the gate is:
+  - [ ] In `src/AppForge.ServiceDefaults/Extensions.cs`, replace `AddOpenTelemetryExporters` (lines 81–98) so the gate is:
     ```csharp
     var raw = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
     if (!string.IsNullOrWhiteSpace(raw))
@@ -178,23 +178,23 @@ so that debugging is tractable without guesswork.
 
 - [x] **Task 7 — Add unit tests for the new helpers** (AC: 1, 3, 4, 5, 6)
   - [ ] At the bottom of `Program.cs`, after `app.Run();`, add `public partial class Program;` (single line) to make the auto-generated `Program` class accessible to `WebApplicationFactory<Program>` in the test project. CPM does not need a `Version=` for this — it is a source-file declaration, not a package.
-  - [ ] Create `src/FormForge.Api.Tests/Common/Logging/CorrelationIdMiddlewareTests.cs`:
+  - [ ] Create `src/AppForge.Api.Tests/Common/Logging/CorrelationIdMiddlewareTests.cs`:
     - **Test 1:** `HappyPath_ClientSuppliesValidUlid_ServerEchoesSameUlid` — `WebApplicationFactory<Program>` builds a client, sends `GET /` with `X-Correlation-ID: 01HX9JK8YZ4N6T2X3V5W7P9Q0R` (a known valid ULID), asserts response header equals the same value.
     - **Test 2:** `NoHeader_ServerGeneratesUlid` — no inbound header; response header is a 26-char value that round-trips through `Ulid.Parse(...)`.
     - **Test 3:** `MalformedHeader_IsIgnoredAndUlidIsGenerated` — inbound header `not-a-ulid-value`; response header is a fresh ULID (not the malformed input).
-  - [ ] Create `src/FormForge.Api.Tests/Common/Logging/SqlFingerprintTests.cs`:
+  - [ ] Create `src/AppForge.Api.Tests/Common/Logging/SqlFingerprintTests.cs`:
     - `Fingerprint_StripsSingleQuotedLiterals` — `"SELECT * FROM x WHERE name = 'bob'"` → `"SELECT * FROM x WHERE name = ?"`.
     - `Fingerprint_StripsInlineNumbers` — `"SELECT id FROM x WHERE age > 18"` → `"SELECT id FROM x WHERE age > ?"`.
     - `Fingerprint_PreservesNamedPlaceholders` — `"INSERT INTO x (id, name) VALUES (@p0, @p1)"` → unchanged.
     - `Fingerprint_NullThrows` — `ArgumentNullException`.
-  - [ ] Create `src/FormForge.Api.Tests/Common/Logging/ProblemDetailsCorrelationIdTests.cs`:
+  - [ ] Create `src/AppForge.Api.Tests/Common/Logging/ProblemDetailsCorrelationIdTests.cs`:
     - Trigger an exception path on a test endpoint (or hit `/__notfound`) → response body's `extensions.correlationId` equals the response header `X-Correlation-ID`.
-  - [ ] Create `src/FormForge.Api.Tests/ServiceDefaults/OtlpEndpointValidationTests.cs` (use the live `ConfigureOpenTelemetry` extension via a throwaway host):
+  - [ ] Create `src/AppForge.Api.Tests/ServiceDefaults/OtlpEndpointValidationTests.cs` (use the live `ConfigureOpenTelemetry` extension via a throwaway host):
     - Valid endpoint: `http://localhost:4317` → no warning logged.
     - Empty / whitespace endpoint → no warning, no exporter.
     - Malformed value `"not a uri"` → warning logged, host starts cleanly.
     - Wrong scheme `"file:///tmp/x"` → warning logged, host starts cleanly.
-  - [ ] **CA2254 verification (build-gate test):** add `src/FormForge.Api.Tests/Common/Logging/Ca2254FixtureNotes.md` (text doc only — not a runnable test) that includes a 3-line code sample of a string-interpolated `ILogger` call and a one-line shell command (`dotnet build src/FormForge.Api/` after temporarily uncommenting it) the reviewer can run to prove the analyzer fires. Do not actually commit a broken-build file — the doc is the reproducer. AC-4 is satisfied by the analyzer being active; the doc preserves the proof.
+  - [ ] **CA2254 verification (build-gate test):** add `src/AppForge.Api.Tests/Common/Logging/Ca2254FixtureNotes.md` (text doc only — not a runnable test) that includes a 3-line code sample of a string-interpolated `ILogger` call and a one-line shell command (`dotnet build src/AppForge.Api/` after temporarily uncommenting it) the reviewer can run to prove the analyzer fires. Do not actually commit a broken-build file — the doc is the reproducer. AC-4 is satisfied by the analyzer being active; the doc preserves the proof.
 
 - [x] **Task 8 — Manual verification + build gates** (AC: all)
   - [ ] `dotnet build` — zero warnings, zero errors.
@@ -205,7 +205,7 @@ so that debugging is tractable without guesswork.
     - `curl -i http://localhost:5xxx/ -H "X-Correlation-ID: 01HX9JK8YZ4N6T2X3V5W7P9Q0R"` → response header carries the same value; stdout log line is JSON containing the ID inside `Scopes`.
     - `curl -i http://localhost:5xxx/` (no header) → response header is a fresh 26-char ULID.
     - `curl -i http://localhost:5xxx/nope` → 404 ProblemDetails body has `extensions.correlationId` matching the `X-Correlation-ID` response header.
-  - [ ] Run AppHost (`dotnet run --project src/FormForge.AppHost`) — verify Aspire Dashboard receives logs and the correlation ID appears in the "Structured" log column / scope details.
+  - [ ] Run AppHost (`dotnet run --project src/AppForge.AppHost`) — verify Aspire Dashboard receives logs and the correlation ID appears in the "Structured" log column / scope details.
   - [ ] Run Compose mode (`docker compose up`) — `docker compose logs api` shows JSON lines, not the default plain-text formatter.
 
 ### Review Findings
@@ -214,24 +214,24 @@ Code review run on 2026-05-22 — three parallel layers (Blind Hunter, Edge Case
 
 **Decision-needed (7) — user input required before patching:**
 
-- [x] [Review][Decision] **ULID echo loses original case** — `Ulid.TryParse` is case-insensitive but `parsed.ToString()` returns canonical uppercase, so a client sending lowercase `01hx…` gets `01HX…` back. AC-1 says "the same correlation ID is set on the response header" — "same" is ambiguous (byte-equal vs canonical form). [src/FormForge.Api/Common/Logging/CorrelationIdMiddleware.cs:67-69]; test gap [src/FormForge.Api.Tests/Common/Logging/CorrelationIdMiddlewareTests.cs:14-28]
-- [x] [Review][Decision] **SqlFingerprint regex misses negatives, hex, scientific, dollar-quoted, E'' literals** — `-100` → `-?` (sign retained); `0x1F` survives unchanged; `1.5e10` → `?e?`; PG `$tag$secret$tag$` unchanged; `E'\n'` may terminate prematurely. Spec sanctions this as "defense in depth" with parameterization at the call site as the primary mechanism — but the helper's contract claim of "placeholders only -- never parameter values" is not upheld. [src/FormForge.Api/Common/Logging/SqlFingerprint.cs:13-19]
-- [x] [Review][Decision] **`BeginDdlScope` and `BeginCrudScope` emit identical scope payloads** — both produce `{ designerId, operation, sqlFingerprint }` with no tag distinguishing DDL from CRUD; downstream log filtering cannot tell them apart. Spec says "separate method only for caller-site readability" — so the API shape is fixed, but should the payloads carry an `operationKind` key? [src/FormForge.Api/Common/Logging/SqlFingerprint.cs:30-58]
-- [x] [Review][Decision] **`endpoint` scope value embeds unbounded, unsanitized `Request.Path`** — every log line for the request carries the full path (Kestrel allows ~8 KB) with no length cap and no control-character filter. The class header advertises log-injection prevention but doesn't apply it here. Spec just says scope contains "endpoint (request path + method)". Cap length / strip CR/LF or accept as-is? [src/FormForge.Api/Common/Logging/CorrelationIdMiddleware.cs:51-53]
-- [x] [Review][Decision] **`ProblemDetailsCorrelationIdTests` is gated by two nested `if`s — green-by-default** — body assertion runs only if the response body is non-empty JSON containing a `correlationId` property. A 404 with empty body passes without ever verifying the AC-5 extension wiring. Strengthen with a route that explicitly produces a ProblemDetails body, or accept the header as canonical proof (as Completion Notes argues)? [src/FormForge.Api.Tests/Common/Logging/ProblemDetailsCorrelationIdTests.cs:24-37]
-- [x] [Review][Decision] **`IsValidOtlpEndpoint` accepts URLs with embedded userinfo (credentials)** — `http://user:pass@otel:4317` passes validation and credentials propagate to `UseOtlpExporter()`. Spec only requires "absolute http/https with non-empty host", so technically compliant — but a real exfil risk if operators embed creds in URLs. Reject userinfo, strip silently, or accept? [src/FormForge.ServiceDefaults/Extensions.cs:108-113]
-- [x] [Review][Decision] **AC-6 test coverage narrower than Task 7 prescribes** — tests only assert the boolean `IsValidOtlpEndpoint` helper; Task 7 calls for "live `ConfigureOpenTelemetry` extension via a throwaway host" with empty / valid / malformed / wrong-scheme behavioral cases (warning logged vs not). Auditor judged AC-6 itself satisfied since the production gate is wired. Expand tests now or accept helper-level coverage? [src/FormForge.Api.Tests/ServiceDefaults/OtlpEndpointValidationTests.cs:1-46]
+- [x] [Review][Decision] **ULID echo loses original case** — `Ulid.TryParse` is case-insensitive but `parsed.ToString()` returns canonical uppercase, so a client sending lowercase `01hx…` gets `01HX…` back. AC-1 says "the same correlation ID is set on the response header" — "same" is ambiguous (byte-equal vs canonical form). [src/AppForge.Api/Common/Logging/CorrelationIdMiddleware.cs:67-69]; test gap [src/AppForge.Api.Tests/Common/Logging/CorrelationIdMiddlewareTests.cs:14-28]
+- [x] [Review][Decision] **SqlFingerprint regex misses negatives, hex, scientific, dollar-quoted, E'' literals** — `-100` → `-?` (sign retained); `0x1F` survives unchanged; `1.5e10` → `?e?`; PG `$tag$secret$tag$` unchanged; `E'\n'` may terminate prematurely. Spec sanctions this as "defense in depth" with parameterization at the call site as the primary mechanism — but the helper's contract claim of "placeholders only -- never parameter values" is not upheld. [src/AppForge.Api/Common/Logging/SqlFingerprint.cs:13-19]
+- [x] [Review][Decision] **`BeginDdlScope` and `BeginCrudScope` emit identical scope payloads** — both produce `{ designerId, operation, sqlFingerprint }` with no tag distinguishing DDL from CRUD; downstream log filtering cannot tell them apart. Spec says "separate method only for caller-site readability" — so the API shape is fixed, but should the payloads carry an `operationKind` key? [src/AppForge.Api/Common/Logging/SqlFingerprint.cs:30-58]
+- [x] [Review][Decision] **`endpoint` scope value embeds unbounded, unsanitized `Request.Path`** — every log line for the request carries the full path (Kestrel allows ~8 KB) with no length cap and no control-character filter. The class header advertises log-injection prevention but doesn't apply it here. Spec just says scope contains "endpoint (request path + method)". Cap length / strip CR/LF or accept as-is? [src/AppForge.Api/Common/Logging/CorrelationIdMiddleware.cs:51-53]
+- [x] [Review][Decision] **`ProblemDetailsCorrelationIdTests` is gated by two nested `if`s — green-by-default** — body assertion runs only if the response body is non-empty JSON containing a `correlationId` property. A 404 with empty body passes without ever verifying the AC-5 extension wiring. Strengthen with a route that explicitly produces a ProblemDetails body, or accept the header as canonical proof (as Completion Notes argues)? [src/AppForge.Api.Tests/Common/Logging/ProblemDetailsCorrelationIdTests.cs:24-37]
+- [x] [Review][Decision] **`IsValidOtlpEndpoint` accepts URLs with embedded userinfo (credentials)** — `http://user:pass@otel:4317` passes validation and credentials propagate to `UseOtlpExporter()`. Spec only requires "absolute http/https with non-empty host", so technically compliant — but a real exfil risk if operators embed creds in URLs. Reject userinfo, strip silently, or accept? [src/AppForge.ServiceDefaults/Extensions.cs:108-113]
+- [x] [Review][Decision] **AC-6 test coverage narrower than Task 7 prescribes** — tests only assert the boolean `IsValidOtlpEndpoint` helper; Task 7 calls for "live `ConfigureOpenTelemetry` extension via a throwaway host" with empty / valid / malformed / wrong-scheme behavioral cases (warning logged vs not). Auditor judged AC-6 itself satisfied since the production gate is wired. Expand tests now or accept helper-level coverage? [src/AppForge.Api.Tests/ServiceDefaults/OtlpEndpointValidationTests.cs:1-46]
 
 **Patch (4) — fix is unambiguous, awaiting batch apply:**
 
-- [x] [Review][Patch] **Multiple `X-Correlation-ID` header values silently fall through to fresh ULID** — `StringValues.ToString()` joins repeated headers with commas; the joined string fails `Ulid.TryParse` even when each individual value is valid (proxy duplication is common). Take `values[0]` and parse that. [src/FormForge.Api/Common/Logging/CorrelationIdMiddleware.cs:64-67]
-- [x] [Review][Patch] **`BeginDdlScope` / `BeginCrudScope` return `IDisposable` via `!` null-suppression** — `ILogger.BeginScope<TState>` returns `IDisposable?` per framework contract; custom loggers (Moq default) can legitimately return null and a `using` causes NRE on dispose. Align the helper signature to `IDisposable?`. [src/FormForge.Api/Common/Logging/SqlFingerprint.cs:42, 57]
-- [x] [Review][Patch] **Reflection-based OTLP test walks wrong assembly first; brittle fallback** — primary lookup `typeof(HostApplicationBuilder).Assembly.GetType(...)` cannot find the type (it lives in `FormForge.ServiceDefaults`); fallback iterates and `Assembly.Load`s every reference. Add `InternalsVisibleTo("FormForge.Api.Tests")` to `FormForge.ServiceDefaults` and call `ServiceDefaultsExtensions.IsValidOtlpEndpoint` directly. [src/FormForge.Api.Tests/ServiceDefaults/OtlpEndpointValidationTests.cs:30-44]
-- [x] [Review][Patch] **`LogOtlpEndpointInvalid` logs the raw env-var value (credential leak via userinfo)** — if `OTEL_EXPORTER_OTLP_ENDPOINT=https://user:secret@bad..host` (invalid due to malformed host), the warning template echoes the secret. Drop the `{Value}` placeholder from the LoggerMessage (or strip userinfo). [src/FormForge.ServiceDefaults/Extensions.cs:148-150]
+- [x] [Review][Patch] **Multiple `X-Correlation-ID` header values silently fall through to fresh ULID** — `StringValues.ToString()` joins repeated headers with commas; the joined string fails `Ulid.TryParse` even when each individual value is valid (proxy duplication is common). Take `values[0]` and parse that. [src/AppForge.Api/Common/Logging/CorrelationIdMiddleware.cs:64-67]
+- [x] [Review][Patch] **`BeginDdlScope` / `BeginCrudScope` return `IDisposable` via `!` null-suppression** — `ILogger.BeginScope<TState>` returns `IDisposable?` per framework contract; custom loggers (Moq default) can legitimately return null and a `using` causes NRE on dispose. Align the helper signature to `IDisposable?`. [src/AppForge.Api/Common/Logging/SqlFingerprint.cs:42, 57]
+- [x] [Review][Patch] **Reflection-based OTLP test walks wrong assembly first; brittle fallback** — primary lookup `typeof(HostApplicationBuilder).Assembly.GetType(...)` cannot find the type (it lives in `AppForge.ServiceDefaults`); fallback iterates and `Assembly.Load`s every reference. Add `InternalsVisibleTo("AppForge.Api.Tests")` to `AppForge.ServiceDefaults` and call `ServiceDefaultsExtensions.IsValidOtlpEndpoint` directly. [src/AppForge.Api.Tests/ServiceDefaults/OtlpEndpointValidationTests.cs:30-44]
+- [x] [Review][Patch] **`LogOtlpEndpointInvalid` logs the raw env-var value (credential leak via userinfo)** — if `OTEL_EXPORTER_OTLP_ENDPOINT=https://user:secret@bad..host` (invalid due to malformed host), the warning template echoes the secret. Drop the `{Value}` placeholder from the LoggerMessage (or strip userinfo). [src/AppForge.ServiceDefaults/Extensions.cs:148-150]
 
 **Deferred (1) — pre-existing or spec-sanctioned, tracked in deferred-work.md:**
 
-- [x] [Review][Defer] **WebApplicationFactory fixture relies on `Database.Migrate()` swallowing DNS-resolve failure for `ignored.invalid`** — Dev Notes "Testing standards summary" explicitly sanctions this approach and forbids in-memory EF provider / test-only env branch in Program.cs. Risk: DNS-resolver inconsistencies on some Windows CI agents could surface as a slow / hanging fixture startup. [src/FormForge.Api.Tests/Common/Logging/CorrelationIdMiddlewareTests.cs:63-72] — deferred, pre-existing
+- [x] [Review][Defer] **WebApplicationFactory fixture relies on `Database.Migrate()` swallowing DNS-resolve failure for `ignored.invalid`** — Dev Notes "Testing standards summary" explicitly sanctions this approach and forbids in-memory EF provider / test-only env branch in Program.cs. Risk: DNS-resolver inconsistencies on some Windows CI agents could surface as a slow / hanging fixture startup. [src/AppForge.Api.Tests/Common/Logging/CorrelationIdMiddlewareTests.cs:63-72] — deferred, pre-existing
 
 **Dismissed as noise (15):** brittle `OnStarting` cast (speculative future-refactor); claim that `UseExceptionHandler` re-execution drops the scope (incorrect — re-execution stays inside the original `BeginScope` frame); OTLP rejecting `grpc://`/`unix://` (spec explicitly limits to http/https); `LoggerFactory.Create` flush race (Console provider drains on dispose); `public partial class Program;` (spec mandates it for `WebApplicationFactory<Program>`); missing `Ulid` using directive (root namespace, no using needed); `BeginUserScope` dead code (spec carves out as Story 2.6 prep); test ULID literal fragility (speculative); middleware running on `/health`/`/alive` (spec mandates header on health responses); IDN hosts in OTLP URI (speculative DNS inconsistency); `.editorconfig` drive-by (documented in Completion Notes, functionally needed for test naming); `BeginUserScope` widened to `ClaimsPrincipal?` (defensive, semantic-equivalent); `Mvc.Testing 10.0.8` vs 10.0.7 (within spec's "10.0.x family"); AC-4 not demonstrated by a committed broken-build file (spec explicitly carves out the doc-only proof); `HttpContext.TraceIdentifier` overwrite (spec sanctions as "soft alignment" in Dev Notes).
 
@@ -264,12 +264,12 @@ This story implements **FR-46** in full plus the structural prerequisites of:
 
 ### Current code state (what you are modifying)
 
-**`src/FormForge.Api/Program.cs`** (current, 80 lines):
+**`src/AppForge.Api/Program.cs`** (current, 80 lines):
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.Services.AddProblemDetails();                         // ← extend (Task 5)
-builder.Services.AddDbContext<FormForgeDbContext>(...);
+builder.Services.AddDbContext<AppForgeDbContext>(...);
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddOpenApi(options => { ... });          // unchanged
@@ -283,18 +283,18 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.UseSwaggerUI(...);
 }
-app.MapGet("/", () => "FormForge API is running.");
+app.MapGet("/", () => "AppForge API is running.");
 app.MapDefaultEndpoints();
 app.Run();
 ```
 - The `StartupLog` partial class at the bottom uses `[LoggerMessage]` — that pattern is the canonical CA1848-compliant style; follow it for any new high-frequency log call sites (none in this story).
 - The story adds `builder.Logging.AddJsonConsole(...)` (Task 3), `builder.Services.AddProblemDetails(opts => ...)` (Task 5), and `app.UseMiddleware<CorrelationIdMiddleware>()` BEFORE `app.UseExceptionHandler()` (Task 2).
 
-**`src/FormForge.ServiceDefaults/Extensions.cs`** (current, 130 lines):
+**`src/AppForge.ServiceDefaults/Extensions.cs`** (current, 130 lines):
 - `ConfigureOpenTelemetry` (line 47) already calls `builder.Logging.AddOpenTelemetry(...)` with `IncludeScopes = true`. Leave intact — that path covers the OTel/Aspire Dashboard surface.
 - `AddOpenTelemetryExporters` (line 81) is the function to patch (Task 6). It currently activates the exporter on any non-whitespace value.
 
-**`src/FormForge.Api/appsettings.json`** — leave the `Logging.LogLevel` block intact; the formatter is selected in code, not config, to make the choice unambiguous and Compose-portable.
+**`src/AppForge.Api/appsettings.json`** — leave the `Logging.LogLevel` block intact; the formatter is selected in code, not config, to make the choice unambiguous and Compose-portable.
 
 ### Previous story intelligence (Story 1.4, completed 2026-05-22)
 
@@ -308,7 +308,7 @@ Key inherited context that affects this story:
 - **OpenAPI is dev-only and unaffected** — Swagger UI continues to work; the correlation header simply appears on its responses too.
 - **Aspire Dashboard** — Story 1.2 wired the dashboard. The architecture says correlation IDs should appear in Trace tags (AR-38 / §5.3 line 652). The framework's `Activity.Current.TraceId` is the OTel surface; setting `HttpContext.TraceIdentifier = correlationId` makes them align. This is a soft alignment, not a hard contract.
 - **`#pragma warning disable CA1031`** is used in `Program.cs` line 51–53 to suppress "do not catch general Exception" for the migration retry path. Pattern reuse is fine; avoid copy-pasting the suppression elsewhere.
-- **From Story 1.3 review:** `dotnet test` currently discovers zero tests. This story adds the first real tests, which means the `FormForge.Api.Tests` project will start producing pass counts on every build — track this in CI logs.
+- **From Story 1.3 review:** `dotnet test` currently discovers zero tests. This story adds the first real tests, which means the `AppForge.Api.Tests` project will start producing pass counts on every build — track this in CI logs.
 
 ### Git intelligence
 
@@ -335,23 +335,23 @@ After this story lands, commit message: `Story 1.5 — Structured logging + corr
 
 **Touch:**
 - `Directory.Packages.props` — add `Ulid` and `Microsoft.AspNetCore.Mvc.Testing` versions
-- `src/FormForge.Api/FormForge.Api.csproj` — add `Ulid` PackageReference
-- `src/FormForge.Api/Program.cs` — `AddJsonConsole`, `AddProblemDetails(opts)`, `UseMiddleware<CorrelationIdMiddleware>()`, `public partial class Program;` declaration
-- `src/FormForge.ServiceDefaults/Extensions.cs` — patch `AddOpenTelemetryExporters` + add `ServiceDefaultsLog` partial
-- `src/FormForge.Api.Tests/FormForge.Api.Tests.csproj` — add `Microsoft.AspNetCore.Mvc.Testing` PackageReference
+- `src/AppForge.Api/AppForge.Api.csproj` — add `Ulid` PackageReference
+- `src/AppForge.Api/Program.cs` — `AddJsonConsole`, `AddProblemDetails(opts)`, `UseMiddleware<CorrelationIdMiddleware>()`, `public partial class Program;` declaration
+- `src/AppForge.ServiceDefaults/Extensions.cs` — patch `AddOpenTelemetryExporters` + add `ServiceDefaultsLog` partial
+- `src/AppForge.Api.Tests/AppForge.Api.Tests.csproj` — add `Microsoft.AspNetCore.Mvc.Testing` PackageReference
 
 **New:**
-- `src/FormForge.Api/Common/Logging/CorrelationIdMiddleware.cs`
-- `src/FormForge.Api/Common/Logging/LogContextExtensions.cs`
-- `src/FormForge.Api/Common/Logging/SqlFingerprint.cs`
-- `src/FormForge.Api.Tests/Common/Logging/CorrelationIdMiddlewareTests.cs`
-- `src/FormForge.Api.Tests/Common/Logging/SqlFingerprintTests.cs`
-- `src/FormForge.Api.Tests/Common/Logging/ProblemDetailsCorrelationIdTests.cs`
-- `src/FormForge.Api.Tests/Common/Logging/Ca2254FixtureNotes.md` (reviewer-runnable proof; not a unit test)
-- `src/FormForge.Api.Tests/ServiceDefaults/OtlpEndpointValidationTests.cs`
+- `src/AppForge.Api/Common/Logging/CorrelationIdMiddleware.cs`
+- `src/AppForge.Api/Common/Logging/LogContextExtensions.cs`
+- `src/AppForge.Api/Common/Logging/SqlFingerprint.cs`
+- `src/AppForge.Api.Tests/Common/Logging/CorrelationIdMiddlewareTests.cs`
+- `src/AppForge.Api.Tests/Common/Logging/SqlFingerprintTests.cs`
+- `src/AppForge.Api.Tests/Common/Logging/ProblemDetailsCorrelationIdTests.cs`
+- `src/AppForge.Api.Tests/Common/Logging/Ca2254FixtureNotes.md` (reviewer-runnable proof; not a unit test)
+- `src/AppForge.Api.Tests/ServiceDefaults/OtlpEndpointValidationTests.cs`
 
 **Do NOT touch:**
-- `src/FormForge.AppHost/AppHost.cs` — no Aspire orchestration changes
+- `src/AppForge.AppHost/AppHost.cs` — no Aspire orchestration changes
 - `web/` — no frontend changes (the `X-Correlation-ID` outbound from frontend `httpClient.ts` lands with Decision 4.7 in Story 2.1, not here)
 - `docker-compose.yml`, `Dockerfile` — no infra changes
 - `appsettings.*.json` — formatter is selected in code (deliberate; do not introduce dual sources of truth)
@@ -379,18 +379,18 @@ After this story lands, commit message: `Story 1.5 — Structured logging + corr
 tinnitus/
 ├── Directory.Packages.props            ← ADD Ulid + Microsoft.AspNetCore.Mvc.Testing
 ├── src/
-│   ├── FormForge.Api/
-│   │   ├── FormForge.Api.csproj        ← ADD Ulid PackageReference
+│   ├── AppForge.Api/
+│   │   ├── AppForge.Api.csproj        ← ADD Ulid PackageReference
 │   │   ├── Program.cs                  ← AddJsonConsole, AddProblemDetails(opts), UseMiddleware, partial Program;
 │   │   └── Common/
 │   │       └── Logging/                ← NEW directory
 │   │           ├── CorrelationIdMiddleware.cs
 │   │           ├── LogContextExtensions.cs
 │   │           └── SqlFingerprint.cs
-│   ├── FormForge.ServiceDefaults/
+│   ├── AppForge.ServiceDefaults/
 │   │   └── Extensions.cs               ← PATCH AddOpenTelemetryExporters + add ServiceDefaultsLog
-│   └── FormForge.Api.Tests/
-│       ├── FormForge.Api.Tests.csproj  ← ADD Microsoft.AspNetCore.Mvc.Testing PackageReference
+│   └── AppForge.Api.Tests/
+│       ├── AppForge.Api.Tests.csproj  ← ADD Microsoft.AspNetCore.Mvc.Testing PackageReference
 │       ├── Common/Logging/
 │       │   ├── CorrelationIdMiddlewareTests.cs
 │       │   ├── SqlFingerprintTests.cs
@@ -405,7 +405,7 @@ tinnitus/
 - **Test framework:** xUnit (already pinned via CPM).
 - **Web testing:** `WebApplicationFactory<Program>` from `Microsoft.AspNetCore.Mvc.Testing` — the canonical .NET 10 in-process test host. No external network.
 - **No Testcontainers usage in this story** — the DB is unused by the middleware. The migration call at startup in `Program.cs` lines 45–56 wraps `Database.Migrate()` in a `try / catch (Exception)` that logs `StartupLog.MigrationFailed` and continues. When `WebApplicationFactory<Program>` constructs the host without a reachable PostgreSQL, the catch fires once during fixture init and the warning shows up in test output; **this is expected and acceptable**, not a test failure. Do NOT introduce an in-memory EF provider or test-only environment branch in `Program.cs` to "fix" this — production code must stay unchanged.
-- **Optional cleanup if the warning is noisy:** in the `WebApplicationFactory` derived class, override `ConfigureWebHost` and call `builder.UseSetting("ConnectionStrings:formforge", "Host=localhost;Database=ignored;Username=u;Password=p")` plus `builder.ConfigureTestServices(s => s.RemoveAll<FormForgeDbContext>())`. The migration call then hits a missing DbContext registration and the `try/catch` swallows it identically — but without the connection-attempt latency on first request.
+- **Optional cleanup if the warning is noisy:** in the `WebApplicationFactory` derived class, override `ConfigureWebHost` and call `builder.UseSetting("ConnectionStrings:appforge", "Host=localhost;Database=ignored;Username=u;Password=p")` plus `builder.ConfigureTestServices(s => s.RemoveAll<AppForgeDbContext>())`. The migration call then hits a missing DbContext registration and the `try/catch` swallows it identically — but without the connection-attempt latency on first request.
 - **Assertions:** plain xUnit `Assert.Equal` / `Assert.True`. No FluentAssertions in scope (zero packages added beyond the two listed above).
 - **Naming:** `MethodName_Scenario_Expected` (existing convention not yet established — set it here, follow it forward).
 - **Coverage expectation:** the four new helper-set classes (`CorrelationIdMiddleware`, `SqlFingerprint`, `ProblemDetails` customizer, `OTLP URI gate`) each have at least one passing test. CA2254 has the reviewer-runnable proof doc.
@@ -447,14 +447,14 @@ claude-opus-4-7[1m]
 - **`HttpContext.TraceIdentifier` is also set to the correlation ID** so OTel `Activity.TraceId` / .NET diagnostic surfaces align with the structured-log `correlationId` field. Source of truth for the value remains `HttpContext.Items["CorrelationId"]` (read via `LogContextExtensions.GetCorrelationId`).
 - **CA1812 on the middleware** — the analyzer cannot see `UseMiddleware<T>()` runtime instantiation. Suppressed at class level with `[SuppressMessage("Performance", "CA1812", ...)]` and a justification.
 - **CA1515 on `public partial class Program`** — `WebApplicationFactory<Program>` requires the entry point type to be public. Suppressed inline with a `#pragma warning disable CA1515` block.
-- **Pre-existing `.editorconfig` bug discovered and fixed:** the line `dotnet_diagnostic.CA1707.severity = none` was placed after `[*.md]`, making it effectively dead. Moved into a new test-scoped section `[src/FormForge.Api.Tests/**/*.cs]` along with CA1515 and CA2007 suppressions. CA1707 stays active in production code (which uses no underscored member names today).
-- **`InternalsVisibleTo`** added to `FormForge.Api.csproj` so the test project can construct `SqlFingerprint` directly. The internal-only surface stays narrow — only the helper class and the middleware are exercised through this seam.
+- **Pre-existing `.editorconfig` bug discovered and fixed:** the line `dotnet_diagnostic.CA1707.severity = none` was placed after `[*.md]`, making it effectively dead. Moved into a new test-scoped section `[src/AppForge.Api.Tests/**/*.cs]` along with CA1515 and CA2007 suppressions. CA1707 stays active in production code (which uses no underscored member names today).
+- **`InternalsVisibleTo`** added to `AppForge.Api.csproj` so the test project can construct `SqlFingerprint` directly. The internal-only surface stays narrow — only the helper class and the middleware are exercised through this seam.
 - **JSON console formatter wiring:** `builder.Logging.AddJsonConsole(...)` selected with `IncludeScopes=true`, `UseUtcTimestamp=true`, ISO-8601 timestamp format, and non-indented writer. The OTel logging exporter wired in `ServiceDefaults.ConfigureOpenTelemetry` continues to coexist; both surfaces see the correlation ID inside scopes.
 - **JSON formatter writes Scopes as a nested array, not flat fields** — as anticipated in AC-2's implementation note. The `correlationId` and `endpoint` keys land inside the last element of `Scopes[]`. Verified during smoke test: a `GET /` request with `X-Correlation-ID: 01HX9JK8YZ4N6T2X3V5W7P9Q0R` produced `"Scopes":[..., {"correlationId":"01HX9JK8YZ4N6T2X3V5W7P9Q0R","endpoint":"GET /"}]` on the `Microsoft.AspNetCore.Routing.EndpointMiddleware` log line.
 - **`ProblemDetails.Extensions["correlationId"]`** is populated by `CustomizeProblemDetails`. The integration test sends a request to a non-existent route and asserts the response header carries a ULID; the body assertion is conditional because ASP.NET Core's default 404 emits an empty body when no MapNotFound handler is wired — the header remains the canonical proof.
 - **OTLP URI validation (Task 6 / AC-6):** the gate is now `Uri.TryCreate(value, UriKind.Absolute, ...)` plus scheme check (`http` or `https`) plus non-empty host. Invalid values produce a `Warning` via a source-generated `[LoggerMessage]` partial; host startup continues without the exporter. Test coverage: 3 valid + 6 invalid cases (whitespace handled at the outer `!string.IsNullOrWhiteSpace` gate; reflection used to reach the internal `IsValidOtlpEndpoint` helper without exposing it).
-- **Test count grew from 0 to 19.** First real tests in `FormForge.Api.Tests`. Test classes use the `Method_Scenario_Expected` xUnit convention, enabled by the `.editorconfig` scope fix.
-- **`Microsoft.AspNetCore` log level note:** at the default appsettings.json level of `Warning`, ASP.NET Core's per-request `Information` log lines do not emit, so a casual run of the API does not visibly show the correlation scope. Verified via `dotnet run -- --Logging:LogLevel:Microsoft.AspNetCore=Information` for the smoke test. This is **expected and correct** — production should not be flooded with per-request Info lines. Application-domain logs (any future `_logger.LogInformation` call from FormForge code) emit at `Information` by default and will carry the scope automatically.
+- **Test count grew from 0 to 19.** First real tests in `AppForge.Api.Tests`. Test classes use the `Method_Scenario_Expected` xUnit convention, enabled by the `.editorconfig` scope fix.
+- **`Microsoft.AspNetCore` log level note:** at the default appsettings.json level of `Warning`, ASP.NET Core's per-request `Information` log lines do not emit, so a casual run of the API does not visibly show the correlation scope. Verified via `dotnet run -- --Logging:LogLevel:Microsoft.AspNetCore=Information` for the smoke test. This is **expected and correct** — production should not be flooded with per-request Info lines. Application-domain logs (any future `_logger.LogInformation` call from AppForge code) emit at `Information` by default and will carry the scope automatically.
 - **Manual smoke test results:**
   - `curl -i http://localhost:5429/ -H "X-Correlation-ID: 01HX9JK8YZ4N6T2X3V5W7P9Q0R"` → `X-Correlation-ID: 01HX9JK8YZ4N6T2X3V5W7P9Q0R` (echoed).
   - `curl -i http://localhost:5429/` → fresh ULID `01KS7ZJYSJ52M7DYSC6RYPSFRD` returned.
@@ -466,16 +466,16 @@ claude-opus-4-7[1m]
 ### File List
 
 - Modified: `Directory.Packages.props` — added `Ulid 1.4.1` and `Microsoft.AspNetCore.Mvc.Testing 10.0.8` PackageVersion entries
-- Modified: `src/FormForge.Api/FormForge.Api.csproj` — added `Ulid` PackageReference + `InternalsVisibleTo FormForge.Api.Tests`
-- Modified: `src/FormForge.Api/Program.cs` — added `using` for new namespace, `builder.Logging.AddJsonConsole`, expanded `AddProblemDetails` with `CustomizeProblemDetails`, `app.UseMiddleware<CorrelationIdMiddleware>()` before `UseExceptionHandler`, `public partial class Program;` declaration with CA1515 suppression
-- Modified: `src/FormForge.ServiceDefaults/Extensions.cs` — replaced naive `!IsNullOrWhiteSpace` gate in `AddOpenTelemetryExporters` with `IsValidOtlpEndpoint` (URI absolute + http/https + non-empty host); added `ServiceDefaultsLog.LogOtlpEndpointInvalid` partial logger
-- Modified: `src/FormForge.Api.Tests/FormForge.Api.Tests.csproj` — added `Microsoft.AspNetCore.Mvc.Testing` PackageReference
-- Modified: `.editorconfig` — moved misplaced `CA1707` suppression into a properly scoped `[src/FormForge.Api.Tests/**/*.cs]` block; added CA1515 and CA2007 to the same test-only scope
-- New: `src/FormForge.Api/Common/Logging/CorrelationIdMiddleware.cs` — middleware reads/generates ULID, sets `HttpContext.Items["CorrelationId"]` + `TraceIdentifier`, writes response header via `OnStarting`, pushes `correlationId`/`endpoint` onto `ILogger.BeginScope`
-- New: `src/FormForge.Api/Common/Logging/LogContextExtensions.cs` — `HttpContext.GetCorrelationId()` and `ILogger.BeginUserScope(ClaimsPrincipal)` (the latter dormant until Story 2.6)
-- New: `src/FormForge.Api/Common/Logging/SqlFingerprint.cs` — `Fingerprint(string)` plus `BeginDdlScope` / `BeginCrudScope` helpers for Epic 5/6 consumers; uses two `[GeneratedRegex]` partials to strip quoted/numeric literals as defense in depth
-- New: `src/FormForge.Api.Tests/Common/Logging/CorrelationIdMiddlewareTests.cs` — 3 tests + `FormForgeApiFactory` (WebApplicationFactory subclass with unreachable connection string so `Database.Migrate()` fails fast inside the existing try/catch)
-- New: `src/FormForge.Api.Tests/Common/Logging/SqlFingerprintTests.cs` — 6 tests covering literal stripping, placeholder preservation, identifier protection, and null guard
-- New: `src/FormForge.Api.Tests/Common/Logging/ProblemDetailsCorrelationIdTests.cs` — verifies 404 response carries `X-Correlation-ID` header (and `extensions.correlationId` when body is JSON)
-- New: `src/FormForge.Api.Tests/Common/Logging/Ca2254FixtureNotes.md` — reviewer-runnable proof that CA2254 fires on string-interpolated `ILogger` calls (no broken-build code committed)
-- New: `src/FormForge.Api.Tests/ServiceDefaults/OtlpEndpointValidationTests.cs` — 3 valid + 6 invalid URI cases for the OTLP gate (reflection access to the internal `IsValidOtlpEndpoint`)
+- Modified: `src/AppForge.Api/AppForge.Api.csproj` — added `Ulid` PackageReference + `InternalsVisibleTo AppForge.Api.Tests`
+- Modified: `src/AppForge.Api/Program.cs` — added `using` for new namespace, `builder.Logging.AddJsonConsole`, expanded `AddProblemDetails` with `CustomizeProblemDetails`, `app.UseMiddleware<CorrelationIdMiddleware>()` before `UseExceptionHandler`, `public partial class Program;` declaration with CA1515 suppression
+- Modified: `src/AppForge.ServiceDefaults/Extensions.cs` — replaced naive `!IsNullOrWhiteSpace` gate in `AddOpenTelemetryExporters` with `IsValidOtlpEndpoint` (URI absolute + http/https + non-empty host); added `ServiceDefaultsLog.LogOtlpEndpointInvalid` partial logger
+- Modified: `src/AppForge.Api.Tests/AppForge.Api.Tests.csproj` — added `Microsoft.AspNetCore.Mvc.Testing` PackageReference
+- Modified: `.editorconfig` — moved misplaced `CA1707` suppression into a properly scoped `[src/AppForge.Api.Tests/**/*.cs]` block; added CA1515 and CA2007 to the same test-only scope
+- New: `src/AppForge.Api/Common/Logging/CorrelationIdMiddleware.cs` — middleware reads/generates ULID, sets `HttpContext.Items["CorrelationId"]` + `TraceIdentifier`, writes response header via `OnStarting`, pushes `correlationId`/`endpoint` onto `ILogger.BeginScope`
+- New: `src/AppForge.Api/Common/Logging/LogContextExtensions.cs` — `HttpContext.GetCorrelationId()` and `ILogger.BeginUserScope(ClaimsPrincipal)` (the latter dormant until Story 2.6)
+- New: `src/AppForge.Api/Common/Logging/SqlFingerprint.cs` — `Fingerprint(string)` plus `BeginDdlScope` / `BeginCrudScope` helpers for Epic 5/6 consumers; uses two `[GeneratedRegex]` partials to strip quoted/numeric literals as defense in depth
+- New: `src/AppForge.Api.Tests/Common/Logging/CorrelationIdMiddlewareTests.cs` — 3 tests + `AppForgeApiFactory` (WebApplicationFactory subclass with unreachable connection string so `Database.Migrate()` fails fast inside the existing try/catch)
+- New: `src/AppForge.Api.Tests/Common/Logging/SqlFingerprintTests.cs` — 6 tests covering literal stripping, placeholder preservation, identifier protection, and null guard
+- New: `src/AppForge.Api.Tests/Common/Logging/ProblemDetailsCorrelationIdTests.cs` — verifies 404 response carries `X-Correlation-ID` header (and `extensions.correlationId` when body is JSON)
+- New: `src/AppForge.Api.Tests/Common/Logging/Ca2254FixtureNotes.md` — reviewer-runnable proof that CA2254 fires on string-interpolated `ILogger` calls (no broken-build code committed)
+- New: `src/AppForge.Api.Tests/ServiceDefaults/OtlpEndpointValidationTests.cs` — 3 valid + 6 invalid URI cases for the OTLP gate (reflection access to the internal `IsValidOtlpEndpoint`)

@@ -361,7 +361,7 @@ So that work is not lost between sessions.
 
 ### Task 5: Backend — Add blank filter-condition pre-flight gate in `DatasetSqlGenerator` (AC: 4)
 
-- [x] Modify `src/FormForge.Api/Features/Datasets/DatasetSqlGenerator.cs` (MODIFY existing file)
+- [x] Modify `src/AppForge.Api/Features/Datasets/DatasetSqlGenerator.cs` (MODIFY existing file)
   - [x] In the `Generate` method, after the existing Step 1 pre-flight validation (the four existing checks: no left node, no columns, CASE alias empty, calculated alias empty), add a fifth check that validates all filter conditions have non-blank table and column names:
     ```csharp
     // Step 1 pre-flight (continued): blank filter condition tableName/columnName
@@ -395,7 +395,7 @@ So that work is not lost between sessions.
 
 ### Task 6: Backend — Wire `CreateAsync` for builder-mode creates (AC: 4)
 
-- [x] Modify `src/FormForge.Api/Features/Datasets/Dtos/CreateDatasetRequest.cs` (MODIFY)
+- [x] Modify `src/AppForge.Api/Features/Datasets/Dtos/CreateDatasetRequest.cs` (MODIFY)
   - [x] Add `BuilderState` field:
     ```csharp
     internal sealed record CreateDatasetRequest(
@@ -405,7 +405,7 @@ So that work is not lost between sessions.
         string? BuilderState);
     ```
 
-- [x] Modify `src/FormForge.Api/Features/Datasets/DatasetService.cs` (MODIFY)
+- [x] Modify `src/AppForge.Api/Features/Datasets/DatasetService.cs` (MODIFY)
   - [x] Add `BuilderStateInvalid` to `CreateDatasetOutcome`:
     ```csharp
     internal enum CreateDatasetOutcome { Success, NameConflict, InvalidQuery, BuilderStateInvalid }
@@ -464,7 +464,7 @@ So that work is not lost between sessions.
         CreatedBy: actorId);
     ```
 
-- [x] Modify `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` (MODIFY)
+- [x] Modify `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` (MODIFY)
   - [x] In the `MapPost("/")` handler, add the new outcome to the `result.Outcome switch`:
     ```csharp
     CreateDatasetOutcome.BuilderStateInvalid => Results.Problem(
@@ -516,7 +516,7 @@ So that work is not lost between sessions.
 
 ### Task 8: Backend — Unit tests for `DatasetSqlGenerator` blank-condition gate (AC: 4)
 
-- [x] Modify `src/FormForge.Api.Tests/Features/Datasets/DatasetSqlGeneratorTests.cs` (MODIFY existing file)
+- [x] Modify `src/AppForge.Api.Tests/Features/Datasets/DatasetSqlGeneratorTests.cs` (MODIFY existing file)
   - [x] Add tests for the new blank filter-condition gate:
     - `Generate_FilterCondition_BlankTableName_ReturnsError`: builder state with one left node + one checked column, filter condition with empty `tableName` → `HasErrors == true`, `Errors` contains "table and column"
     - `Generate_FilterCondition_BlankColumnName_ReturnsError`: same with empty `columnName`
@@ -528,7 +528,7 @@ So that work is not lost between sessions.
 
 ### Task 9: Backend — Integration test for builder-mode create (AC: 4)
 
-- [x] Modify `src/FormForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs` (MODIFY existing file)
+- [x] Modify `src/AppForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs` (MODIFY existing file)
   - [x] **Test 5: `Post_BuilderMode_WithBuilderState_Returns201_QueryAndStatePersis ted`**:
     - POST /api/datasets with `is_custom_query: false`, `builder_state: <valid builder state with allowlisted table + 1 checked column>`
     - Assert: 201, `isCustomQuery == false`, `query` contains SELECT…FROM, `builderState` is non-null and matches the input
@@ -557,8 +557,8 @@ So that work is not lost between sessions.
 
 ### Task 11: Verify — Backend build + all tests pass
 
-- [x] `dotnet build src/FormForge.Api` → 0 warnings / 0 errors
-- [x] `dotnet test src/FormForge.Api.Tests` → all new tests pass; pre-existing 2 audit 405 failures remain (don't re-investigate)
+- [x] `dotnet build src/AppForge.Api` → 0 warnings / 0 errors
+- [x] `dotnet test src/AppForge.Api.Tests` → all new tests pass; pre-existing 2 audit 405 failures remain (don't re-investigate)
 - [x] `npm run test` → frontend tests pass including all new `parseBuilderState` normalization tests. Baseline was 356; new tests add ~15 normalization tests.
 - [x] `npm run check` → TypeScript type-check passes; no new type errors
 
@@ -569,11 +569,11 @@ So that work is not lost between sessions.
 - [x] [Review][Patch] Empty node IDs not dropped — nodes with missing/non-string `id` normalize to `id: ''`; two such nodes cause React key deduplication and silent canvas corruption [web/src/features/datasets/types/builderState.ts]
 - [x] [Review][Patch] Edges with empty source/target not dropped — missing/non-string `source`/`target` normalize to `''`; orphan edge objects persist silently in saved state [web/src/features/datasets/types/builderState.ts]
 - [x] [Review][Patch] Filter value array not element-type-checked — `it.value as string[]` cast skips per-element validation; non-string elements (numbers, nulls) pass through and can cause runtime errors in UI code calling string methods [web/src/features/datasets/types/builderState.ts]
-- [x] [Review][Patch] Audit log may record null query for builder-mode creates — if `CreateAsync` audit capture still uses `request.Query` (null for builder-mode creates) instead of `persistedQuery`, the audit trail is incorrect for all builder-mode dataset creations [src/FormForge.Api/Features/Datasets/DatasetService.cs]
-- [x] [Review][Patch] PostAsync test helper disposes HttpRequestMessage before caller reads response — `using var request` inside `PostAsync` disposes the request upon method exit; can cause `ObjectDisposedException` on response content reads in some HttpClient configurations [src/FormForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs]
+- [x] [Review][Patch] Audit log may record null query for builder-mode creates — if `CreateAsync` audit capture still uses `request.Query` (null for builder-mode creates) instead of `persistedQuery`, the audit trail is incorrect for all builder-mode dataset creations [src/AppForge.Api/Features/Datasets/DatasetService.cs]
+- [x] [Review][Patch] PostAsync test helper disposes HttpRequestMessage before caller reads response — `using var request` inside `PostAsync` disposes the request upon method exit; can cause `ObjectDisposedException` on response content reads in some HttpClient configurations [src/AppForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs]
 - [x] [Review][Defer] `_filterIdSeq` module-level variable resets on HMR in dev mode [web/src/components/query-builder/FilterConditionsDialog.tsx] — deferred, pre-existing architecture; fixing requires significant refactor to React context
 - [x] [Review][Defer] `seedFilterIdCounter` side-effect during React render phase [web/src/features/datasets/QueryBuilderCanvas.tsx] — deferred, explicitly prescribed by story spec Task 4 ("synchronous, not a useEffect")
-- [x] [Review][Defer] Blank-operator filter conditions silently omitted from SQL without pre-flight error [src/FormForge.Api/Features/Datasets/DatasetSqlGenerator.cs] — deferred, pre-existing `RenderConditionView` behavior; operator validation not in this story's scope
+- [x] [Review][Defer] Blank-operator filter conditions silently omitted from SQL without pre-flight error [src/AppForge.Api/Features/Datasets/DatasetSqlGenerator.cs] — deferred, pre-existing `RenderConditionView` behavior; operator validation not in this story's scope
 - [x] [Review][Defer] `useRef` counter seeding not re-seeded when `initialState` prop changes after mount [web/src/features/datasets/QueryBuilderCanvas.tsx] — deferred, by-design `useRef` behavior; page never passes new `initialState` without full remount
 - [x] [Review][Defer] `currentVersion` state stale under multi-tab concurrent edits [web/src/routes/_app/admin/datasets_.$id.tsx] — deferred, handled by 409 DATASET_CONCURRENCY_CONFLICT toast; expected optimistic-concurrency recovery path
 - [x] [Review][Defer] `normalizeFilterGroup` could stack-overflow on pathologically deep filter trees [web/src/features/datasets/types/builderState.ts] — deferred, JSON.parse prevents circular refs; practical filter tree depth is bounded by the UI
@@ -583,7 +583,7 @@ So that work is not lost between sessions.
 ### 1. What Story 11.1 Already Did — Do NOT Redo
 
 - `DatasetService.UpdateAsync` — already runs the generator in checkpoint (b), already persists `builder_state` in the UPDATE SQL. The `builder_state` column was there from Story 8.1. The UPDATE already writes `builder_state = @builderState::jsonb`.
-- `BuilderStateDto.cs` — already mirrors `builderState.ts`. The C# DTO hierarchy exists in `src/FormForge.Api/Features/Datasets/Dtos/BuilderStateDto.cs`.
+- `BuilderStateDto.cs` — already mirrors `builderState.ts`. The C# DTO hierarchy exists in `src/AppForge.Api/Features/Datasets/Dtos/BuilderStateDto.cs`.
 - `DatasetSqlGenerator.cs` — the 10-step algorithm, `ExpressionSecurityValidator.cs`, the pre-flight gates (left table, columns, aliases) are all there.
 - `datasets_.$id.tsx` — already fetches the dataset via the route loader (`getDataset(params.id)`), already parses `dataset.builderState` via `parseBuilderState`, already passes it as `initialState` to `QueryBuilderCanvas`. The only missing piece is the **Save button** and **version tracking**.
 - `parseBuilderState` — already handles null/corrupt top-level cases. Task 2 adds field-by-field normalization for the fields that were deferred.
@@ -673,13 +673,13 @@ Task 6 replaces `NULL` with `@builderState::jsonb` and adds the corresponding pa
 - `web/src/components/query-builder/FilterConditionsDialog.tsx` — Export `seedFilterIdCounter` function
 - `web/src/lib/i18n/locales/en.json` — Add `datasets.builder.saveButton`, `savingButton`, `saveSuccess`
 - `web/src/features/datasets/datasetApi.ts` — Add `builderState?: string | null` to `CreateDatasetPayload`
-- `src/FormForge.Api/Features/Datasets/Dtos/CreateDatasetRequest.cs` — Add `BuilderState?: string?`
-- `src/FormForge.Api/Features/Datasets/DatasetService.cs` — Add `BuilderStateInvalid` to `CreateDatasetOutcome`; builder-mode generator block in `CreateAsync`; update INSERT SQL
-- `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — Add `BuilderStateInvalid` case to POST handler
-- `src/FormForge.Api/Features/Datasets/DatasetSqlGenerator.cs` — Add blank-condition pre-flight gate + `HasBlankFilterCondition` helper
+- `src/AppForge.Api/Features/Datasets/Dtos/CreateDatasetRequest.cs` — Add `BuilderState?: string?`
+- `src/AppForge.Api/Features/Datasets/DatasetService.cs` — Add `BuilderStateInvalid` to `CreateDatasetOutcome`; builder-mode generator block in `CreateAsync`; update INSERT SQL
+- `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — Add `BuilderStateInvalid` case to POST handler
+- `src/AppForge.Api/Features/Datasets/DatasetSqlGenerator.cs` — Add blank-condition pre-flight gate + `HasBlankFilterCondition` helper
 - `web/src/features/datasets/types/__tests__/builderState.test.ts` — Add normalization tests
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetSqlGeneratorTests.cs` — Add blank-condition gate tests
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs` — Add create-mode tests
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetSqlGeneratorTests.cs` — Add blank-condition gate tests
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs` — Add create-mode tests
 
 **New files:** None
 
@@ -693,8 +693,8 @@ Task 6 replaces `NULL` with `@builderState::jsonb` and adds the corresponding pa
 - `web/src/routes/_app/admin/datasets_.$id.tsx` — current builder page (Save TODO comment on line 37)
 - `web/src/features/datasets/QueryBuilderCanvas.tsx` — `caseIdCounterRef`, `calcIdCounterRef` declarations
 - `web/src/components/query-builder/FilterConditionsDialog.tsx` — `_filterIdSeq`, `nextFilterId` (lines 22–25)
-- `src/FormForge.Api/Features/Datasets/DatasetService.cs` — `CreateAsync` (INSERT at line ~142), `CreateDatasetOutcome` enum (line 18)
-- `src/FormForge.Api/Features/Datasets/DatasetSqlGenerator.cs` — Step 1 pre-flight block
+- `src/AppForge.Api/Features/Datasets/DatasetService.cs` — `CreateAsync` (INSERT at line ~142), `CreateDatasetOutcome` enum (line 18)
+- `src/AppForge.Api/Features/Datasets/DatasetSqlGenerator.cs` — Step 1 pre-flight block
 - Memory note: `@xyflow/react` v12 typing — `NodeData extends Record<string, unknown>` constraint; use `type` not `interface` for node/edge data shapes. Already respected in `builderState.ts` (all data shapes use `type`). No new nodes or edges created in this story.
 - Memory note: pgsqlparser — no new usages in this story
 
@@ -706,7 +706,7 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context)
 
 ### Debug Log References
 
-- Backend build: `dotnet build src/FormForge.Api` → 0 warnings / 0 errors (TreatWarningsAsErrors).
+- Backend build: `dotnet build src/AppForge.Api` → 0 warnings / 0 errors (TreatWarningsAsErrors).
 - Backend unit tests: `dotnet test --filter DatasetSqlGeneratorTests` → 38/38 pass (33 existing + 5 new blank-condition gate tests).
 - Backend integration tests: `dotnet test --filter DatasetBuilderModeTests` → 7/7 pass (4 existing + 3 new create-mode tests). Required Docker Desktop (Testcontainers/PostgresFixture) to be running.
 - Backend full Datasets feature: `--filter Features.Datasets` → 222/222 pass (no CreateAsync/placeholder/audit regressions).
@@ -736,12 +736,12 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context)
 - `web/src/features/datasets/datasetApi.ts` — added `builderState?: string | null` to `CreateDatasetPayload`.
 - `web/src/lib/i18n/locales/en.json` — added `datasets.builder.saveButton` / `savingButton` / `saveSuccess`.
 - `web/src/features/datasets/types/__tests__/builderState.test.ts` — added `parseBuilderState normalization` describe block (15 tests).
-- `src/FormForge.Api/Features/Datasets/Dtos/CreateDatasetRequest.cs` — added `string? BuilderState`.
-- `src/FormForge.Api/Features/Datasets/DatasetService.cs` — `BuilderStateInvalid` outcome; CreateAsync checkpoint (b) generator block + `builderRegenerated`/`persistedQuery`; INSERT persists `builder_state`; success DTO returns generated query + state.
-- `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — POST handler `BuilderStateInvalid` → 422 case.
-- `src/FormForge.Api/Features/Datasets/DatasetSqlGenerator.cs` — blank filter-condition pre-flight gate + `HasBlankFilterCondition` helper.
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetSqlGeneratorTests.cs` — 5 blank-condition gate tests.
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs` — 3 builder-mode create tests + `PostAsync` helper.
+- `src/AppForge.Api/Features/Datasets/Dtos/CreateDatasetRequest.cs` — added `string? BuilderState`.
+- `src/AppForge.Api/Features/Datasets/DatasetService.cs` — `BuilderStateInvalid` outcome; CreateAsync checkpoint (b) generator block + `builderRegenerated`/`persistedQuery`; INSERT persists `builder_state`; success DTO returns generated query + state.
+- `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — POST handler `BuilderStateInvalid` → 422 case.
+- `src/AppForge.Api/Features/Datasets/DatasetSqlGenerator.cs` — blank filter-condition pre-flight gate + `HasBlankFilterCondition` helper.
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetSqlGeneratorTests.cs` — 5 blank-condition gate tests.
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs` — 3 builder-mode create tests + `PostAsync` helper.
 
 **New files:** None
 

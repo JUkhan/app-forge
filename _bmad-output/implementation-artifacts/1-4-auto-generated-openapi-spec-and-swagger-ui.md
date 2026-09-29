@@ -51,17 +51,17 @@ so that I can integrate without reading source code.
 
 - [x] **Task 1 — Add `Swashbuckle.AspNetCore.SwaggerUi` package** (AC: 2, 3)
   - [x] Add `<PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUi" Version="..." />` to `Directory.Packages.props` — pick the latest stable version compatible with .NET 10 (check https://www.nuget.org/packages/Swashbuckle.AspNetCore.SwaggerUi at dev time; as of May 2026 expect `8.x` or later)
-  - [x] Add `<PackageReference Include="Swashbuckle.AspNetCore.SwaggerUi" />` (no `Version=` per CPM) to `src/FormForge.Api/FormForge.Api.csproj` — this sub-package provides only `app.UseSwaggerUI()` middleware; it does NOT include Swashbuckle's spec generation (we use `Microsoft.AspNetCore.OpenApi` for that)
+  - [x] Add `<PackageReference Include="Swashbuckle.AspNetCore.SwaggerUi" />` (no `Version=` per CPM) to `src/AppForge.Api/AppForge.Api.csproj` — this sub-package provides only `app.UseSwaggerUI()` middleware; it does NOT include Swashbuckle's spec generation (we use `Microsoft.AspNetCore.OpenApi` for that)
   - [x] Run `dotnet restore` — confirm clean, no NU1605 / NU1010
 
 - [x] **Task 2 — Configure Swagger UI middleware in `Program.cs`** (AC: 2, 3)
   - [x] Move `app.MapOpenApi()` into the existing `if (app.Environment.IsDevelopment())` block (it is already there — verify no accidental move needed)
   - [x] Immediately after `app.MapOpenApi()`, add:
     ```csharp
-    app.UseSwaggerUI(c => c.SwaggerEndpoint("/openapi/v1.json", "FormForge API v1"));
+    app.UseSwaggerUI(c => c.SwaggerEndpoint("/openapi/v1.json", "AppForge API v1"));
     ```
   - [x] Confirm both calls remain inside the `IsDevelopment()` guard — Production must NOT serve Swagger UI (AC-3)
-  - [x] Manually verify: `dotnet run --project src/FormForge.Api` → open `/swagger` → Swagger UI renders → the dropdown shows "FormForge API v1" → the `/openapi/v1.json` link works
+  - [x] Manually verify: `dotnet run --project src/AppForge.Api` → open `/swagger` → Swagger UI renders → the dropdown shows "AppForge API v1" → the `/openapi/v1.json` link works
 
 - [x] **Task 3 — Enrich OpenAPI document metadata via document transformer** (AC-1, AC-5)
   - [x] Extend the `if (builder.Environment.IsDevelopment())` block that wraps `builder.Services.AddOpenApi()`:
@@ -72,9 +72,9 @@ so that I can integrate without reading source code.
         {
             document.Info = new()
             {
-                Title = "FormForge API",
+                Title = "AppForge API",
                 Version = "v1",
-                Description = "FormForge dynamic forms platform. All endpoints except /api/auth/* require a valid JWT Bearer token."
+                Description = "AppForge dynamic forms platform. All endpoints except /api/auth/* require a valid JWT Bearer token."
             };
             document.Components ??= new Microsoft.OpenApi.Models.OpenApiComponents();
             document.Components.SecuritySchemes["Bearer"] = new Microsoft.OpenApi.Models.OpenApiSecurityScheme
@@ -92,12 +92,12 @@ so that I can integrate without reading source code.
   - [x] Verify `dotnet build` — zero new warnings
 
 - [x] **Task 4 — Add operation transformer shell for future dynamic endpoint annotation** (AC-4)
-  - [x] Create `src/FormForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs`:
+  - [x] Create `src/AppForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs`:
     ```csharp
     using Microsoft.AspNetCore.OpenApi;
     using Microsoft.OpenApi.Models;
 
-    namespace FormForge.Api.Common.OpenApi;
+    namespace AppForge.Api.Common.OpenApi;
 
     // Applied to /api/data/{designerId}/* endpoints in Epic 6.
     // Marks request/response bodies as object+additionalProperties:true and
@@ -169,7 +169,7 @@ so that I can integrate without reading source code.
   - [x] `dotnet test` — zero tests, exit 0
   - [x] `cd web && npm run build` — clean (no frontend changes in this story; regression check only)
   - [x] Run API in Development (`ASPNETCORE_ENVIRONMENT=Development`):
-    - `GET /openapi/v1.json` → HTTP 200, response body contains `"openapi": "3.1.0"`, `"title": "FormForge API"`, `"securitySchemes"` with `Bearer` entry
+    - `GET /openapi/v1.json` → HTTP 200, response body contains `"openapi": "3.1.0"`, `"title": "AppForge API"`, `"securitySchemes"` with `Bearer` entry
     - `GET /swagger` → HTTP 200, Swagger UI HTML page renders, endpoint list is visible
     - Confirm the `GET /` endpoint appears in the UI
   - [x] Run API in Compose/Production mode (`ASPNETCORE_ENVIRONMENT=Compose` or `Production`):
@@ -179,11 +179,11 @@ so that I can integrate without reading source code.
 ### Review Findings
 
 - [x] [Review][Decision→Patch FIXED] `/openapi/v1.json` gated behind `IsDevelopment()` — moved `AddOpenApi(...)` and `app.MapOpenApi()` outside the `IsDevelopment()` guard; only `UseSwaggerUI` remains dev-only. Spec now served in all environments per AC-1.
-- [x] [Review][Patch FIXED] `RelativePath` leading-slash fragility — added `TrimStart('/')` before `StartsWith("api/data/", ...)`. [src/FormForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs:32]
-- [x] [Review][Defer] `IsSuccessStatusCode` accepts any string starting with '2' — non-standard keys like `"2abc"` or `"200 OK"` would be treated as success; low practical risk since ASP.NET Core emits well-formed numeric keys. [src/FormForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs:122] — deferred, pre-existing
-- [x] [Review][Defer] Body schema methods overwrite ALL media types including non-JSON — `ApplyDynamicRequestBodySchema` and `ApplyDynamicResponseBodySchema` replace schemas for all content types. [src/FormForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs:88,107] — deferred, no Epic 6 routes exist yet
-- [x] [Review][Defer] Collection-root `"api/data/"` route body rewrite without `designerId` guard — any route matching exactly `"api/data/"` passes the prefix check; body schemas are overwritten even though no `designerId` parameter was found. [src/FormForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs:44] — deferred, no Epic 6 routes exist yet
-- [x] [Review][Defer] `DesignerIdPattern` allows single-character identifiers — `^[a-z_][a-z0-9_]{0,62}$` permits 1-char names; alignment with actual SQL minimum length TBD in Epic 5. [src/FormForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs:14] — deferred, SQL validation not yet implemented
+- [x] [Review][Patch FIXED] `RelativePath` leading-slash fragility — added `TrimStart('/')` before `StartsWith("api/data/", ...)`. [src/AppForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs:32]
+- [x] [Review][Defer] `IsSuccessStatusCode` accepts any string starting with '2' — non-standard keys like `"2abc"` or `"200 OK"` would be treated as success; low practical risk since ASP.NET Core emits well-formed numeric keys. [src/AppForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs:122] — deferred, pre-existing
+- [x] [Review][Defer] Body schema methods overwrite ALL media types including non-JSON — `ApplyDynamicRequestBodySchema` and `ApplyDynamicResponseBodySchema` replace schemas for all content types. [src/AppForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs:88,107] — deferred, no Epic 6 routes exist yet
+- [x] [Review][Defer] Collection-root `"api/data/"` route body rewrite without `designerId` guard — any route matching exactly `"api/data/"` passes the prefix check; body schemas are overwritten even though no `designerId` parameter was found. [src/AppForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs:44] — deferred, no Epic 6 routes exist yet
+- [x] [Review][Defer] `DesignerIdPattern` allows single-character identifiers — `^[a-z_][a-z0-9_]{0,62}$` permits 1-char names; alignment with actual SQL minimum length TBD in Epic 5. [src/AppForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs:14] — deferred, SQL validation not yet implemented
 
 ## Dev Notes
 
@@ -255,7 +255,7 @@ The project suppresses `CA1515` (internal types in libraries should be marked `i
 
 ### Testing requirements
 
-**No new automated tests** are required for this story. This is infrastructure plumbing; the build-gate and manual verification steps in Task 5 are sufficient. The `FormForge.Api.Tests` project must continue to discover zero tests cleanly.
+**No new automated tests** are required for this story. This is infrastructure plumbing; the build-gate and manual verification steps in Task 5 are sufficient. The `AppForge.Api.Tests` project must continue to discover zero tests cleanly.
 
 Testcontainers-backed integration tests for API endpoints land in Story 2.1 (first story with real auth endpoints).
 
@@ -263,15 +263,15 @@ Testcontainers-backed integration tests for API endpoints land in Story 2.1 (fir
 
 **Touch:**
 - `Directory.Packages.props` — add `Swashbuckle.AspNetCore.SwaggerUi` version
-- `src/FormForge.Api/FormForge.Api.csproj` — add `Swashbuckle.AspNetCore.SwaggerUi` PackageReference
-- `src/FormForge.Api/Program.cs` — extend `AddOpenApi()` with options lambda + add `UseSwaggerUI()` call
+- `src/AppForge.Api/AppForge.Api.csproj` — add `Swashbuckle.AspNetCore.SwaggerUi` PackageReference
+- `src/AppForge.Api/Program.cs` — extend `AddOpenApi()` with options lambda + add `UseSwaggerUI()` call
 
 **New:**
-- `src/FormForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs`
+- `src/AppForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs`
 
 **Do NOT touch:**
-- `src/FormForge.AppHost/AppHost.cs`
-- `src/FormForge.ServiceDefaults/Extensions.cs`
+- `src/AppForge.AppHost/AppHost.cs`
+- `src/AppForge.ServiceDefaults/Extensions.cs`
 - `web/` — no frontend changes in this story
 - `docker-compose.yml`, `Dockerfile` — not modified
 - Existing EF Core files
@@ -316,8 +316,8 @@ After this story lands, commit message: `Story 1.4 — OpenAPI spec and Swagger 
 tinnitus/
 ├── Directory.Packages.props          ← ADD Swashbuckle.AspNetCore.SwaggerUi version
 ├── src/
-│   └── FormForge.Api/
-│       ├── FormForge.Api.csproj      ← ADD SwaggerUi PackageReference
+│   └── AppForge.Api/
+│       ├── AppForge.Api.csproj      ← ADD SwaggerUi PackageReference
 │       ├── Program.cs                ← EXTEND AddOpenApi() + ADD UseSwaggerUI()
 │       └── Common/
 │           └── OpenApi/
@@ -358,7 +358,7 @@ claude-opus-4-7
 - **`AddOperationTransformer<T>()` instantiates the type but the analyzer can't see it:** CA1812 ("uninstantiated internal class") fires. Suppressed at the class level with `[SuppressMessage("Performance", "CA1812", ...)]` with a justification referencing the OpenAPI pipeline. No DI registration needed — the framework handles instantiation.
 - **OpenAPI version produced:** spec emits `"openapi": "3.1.1"` (not `3.1.0` as the story Task 5 hint suggested). 3.1.1 is the current point release of the 3.1 spec line; AC-1 only requires "OpenAPI 3.1" so this satisfies. Updated Completion Notes to reflect actual output for future reviewers.
 - **Manual verification results:**
-  - Development (port 5431): `GET /` → 200, `GET /openapi/v1.json` → 200 with `openapi=3.1.1`, `info.title="FormForge API"`, `info.version="v1"`, `info.description` populated, `components.securitySchemes.Bearer` with `type=http`, `scheme=bearer`, `bearerFormat=JWT`, and description present. `GET /swagger/index.html` returns Swagger UI HTML (status 200).
+  - Development (port 5431): `GET /` → 200, `GET /openapi/v1.json` → 200 with `openapi=3.1.1`, `info.title="AppForge API"`, `info.version="v1"`, `info.description` populated, `components.securitySchemes.Bearer` with `type=http`, `scheme=bearer`, `bearerFormat=JWT`, and description present. `GET /swagger/index.html` returns Swagger UI HTML (status 200).
   - Production (port 5000): `GET /swagger` → 404, `GET /swagger/index.html` → 404, `GET /openapi/v1.json` → 404 ✓ AC-3.
   - Compose (`ASPNETCORE_ENVIRONMENT=Compose`, port 5430): `GET /swagger` → 404, `GET /openapi/v1.json` → 404 ✓ AC-3.
 - **DynamicEndpointDocumentTransformer is a no-op today:** no `/api/data/*` routes exist yet (Epic 6 adds them). Verified registration does not break the spec emission (the `/` endpoint appears clean). Static `OpenApiSchema` instances are cached as readonly fields to avoid per-request allocation when Epic 6 routes start landing.
@@ -368,6 +368,6 @@ claude-opus-4-7
 ### File List
 
 - Modified: `Directory.Packages.props` — added `Swashbuckle.AspNetCore.SwaggerUI` `10.1.7` PackageVersion
-- Modified: `src/FormForge.Api/FormForge.Api.csproj` — added `Swashbuckle.AspNetCore.SwaggerUI` PackageReference
-- Modified: `src/FormForge.Api/Program.cs` — extended `AddOpenApi` with document transformer (Info + Bearer security scheme) and registered `DynamicEndpointDocumentTransformer`; added `UseSwaggerUI` middleware inside the `IsDevelopment()` guard
-- New: `src/FormForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs` — internal sealed `IOpenApiOperationTransformer` (no-op until Epic 6 adds `/api/data/{designerId}/*` routes)
+- Modified: `src/AppForge.Api/AppForge.Api.csproj` — added `Swashbuckle.AspNetCore.SwaggerUI` PackageReference
+- Modified: `src/AppForge.Api/Program.cs` — extended `AddOpenApi` with document transformer (Info + Bearer security scheme) and registered `DynamicEndpointDocumentTransformer`; added `UseSwaggerUI` middleware inside the `IsDevelopment()` guard
+- New: `src/AppForge.Api/Common/OpenApi/DynamicEndpointDocumentTransformer.cs` — internal sealed `IOpenApiOperationTransformer` (no-op until Epic 6 adds `/api/data/{designerId}/*` routes)

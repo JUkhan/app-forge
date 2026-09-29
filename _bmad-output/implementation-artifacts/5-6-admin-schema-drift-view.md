@@ -57,21 +57,21 @@ so that I can make informed decisions about manual cleanup after schema evolutio
 ## Tasks / Subtasks
 
 - [x] **Task 1 — EF Entity + Migration: add `columns_dropped` to `schema_audit_log`** (AC: 3)
-  - [x] In `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`, add:
+  - [x] In `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`, add:
     ```csharp
     public string[]? ColumnsDropped { get; set; }  // column names removed by a DROP op
     ```
-  - [x] In `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs`, in the `SchemaAuditLogEntry` config block, add:
+  - [x] In `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs`, in the `SchemaAuditLogEntry` config block, add:
     ```csharp
     e.Property(a => a.ColumnsDropped).HasColumnName("columns_dropped").HasColumnType("text[]");
     ```
     Place it immediately after the `ColumnsAdded` property mapping (line ~244).
-  - [x] Run `dotnet ef migrations add AddColumnsDroppedToSchemaAuditLog --project src/FormForge.Api --startup-project src/FormForge.Api --no-build`
+  - [x] Run `dotnet ef migrations add AddColumnsDroppedToSchemaAuditLog --project src/AppForge.Api --startup-project src/AppForge.Api --no-build`
   - [x] Manually add `ArgumentNullException.ThrowIfNull(migrationBuilder)` to both `Up()` and `Down()` per the CA1062 pattern in all prior migrations
   - [x] Verify the snapshot regenerated correctly; rebuild clean
 
 - [x] **Task 2 — Extract `SystemColumnNames` to `internal static`** (AC: 1, 6)
-  - [x] In `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`, change the `SystemColumnNames` modifier from `private` to `internal`:
+  - [x] In `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`, change the `SystemColumnNames` modifier from `private` to `internal`:
     ```csharp
     internal static readonly HashSet<string> SystemColumnNames = new(StringComparer.Ordinal)
     {
@@ -81,11 +81,11 @@ so that I can make informed decisions about manual cleanup after schema evolutio
   - [x] This resolves the deferred item from Story 5.4 code review: "SystemColumnNames has no compile-time link to CreateTableAsync SQL". `SchemaDriftService` will reference `DdlEmitter.SystemColumnNames` directly so the two never diverge.
 
 - [x] **Task 3 — `ISchemaRegistry.InvalidateDesigner` method** (AC: 4)
-  - [x] In `src/FormForge.Api/Features/SchemaRegistry/ISchemaRegistry.cs`, add:
+  - [x] In `src/AppForge.Api/Features/SchemaRegistry/ISchemaRegistry.cs`, add:
     ```csharp
     void InvalidateDesigner(string designerId);
     ```
-  - [x] In `src/FormForge.Api/Features/SchemaRegistry/SchemaRegistry.cs`:
+  - [x] In `src/AppForge.Api/Features/SchemaRegistry/SchemaRegistry.cs`:
     - Add a `ConcurrentDictionary<string, ConcurrentBag<int>> _populatedVersions` field to track which versions have been cached per designer
     - In `Populate()`, after `cache.Set(...)`, add:
       ```csharp
@@ -105,7 +105,7 @@ so that I can make informed decisions about manual cleanup after schema evolutio
   - **Note**: `ConcurrentBag<int>` permits duplicate version entries (a version re-provisioned twice adds its number twice), but `cache.Remove` on a non-existent key is a no-op, so correctness is unaffected. Documented as an acceptable v1 characteristic.
 
 - [x] **Task 4 — `DdlEmitter.DropColumnAsync`** (AC: 3, 4)
-  - [x] In `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`, add a new public method:
+  - [x] In `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`, add a new public method:
     ```csharp
     public async Task DropColumnAsync(
         string designerId,
@@ -142,8 +142,8 @@ so that I can make informed decisions about manual cleanup after schema evolutio
   - The caller (`SchemaDriftService.DropColumnAsync`) calls `db.SaveChangesAsync()` after `DropColumnAsync` returns.
 
 - [x] **Task 5 — `SchemaDriftService.cs`** (AC: 1, 3, 4, 6)
-  - [x] Create `src/FormForge.Api/Features/Designer/SchemaDriftService.cs`
-  - Constructor injection: `FormForgeDbContext db`, `DbConnectionFactory connectionFactory`, `DdlEmitter ddlEmitter`, `ISchemaRegistry schemaRegistry`
+  - [x] Create `src/AppForge.Api/Features/Designer/SchemaDriftService.cs`
+  - Constructor injection: `AppForgeDbContext db`, `DbConnectionFactory connectionFactory`, `DdlEmitter ddlEmitter`, `ISchemaRegistry schemaRegistry`
   - Add `[SuppressMessage("Performance", "CA1812", Justification = "Registered via DI.")]`
   - **`GetDriftAsync(string designerId, CancellationToken ct) → Task<SchemaDriftResponse?>`**:
     1. `SafeIdentifier.TryCreate(designerId, ...)` — return `null` (→ 404) if invalid
@@ -176,7 +176,7 @@ so that I can make informed decisions about manual cleanup after schema evolutio
     ```
 
 - [x] **Task 6 — DTOs** (AC: 1)
-  - [x] Create `src/FormForge.Api/Features/Designer/Dtos/SchemaDriftResponse.cs`:
+  - [x] Create `src/AppForge.Api/Features/Designer/Dtos/SchemaDriftResponse.cs`:
     ```csharp
     internal sealed record OrphanedColumnInfo(
         string ColumnName,
@@ -188,7 +188,7 @@ so that I can make informed decisions about manual cleanup after schema evolutio
   - These are returned as JSON responses; serialized by `System.Text.Json` with default camelCase (same pipeline as all other endpoints).
 
 - [x] **Task 7 — `DesignerAdminEndpoints.cs`** (AC: 1, 3, 6, 7)
-  - [x] Create `src/FormForge.Api/Features/Designer/DesignerAdminEndpoints.cs`:
+  - [x] Create `src/AppForge.Api/Features/Designer/DesignerAdminEndpoints.cs`:
     ```csharp
     internal static class DesignerAdminEndpoints
     {
@@ -221,12 +221,12 @@ so that I can make informed decisions about manual cleanup after schema evolutio
     - default → 500
 
 - [x] **Task 8 — Wire into `AdminEndpoints.cs` and DI in `Program.cs`** (AC: 1, 3)
-  - [x] In `src/FormForge.Api/Features/Roles/AdminEndpoints.cs`, add to `MapAdminEndpoints`:
+  - [x] In `src/AppForge.Api/Features/Roles/AdminEndpoints.cs`, add to `MapAdminEndpoints`:
     ```csharp
     group.MapGroup("/designers").WithTags("Admin — Designers").MapDesignerAdminEndpoints();
     ```
     Add this BEFORE or AFTER the `/menus` line — any order is fine (DI resolves lazily).
-  - [x] Add `using FormForge.Api.Features.Designer;` to `AdminEndpoints.cs`
+  - [x] Add `using AppForge.Api.Features.Designer;` to `AdminEndpoints.cs`
   - [x] In `Program.cs`, register the scoped service immediately after the other designer services:
     ```csharp
     // Story 5.6 — admin drift view: inspect + drop orphaned columns on provisioned tables
@@ -235,7 +235,7 @@ so that I can make informed decisions about manual cleanup after schema evolutio
     Place after the existing `IDesignerService` line (line ~174).
 
 - [x] **Task 9 — Fix deferred 5.2 item: `GetBindingDiffHandler` guard** (AC: 7)
-  - [x] In `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs`, in `GetBindingDiffHandler`:
+  - [x] In `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs`, in `GetBindingDiffHandler`:
     ```csharp
     private static async Task<IResult> GetBindingDiffHandler(
         Guid id,
@@ -380,7 +380,7 @@ so that I can make informed decisions about manual cleanup after schema evolutio
   - The route is navigable at `/admin/designers/{designerId}/drift`. No parent `designers.tsx` layout route is needed for Story 5.6 — navigating to this URL directly is sufficient for the admin workflow.
 
 - [x] **Task 15 — Tests** (AC: 1–7)
-  - [x] **Backend integration tests** — add to `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs` (or a new `SchemaDriftIntegrationTests.cs` in the same folder for clarity):
+  - [x] **Backend integration tests** — add to `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs` (or a new `SchemaDriftIntegrationTests.cs` in the same folder for clarity):
 
     | Test | Coverage |
     |---|---|
@@ -413,11 +413,11 @@ so that I can make informed decisions about manual cleanup after schema evolutio
 
 | New file | Path |
 |---|---|
-| `SchemaAuditLogEntry.cs` update | `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs` |
-| EF migration | `src/FormForge.Api/Infrastructure/Persistence/Migrations/AddColumnsDroppedToSchemaAuditLog.cs` |
-| `SchemaDriftService.cs` | `src/FormForge.Api/Features/Designer/SchemaDriftService.cs` |
-| `SchemaDriftResponse.cs` (DTOs) | `src/FormForge.Api/Features/Designer/Dtos/SchemaDriftResponse.cs` |
-| `DesignerAdminEndpoints.cs` | `src/FormForge.Api/Features/Designer/DesignerAdminEndpoints.cs` |
+| `SchemaAuditLogEntry.cs` update | `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs` |
+| EF migration | `src/AppForge.Api/Infrastructure/Persistence/Migrations/AddColumnsDroppedToSchemaAuditLog.cs` |
+| `SchemaDriftService.cs` | `src/AppForge.Api/Features/Designer/SchemaDriftService.cs` |
+| `SchemaDriftResponse.cs` (DTOs) | `src/AppForge.Api/Features/Designer/Dtos/SchemaDriftResponse.cs` |
+| `DesignerAdminEndpoints.cs` | `src/AppForge.Api/Features/Designer/DesignerAdminEndpoints.cs` |
 | `designerAdminApi.ts` | `web/src/features/admin/designers/designerAdminApi.ts` |
 | `useSchemaDriftQuery.ts` | `web/src/features/admin/designers/useSchemaDriftQuery.ts` |
 | `schemaDriftMutations.ts` | `web/src/features/admin/designers/schemaDriftMutations.ts` |
@@ -434,7 +434,7 @@ so that I can make informed decisions about manual cleanup after schema evolutio
 | `AdminEndpoints.cs` | Add `/designers` sub-group line + using |
 | `Program.cs` | Register `SchemaDriftService` |
 | `MenuAdminEndpoints.cs` | Add `targetVersion <= 0` guard in `GetBindingDiffHandler` |
-| `FormForgeDbContext.cs` | Add `ColumnsDropped` EF config line |
+| `AppForgeDbContext.cs` | Add `ColumnsDropped` EF config line |
 | `en.json` | Add `admin.designers.drift.*` keys + `admin.menus.invalidTargetVersion` |
 
 ### `httpClient.delete<T>()` — check before Task 10
@@ -491,11 +491,11 @@ The Task 9 fix is minimal: just the guard + i18n key. Do NOT refactor `BindingDi
 
 ### References
 
-- [Source: `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`] — `SystemColumnNames`, `TableExistsAsync`, `AddMissingColumnsCoreAsync` patterns for information_schema queries
-- [Source: `src/FormForge.Api/Features/SchemaRegistry/SchemaRegistry.cs`] — `CacheKey`, `EntryOptions`, `Populate`/`TryGet` pattern to follow for `InvalidateDesigner`
-- [Source: `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`] — entity shape; `ColumnsAdded HasColumnType("text[]")` pattern to replicate for `ColumnsDropped`
-- [Source: `src/FormForge.Api/Features/Roles/AdminEndpoints.cs`] — `MapAdminEndpoints` registration pattern
-- [Source: `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs`] — `BindDesignerHandler` actorId extraction, `Results.Problem` extensions dictionary pattern, `GetBindingDiffHandler` to modify for Task 9
+- [Source: `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`] — `SystemColumnNames`, `TableExistsAsync`, `AddMissingColumnsCoreAsync` patterns for information_schema queries
+- [Source: `src/AppForge.Api/Features/SchemaRegistry/SchemaRegistry.cs`] — `CacheKey`, `EntryOptions`, `Populate`/`TryGet` pattern to follow for `InvalidateDesigner`
+- [Source: `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`] — entity shape; `ColumnsAdded HasColumnType("text[]")` pattern to replicate for `ColumnsDropped`
+- [Source: `src/AppForge.Api/Features/Roles/AdminEndpoints.cs`] — `MapAdminEndpoints` registration pattern
+- [Source: `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs`] — `BindDesignerHandler` actorId extraction, `Results.Problem` extensions dictionary pattern, `GetBindingDiffHandler` to modify for Task 9
 - [Source: `web/src/routes/_app/admin/menus.$menuId.tsx`] — `createFileRoute`, `Route.useParams()`, error state pattern
 - [Source: `web/src/features/admin/menus/DesignerBindingSection.tsx`] — component pattern: inline CSS, i18n, mutation hooks, confirmation flow
 - [Source: `web/src/features/admin/menus/menuAdminMutations.ts`] — `useMutation` + `queryClient.invalidateQueries` pattern
@@ -526,19 +526,19 @@ claude-opus-4-7
 - **Pre-existing TS-test errors** (debug-log #4): the project's existing typecheck has 12 unrelated errors in `Navbar.test.tsx` (jest-dom typing) and `usePollProvisioning.test.tsx` (literal-type narrowing). Confirmed not introduced by Story 5.6 via a stash-pop comparison. Recorded so a future cleanup story can address them.
 - **`ToVersion = 0` sentinel for DROP**: the `schema_audit_log.to_version` column is `INT NOT NULL`. DROP rows use `0` as a sentinel meaning "not version-bound". Story 5.7's audit log view must handle this — recorded in story Dev Notes already.
 - **`AdminEndpoints.cs` registration order**: added `MapDesignerAdminEndpoints()` after `/menus`, so the JSON dispatcher reads top-down. DI resolves lazily, so the order is purely a readability preference.
-- **`Program.cs` registration placement**: `SchemaDriftService` is `Scoped` (it injects `FormForgeDbContext`); registered alongside the other designer-feature services after `IDesignerService`.
+- **`Program.cs` registration placement**: `SchemaDriftService` is `Scoped` (it injects `AppForgeDbContext`); registered alongside the other designer-feature services after `IDesignerService`.
 - **Test counts**: total backend tests 374 → 395 (+21 = 10 Story 5.6 integration + 1 Story 5.6 unit + 10 from prior commits that landed in the suite between the spec's 374 baseline and this run). All 395 pass. Frontend production build: ✓ built in 17.02s with the new `designers._designerId.drift` chunk in the bundle.
 
 ### File List
 
 **Added (12)**
 
-- `src/FormForge.Api/Features/Designer/SchemaDriftService.cs`
-- `src/FormForge.Api/Features/Designer/DesignerAdminEndpoints.cs`
-- `src/FormForge.Api/Features/Designer/Dtos/SchemaDriftResponse.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260525203424_AddColumnsDroppedToSchemaAuditLog.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260525203424_AddColumnsDroppedToSchemaAuditLog.Designer.cs`
-- `src/FormForge.Api.Tests/Features/SchemaRegistry/SchemaRegistryTests.cs`
+- `src/AppForge.Api/Features/Designer/SchemaDriftService.cs`
+- `src/AppForge.Api/Features/Designer/DesignerAdminEndpoints.cs`
+- `src/AppForge.Api/Features/Designer/Dtos/SchemaDriftResponse.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260525203424_AddColumnsDroppedToSchemaAuditLog.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260525203424_AddColumnsDroppedToSchemaAuditLog.Designer.cs`
+- `src/AppForge.Api.Tests/Features/SchemaRegistry/SchemaRegistryTests.cs`
 - `web/src/features/admin/designers/designerAdminApi.ts`
 - `web/src/features/admin/designers/useSchemaDriftQuery.ts`
 - `web/src/features/admin/designers/schemaDriftMutations.ts`
@@ -547,16 +547,16 @@ claude-opus-4-7
 
 **Modified (11)**
 
-- `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs` — added `ColumnsDropped` property
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — added `ColumnsDropped` text[] mapping
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` — regenerated by `dotnet ef`
-- `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs` — `SystemColumnNames` → `internal`; added `DropColumnAsync` + `LogDroppedColumn`
-- `src/FormForge.Api/Features/SchemaRegistry/ISchemaRegistry.cs` — added `InvalidateDesigner`
-- `src/FormForge.Api/Features/SchemaRegistry/SchemaRegistry.cs` — added `_populatedVersions` dict + `InvalidateDesigner` implementation
-- `src/FormForge.Api/Features/Roles/AdminEndpoints.cs` — wired `/designers` admin sub-group + using
-- `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` — added `targetVersion <= 0` guard to `GetBindingDiffHandler`
-- `src/FormForge.Api/Program.cs` — registered `SchemaDriftService` scoped
-- `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs` — appended 10 Story 5.6 integration tests + 3 helpers + 2 DTOs
+- `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs` — added `ColumnsDropped` property
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — added `ColumnsDropped` text[] mapping
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` — regenerated by `dotnet ef`
+- `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs` — `SystemColumnNames` → `internal`; added `DropColumnAsync` + `LogDroppedColumn`
+- `src/AppForge.Api/Features/SchemaRegistry/ISchemaRegistry.cs` — added `InvalidateDesigner`
+- `src/AppForge.Api/Features/SchemaRegistry/SchemaRegistry.cs` — added `_populatedVersions` dict + `InvalidateDesigner` implementation
+- `src/AppForge.Api/Features/Roles/AdminEndpoints.cs` — wired `/designers` admin sub-group + using
+- `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` — added `targetVersion <= 0` guard to `GetBindingDiffHandler`
+- `src/AppForge.Api/Program.cs` — registered `SchemaDriftService` scoped
+- `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs` — appended 10 Story 5.6 integration tests + 3 helpers + 2 DTOs
 - `web/src/lib/i18n/locales/en.json` — added `admin.designers.drift.*` block, `admin.designers.notFound`, `admin.menus.invalidTargetVersion`
 
 ### Review Findings

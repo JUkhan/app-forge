@@ -24,7 +24,7 @@ so that Query Builder saves have identical atomicity and rollback safety to Cust
 
 ### Task 1: Backend — Annotate builder-generated DDL in audit log (AC: 4)
 
-- [x] Modify `src/FormForge.Api/Features/Datasets/DatasetService.cs` (MODIFY — `UpdateAsync` method only):
+- [x] Modify `src/AppForge.Api/Features/Datasets/DatasetService.cs` (MODIFY — `UpdateAsync` method only):
   - [x] Locate the **Step E** comment block (around line 417) where `primaryDdl` is built:
     ```csharp
     var primaryDdl = isRename
@@ -49,11 +49,11 @@ so that Query Builder saves have identical atomicity and rollback safety to Cust
 
 ### Task 2: Backend — Integration tests for Story 11.4 (AC: 1–4)
 
-- [x] Create `src/FormForge.Api.Tests/Features/Datasets/DatasetBuilderLifecycleTests.cs` (NEW):
+- [x] Create `src/AppForge.Api.Tests/Features/Datasets/DatasetBuilderLifecycleTests.cs` (NEW):
 
   Use the same test infrastructure as `DatasetBuilderModeTests.cs`:
   - `[Collection("DatasetIntegrationTests")]` + `IClassFixture<PostgresFixture>` + `IAsyncLifetime`
-  - `WebApplicationFactory<Program>` with `UseSetting` for `ConnectionStrings:formforge`, `Jwt:SigningKey`, `Cors:AllowedOrigins:0`
+  - `WebApplicationFactory<Program>` with `UseSetting` for `ConnectionStrings:appforge`, `Jwt:SigningKey`, `Cors:AllowedOrigins:0`
   - `UseSetting("DatasetManager:AllowedTables:0", "blc_probe")` and `UseSetting("DatasetManager:AllowedTables:1", "blc_ghost")` — see Task 2 §3 below for why two tables are needed
   - `InitializeAsync`: `MigrateAsync`, TRUNCATE tables, drop datasets schema VIEWs, seed `public.blc_probe` table (real), do NOT seed `public.blc_ghost` (intentionally absent for AC-3 test), seed admin role + user
   - `DisposeAsync`: drop `public.blc_probe`
@@ -96,8 +96,8 @@ so that Query Builder saves have identical atomicity and rollback safety to Cust
 
 ### Task 3: Verify
 
-- [x] `dotnet build src/FormForge.Api` → 0 warnings / 0 errors
-- [x] `dotnet test src/FormForge.Api.Tests` → all 5 new lifecycle tests pass; pre-existing 2 audit 405 failures remain (do NOT reinvestigate); `DatasetBuilderModeTests` still fully passes (existing builder tests are unaffected by the annotation-only change)
+- [x] `dotnet build src/AppForge.Api` → 0 warnings / 0 errors
+- [x] `dotnet test src/AppForge.Api.Tests` → all 5 new lifecycle tests pass; pre-existing 2 audit 405 failures remain (do NOT reinvestigate); `DatasetBuilderModeTests` still fully passes (existing builder tests are unaffected by the annotation-only change)
 - [x] `npm run check` → no TypeScript errors (no frontend changes in this story) — repo has no `check` script; ran the equivalent `tsc -b --noEmit` (exit 0)
 
 ---
@@ -106,7 +106,7 @@ so that Query Builder saves have identical atomicity and rollback safety to Cust
 
 _Code review 2026-06-05 (Blind Hunter + Edge Case Hunter + Acceptance Auditor). Production code verified correct on all 4 ACs; one test-coverage gap found._
 
-- [x] [Review][Patch] AC-2 "rename + query-change" sub-case has no test coverage [src/FormForge.Api.Tests/Features/Datasets/DatasetBuilderLifecycleTests.cs:142] — Test 2 PUTs the *same* `builder_state` on rename, so the deterministic generator yields SQL identical to `current.Query` → `queryChanged == false` → only `RenameAsync` runs, never the `RenameAsync`→`ReplaceAsync` branch (DatasetService.cs:485-489). That regen+rename+REPLACE path (the one Story 11.1's `queryChanged` expansion at DatasetService.cs:389-390 and this story's `-- Builder-generated` annotation target) is untested. Fix: PUT a *different* `builder_state` (e.g. a different `blc_probe` column) alongside the new name so `effectiveNewQuery != current.Query`, then assert the renamed VIEW reflects the new definition. Flagged independently by Acceptance Auditor + Edge Case Hunter (Med). **RESOLVED 2026-06-05:** added Test 6 `Put_BuilderMode_RenameAndQueryChange_ViewRedefinedUnderNewName` — creates with `blc_probe.id`, PUTs new name + `blc_probe.status` (queryChanged=true), asserts old VIEW gone / new VIEW redefined with `status`, and audit DDL = `-- Builder-generated\n` + `ALTER VIEW` + `CREATE VIEW datasets."blc_renqc_done"`. All 6 lifecycle tests pass.
+- [x] [Review][Patch] AC-2 "rename + query-change" sub-case has no test coverage [src/AppForge.Api.Tests/Features/Datasets/DatasetBuilderLifecycleTests.cs:142] — Test 2 PUTs the *same* `builder_state` on rename, so the deterministic generator yields SQL identical to `current.Query` → `queryChanged == false` → only `RenameAsync` runs, never the `RenameAsync`→`ReplaceAsync` branch (DatasetService.cs:485-489). That regen+rename+REPLACE path (the one Story 11.1's `queryChanged` expansion at DatasetService.cs:389-390 and this story's `-- Builder-generated` annotation target) is untested. Fix: PUT a *different* `builder_state` (e.g. a different `blc_probe` column) alongside the new name so `effectiveNewQuery != current.Query`, then assert the renamed VIEW reflects the new definition. Flagged independently by Acceptance Auditor + Edge Case Hunter (Med). **RESOLVED 2026-06-05:** added Test 6 `Put_BuilderMode_RenameAndQueryChange_ViewRedefinedUnderNewName` — creates with `blc_probe.id`, PUTs new name + `blc_probe.status` (queryChanged=true), asserts old VIEW gone / new VIEW redefined with `status`, and audit DDL = `-- Builder-generated\n` + `ALTER VIEW` + `CREATE VIEW datasets."blc_renqc_done"`. All 6 lifecycle tests pass.
 
 ---
 
@@ -198,10 +198,10 @@ Or the `OpenRawAsync()` helper pattern from `DatasetUpdateTests.cs`. Do NOT use 
 ### Project Structure Notes
 
 **Modified files:**
-- `src/FormForge.Api/Features/Datasets/DatasetService.cs` — 2-line change in `UpdateAsync` after Step E
+- `src/AppForge.Api/Features/Datasets/DatasetService.cs` — 2-line change in `UpdateAsync` after Step E
 
 **New files:**
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetBuilderLifecycleTests.cs` — 5 integration tests
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetBuilderLifecycleTests.cs` — 5 integration tests
 
 **No changes to:**
 - `DatasetViewManager.cs` — DDL builders already correct
@@ -214,13 +214,13 @@ Or the `OpenRawAsync()` helper pattern from `DatasetUpdateTests.cs`. Do NOT use 
 
 - Epics: `_bmad-output/planning-artifacts/epics.md` §Story 11.4 (FR-73 ACs 1–4)
 - Architecture: `_bmad-output/planning-artifacts/architecture.md` §6.3 (Transactional View Lifecycle / AR-59), §6.10 (SQL Generator — ViewSql vs ParameterizedSql)
-- `src/FormForge.Api/Features/Datasets/DatasetService.cs:361-383` — Story 11.1 builder-mode generation block (`builderRegenerated`)
-- `src/FormForge.Api/Features/Datasets/DatasetService.cs:417-424` — Step E: `primaryDdl` construction (insert annotation after line 424)
-- `src/FormForge.Api/Features/Datasets/DatasetViewManager.cs:51-53` — `BuildReplaceViewDdl` (DROP + CREATE, Story 8.10 fix)
-- `src/FormForge.Api/Features/Datasets/DatasetViewManager.cs:57-58` — `BuildRenameViewDdl` (ALTER RENAME)
-- `src/FormForge.Api/Features/Datasets/DatasetSqlGenerator.cs:22-24` — `ViewSql` vs `ParameterizedSql` distinction
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs` — test infrastructure pattern to replicate (WebApplicationFactory, allowlist config, `BuilderStateJson` helper)
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs` — `OpenRawAsync`, `GetAuditEntriesAsync`, `ViewExistsAsync` helpers to replicate
+- `src/AppForge.Api/Features/Datasets/DatasetService.cs:361-383` — Story 11.1 builder-mode generation block (`builderRegenerated`)
+- `src/AppForge.Api/Features/Datasets/DatasetService.cs:417-424` — Step E: `primaryDdl` construction (insert annotation after line 424)
+- `src/AppForge.Api/Features/Datasets/DatasetViewManager.cs:51-53` — `BuildReplaceViewDdl` (DROP + CREATE, Story 8.10 fix)
+- `src/AppForge.Api/Features/Datasets/DatasetViewManager.cs:57-58` — `BuildRenameViewDdl` (ALTER RENAME)
+- `src/AppForge.Api/Features/Datasets/DatasetSqlGenerator.cs:22-24` — `ViewSql` vs `ParameterizedSql` distinction
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs` — test infrastructure pattern to replicate (WebApplicationFactory, allowlist config, `BuilderStateJson` helper)
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs` — `OpenRawAsync`, `GetAuditEntriesAsync`, `ViewExistsAsync` helpers to replicate
 - Memory: Pre-existing audit 405 test failures — 2 tests fail on clean tree, do NOT reinvestigate
 - Memory: Validators registered explicitly — no new validators needed for this story
 
@@ -240,12 +240,12 @@ claude-opus-4-8 (1M context)
 - **ACs 1–3 (verified, not re-implemented):** confirmed against the live code that the Story 11.1 path already satisfies them — `DatasetSqlGenerator.Generate` runs before the transaction and returns 422 `BUILDER_STATE_INVALID` with no DDL on failure (AC-1); the row UPDATE + VIEW DDL share one `NpgsqlTransaction` with full rollback (AC-2); a Postgres DDL failure (`NpgsqlException`) rolls back the row and leaves the original VIEW intact, mapped to 422 `INVALID_QUERY` (AC-3).
 - **Task 2:** Added `DatasetBuilderLifecycleTests.cs` with 5 integration tests (save→VIEW exists with generated SQL, rename lifecycle, DDL-failure rollback via the allowlisted-but-absent `blc_ghost` table, `-- Builder-generated` audit marker, invalid builder_state→422 with no audit row). All 5 pass; the 7 existing `DatasetBuilderModeTests` still pass.
 - **Deviation note:** `GetViewDefAsync` uses a parameterized `@rc::regclass` cast instead of an interpolated identifier to satisfy CA2100 (interpolating the view name into the command text was a build error). Behavior is identical.
-- **Verify:** `dotnet build src/FormForge.Api` → 0/0; test project build → 0/0; 5 new + 7 existing builder tests pass; `tsc -b --noEmit` → exit 0 (repo exposes no `npm run check` script; ran its TypeScript equivalent).
+- **Verify:** `dotnet build src/AppForge.Api` → 0/0; test project build → 0/0; 5 new + 7 existing builder tests pass; `tsc -b --noEmit` → exit 0 (repo exposes no `npm run check` script; ran its TypeScript equivalent).
 
 ### File List
 
-- `src/FormForge.Api/Features/Datasets/DatasetService.cs` — MODIFIED (2-line builder-generated DDL annotation in `UpdateAsync`, between Step E and Step F)
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetBuilderLifecycleTests.cs` — NEW (6 integration tests for AC 1–4; Test 6 added during code review to cover the rename + query-change branch)
+- `src/AppForge.Api/Features/Datasets/DatasetService.cs` — MODIFIED (2-line builder-generated DDL annotation in `UpdateAsync`, between Step E and Step F)
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetBuilderLifecycleTests.cs` — NEW (6 integration tests for AC 1–4; Test 6 added during code review to cover the rename + query-change branch)
 
 ## Change Log
 

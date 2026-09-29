@@ -99,7 +99,7 @@ so that I can authenticate subsequent API requests.
   - `<PackageVersion Include="FluentValidation" Version="11.11.0" />` (verify latest; [NuGet](https://www.nuget.org/packages/FluentValidation))
   - `<PackageVersion Include="NetEscapades.AspNetCore.SecurityHeaders" Version="1.0.0" />` (verify latest; [NuGet](https://www.nuget.org/packages/NetEscapades.AspNetCore.SecurityHeaders))
   - `Microsoft.IdentityModel.JsonWebTokens` is transitively pulled by `Microsoft.AspNetCore.Authentication.JwtBearer` (framework component in .NET 10 SDK). If CPM raises NU1605 after the framework reference is resolved, pin the version explicitly.
-- [x] In `src/FormForge.Api/FormForge.Api.csproj`, add:
+- [x] In `src/AppForge.Api/AppForge.Api.csproj`, add:
   ```xml
   <PackageReference Include="BCrypt.Net-Next" />
   <PackageReference Include="FluentValidation" />
@@ -109,9 +109,9 @@ so that I can authenticate subsequent API requests.
 
 ### Task 2 — Create domain entities (AC: 1, 5)
 
-- [x] Create `src/FormForge.Api/Domain/Entities/User.cs`:
+- [x] Create `src/AppForge.Api/Domain/Entities/User.cs`:
   ```csharp
-  namespace FormForge.Api.Domain.Entities;
+  namespace AppForge.Api.Domain.Entities;
 
   internal sealed class User
   {
@@ -126,9 +126,9 @@ so that I can authenticate subsequent API requests.
       public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
   }
   ```
-- [x] Create `src/FormForge.Api/Domain/Entities/RefreshToken.cs`:
+- [x] Create `src/AppForge.Api/Domain/Entities/RefreshToken.cs`:
   ```csharp
-  namespace FormForge.Api.Domain.Entities;
+  namespace AppForge.Api.Domain.Entities;
 
   internal sealed class RefreshToken
   {
@@ -142,18 +142,18 @@ so that I can authenticate subsequent API requests.
   }
   ```
 
-### Task 3 — Update `FormForgeDbContext` and configure EF mappings (AC: 5)
+### Task 3 — Update `AppForgeDbContext` and configure EF mappings (AC: 5)
 
-- [x] In `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs`, add DbSets and `OnModelCreating`:
+- [x] In `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs`, add DbSets and `OnModelCreating`:
   ```csharp
-  using FormForge.Api.Domain.Entities;
+  using AppForge.Api.Domain.Entities;
   using Microsoft.EntityFrameworkCore;
 
-  namespace FormForge.Api.Infrastructure.Persistence;
+  namespace AppForge.Api.Infrastructure.Persistence;
 
   [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
       Justification = "Instantiated by EF Core DI registration.")]
-  internal sealed class FormForgeDbContext(DbContextOptions<FormForgeDbContext> options) : DbContext(options)
+  internal sealed class AppForgeDbContext(DbContextOptions<AppForgeDbContext> options) : DbContext(options)
   {
       public DbSet<User> Users => Set<User>();
       public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
@@ -199,8 +199,8 @@ so that I can authenticate subsequent API requests.
 - [x] From the repo root, run:
   ```
   dotnet ef migrations add CreateUsersAndRefreshTokens \
-    --project src/FormForge.Api \
-    --startup-project src/FormForge.Api \
+    --project src/AppForge.Api \
+    --startup-project src/AppForge.Api \
     --output-dir Infrastructure/Persistence/Migrations
   ```
 - [x] Review the generated migration file. Verify:
@@ -211,24 +211,24 @@ so that I can authenticate subsequent API requests.
 
 ### Task 5 — Create JWT options and configuration (AC: 1, 7)
 
-- [x] Create `src/FormForge.Api/Features/Auth/JwtOptions.cs`:
+- [x] Create `src/AppForge.Api/Features/Auth/JwtOptions.cs`:
   ```csharp
-  namespace FormForge.Api.Features.Auth;
+  namespace AppForge.Api.Features.Auth;
 
   internal sealed class JwtOptions
   {
       public const string SectionName = "Jwt";
       public string SigningKey { get; set; } = string.Empty; // mandatory; env var in prod, user-secrets in dev
-      public string Issuer { get; set; } = "FormForge";
-      public string Audience { get; set; } = "FormForge";
+      public string Issuer { get; set; } = "AppForge";
+      public string Audience { get; set; } = "AppForge";
       public int AccessTokenTtlMinutes { get; set; } = 15;
   }
   ```
-- [x] In `src/FormForge.Api/appsettings.json`, add:
+- [x] In `src/AppForge.Api/appsettings.json`, add:
   ```json
   "Jwt": {
-    "Issuer": "FormForge",
-    "Audience": "FormForge",
+    "Issuer": "AppForge",
+    "Audience": "AppForge",
     "AccessTokenTtlMinutes": 15
   }
   ```
@@ -236,16 +236,16 @@ so that I can authenticate subsequent API requests.
 - [x] Set dev signing key via user-secrets. The developer runs once:
   ```
   dotnet user-secrets set "Jwt:SigningKey" "dev-only-change-before-production-minimum-32-chars" \
-    --project src/FormForge.Api
+    --project src/AppForge.Api
   ```
 
 ### Task 6 — Create `PasswordHasher` (AC: 1, 2, 3)
 
-- [x] Create `src/FormForge.Api/Features/Auth/PasswordHasher.cs`:
+- [x] Create `src/AppForge.Api/Features/Auth/PasswordHasher.cs`:
   ```csharp
   using BCrypt.Net;
 
-  namespace FormForge.Api.Features.Auth;
+  namespace AppForge.Api.Features.Auth;
 
   internal interface IPasswordHasher
   {
@@ -269,16 +269,16 @@ so that I can authenticate subsequent API requests.
 
 ### Task 7 — Create `JwtTokenService` (AC: 1)
 
-- [x] Create `src/FormForge.Api/Features/Auth/JwtTokenService.cs`:
+- [x] Create `src/AppForge.Api/Features/Auth/JwtTokenService.cs`:
   ```csharp
   using System.IdentityModel.Tokens.Jwt;
   using System.Security.Claims;
   using System.Text;
-  using FormForge.Api.Domain.Entities;
+  using AppForge.Api.Domain.Entities;
   using Microsoft.Extensions.Options;
   using Microsoft.IdentityModel.Tokens;
 
-  namespace FormForge.Api.Features.Auth;
+  namespace AppForge.Api.Features.Auth;
 
   internal interface IJwtTokenService
   {
@@ -324,24 +324,24 @@ so that I can authenticate subsequent API requests.
 
 ### Task 8 — Create Auth DTOs and FluentValidation validator (AC: 1, 2)
 
-- [x] Create `src/FormForge.Api/Features/Auth/Dtos/LoginRequest.cs`:
+- [x] Create `src/AppForge.Api/Features/Auth/Dtos/LoginRequest.cs`:
   ```csharp
-  namespace FormForge.Api.Features.Auth.Dtos;
+  namespace AppForge.Api.Features.Auth.Dtos;
 
   internal sealed record LoginRequest(string Email, string Password);
   ```
-- [x] Create `src/FormForge.Api/Features/Auth/Dtos/LoginResponse.cs`:
+- [x] Create `src/AppForge.Api/Features/Auth/Dtos/LoginResponse.cs`:
   ```csharp
-  namespace FormForge.Api.Features.Auth.Dtos;
+  namespace AppForge.Api.Features.Auth.Dtos;
 
   internal sealed record LoginResponse(string AccessToken, string RefreshToken, int ExpiresIn);
   ```
-- [x] Create `src/FormForge.Api/Features/Auth/Validators/LoginRequestValidator.cs`:
+- [x] Create `src/AppForge.Api/Features/Auth/Validators/LoginRequestValidator.cs`:
   ```csharp
   using FluentValidation;
-  using FormForge.Api.Features.Auth.Dtos;
+  using AppForge.Api.Features.Auth.Dtos;
 
-  namespace FormForge.Api.Features.Auth.Validators;
+  namespace AppForge.Api.Features.Auth.Validators;
 
   internal sealed class LoginRequestValidator : AbstractValidator<LoginRequest>
   {
@@ -361,11 +361,11 @@ so that I can authenticate subsequent API requests.
 
 ### Task 9 — Create `ValidationFilter` and route group extensions (Decision 3.3, first use in project)
 
-- [x] Create `src/FormForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs`:
+- [x] Create `src/AppForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs`:
   ```csharp
   using FluentValidation;
 
-  namespace FormForge.Api.Common.Endpoints.EndpointFilters;
+  namespace AppForge.Api.Common.Endpoints.EndpointFilters;
 
   internal sealed class ValidationFilter<T>(IValidator<T> validator) : IEndpointFilter
       where T : class
@@ -396,12 +396,12 @@ so that I can authenticate subsequent API requests.
       }
   }
   ```
-- [x] Create `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs`:
+- [x] Create `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs`:
   ```csharp
   using FluentValidation;
-  using FormForge.Api.Common.Endpoints.EndpointFilters;
+  using AppForge.Api.Common.Endpoints.EndpointFilters;
 
-  namespace FormForge.Api.Common.Endpoints;
+  namespace AppForge.Api.Common.Endpoints;
 
   internal static class RouteGroupExtensions
   {
@@ -416,16 +416,16 @@ so that I can authenticate subsequent API requests.
 
 ### Task 10 — Create `AuthService` (AC: 1, 2, 3)
 
-- [x] Create `src/FormForge.Api/Features/Auth/AuthService.cs`:
+- [x] Create `src/AppForge.Api/Features/Auth/AuthService.cs`:
   ```csharp
   using System.Security.Cryptography;
   using System.Text;
-  using FormForge.Api.Domain.Entities;
-  using FormForge.Api.Features.Auth.Dtos;
-  using FormForge.Api.Infrastructure.Persistence;
+  using AppForge.Api.Domain.Entities;
+  using AppForge.Api.Features.Auth.Dtos;
+  using AppForge.Api.Infrastructure.Persistence;
   using Microsoft.EntityFrameworkCore;
 
-  namespace FormForge.Api.Features.Auth;
+  namespace AppForge.Api.Features.Auth;
 
   internal interface IAuthService
   {
@@ -444,7 +444,7 @@ so that I can authenticate subsequent API requests.
   [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
       Justification = "Registered via DI.")]
   internal sealed class AuthService(
-      FormForgeDbContext db,
+      AppForgeDbContext db,
       IPasswordHasher passwordHasher,
       IJwtTokenService jwtTokenService) : IAuthService
   {
@@ -519,14 +519,14 @@ so that I can authenticate subsequent API requests.
 
 ### Task 11 — Create `AuthEndpoints` (AC: 1, 2, 3, 4, 7)
 
-- [x] Create `src/FormForge.Api/Features/Auth/AuthEndpoints.cs`:
+- [x] Create `src/AppForge.Api/Features/Auth/AuthEndpoints.cs`:
   ```csharp
-  using FormForge.Api.Common.Endpoints;
-  using FormForge.Api.Features.Auth.Dtos;
-  using FormForge.Api.Features.Auth.Validators;
+  using AppForge.Api.Common.Endpoints;
+  using AppForge.Api.Features.Auth.Dtos;
+  using AppForge.Api.Features.Auth.Validators;
   using FluentValidation;
 
-  namespace FormForge.Api.Features.Auth;
+  namespace AppForge.Api.Features.Auth;
 
   internal static class AuthEndpoints
   {
@@ -623,9 +623,9 @@ so that I can authenticate subsequent API requests.
           options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
           {
               ValidateIssuer = true,
-              ValidIssuer = jwtSection["Issuer"] ?? "FormForge",
+              ValidIssuer = jwtSection["Issuer"] ?? "AppForge",
               ValidateAudience = true,
-              ValidAudience = jwtSection["Audience"] ?? "FormForge",
+              ValidAudience = jwtSection["Audience"] ?? "AppForge",
               ValidateLifetime = true,
               ValidateIssuerSigningKey = true,
               IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
@@ -687,10 +687,10 @@ so that I can authenticate subsequent API requests.
 
 - [x] Add new using statements at the top of `Program.cs`:
   ```csharp
-  using FormForge.Api.Features.Auth;
-  using FormForge.Api.Features.Auth.Dtos;
-  using FormForge.Api.Features.Auth.Validators;
-  using FormForge.Api.Common.Endpoints;
+  using AppForge.Api.Features.Auth;
+  using AppForge.Api.Features.Auth.Dtos;
+  using AppForge.Api.Features.Auth.Validators;
+  using AppForge.Api.Common.Endpoints;
   ```
 
 - [x] In the middleware pipeline section (after `app.UseMiddleware<CorrelationIdMiddleware>()`, before `app.UseStaticFiles()`), add:
@@ -712,7 +712,7 @@ so that I can authenticate subsequent API requests.
 
 ### Task 13 — Add CORS origin to appsettings.Development.json (AC: 7)
 
-- [x] In `src/FormForge.Api/appsettings.Development.json`, add:
+- [x] In `src/AppForge.Api/appsettings.Development.json`, add:
   ```json
   "Cors": {
     "AllowedOrigins": ["http://localhost:5173"]
@@ -1022,7 +1022,7 @@ so that I can authenticate subsequent API requests.
     export const Route = createFileRoute('/_app/')({
       component: () => {
         const { t } = useTranslation()
-        return <h1>{t('app.home', 'FormForge')}</h1>
+        return <h1>{t('app.home', 'AppForge')}</h1>
       },
     })
     ```
@@ -1138,13 +1138,13 @@ so that I can authenticate subsequent API requests.
 
 **Unit tests (no DB needed):**
 
-- [x] Create `src/FormForge.Api.Tests/Features/Auth/PasswordHasherTests.cs`:
+- [x] Create `src/AppForge.Api.Tests/Features/Auth/PasswordHasherTests.cs`:
   - `Hash_ReturnsNonEmptyBcryptString`
   - `Verify_CorrectPassword_ReturnsTrue`
   - `Verify_WrongPassword_ReturnsFalse`
   - `Hash_SamePassword_ProducesDifferentHashes` (BCrypt salt is randomized)
 
-- [x] Create `src/FormForge.Api.Tests/Features/Auth/JwtTokenServiceTests.cs`:
+- [x] Create `src/AppForge.Api.Tests/Features/Auth/JwtTokenServiceTests.cs`:
   - `CreateAccessToken_ReturnsThreeDotSeparatedJwt`
   - `CreateAccessToken_ContainsExpectedClaims` (userId, email, iat, exp)
   - `CreateAccessToken_ExpiresIn15Minutes`
@@ -1152,7 +1152,7 @@ so that I can authenticate subsequent API requests.
   - `CreateAccessToken_WithEmptyRoles_HasNoRolesClaims`
   - Use `IOptions<JwtOptions>` with a test signing key.
 
-- [x] Create `src/FormForge.Api.Tests/Features/Auth/LoginRequestValidatorTests.cs`:
+- [x] Create `src/AppForge.Api.Tests/Features/Auth/LoginRequestValidatorTests.cs`:
   - `Valid_Request_PassesValidation`
   - `EmptyEmail_FailsValidation`
   - `InvalidEmailFormat_FailsValidation`
@@ -1160,17 +1160,17 @@ so that I can authenticate subsequent API requests.
 
 **Integration tests (Testcontainers — first use in project):**
 
-- [x] Create `src/FormForge.Api.Tests/Infrastructure/PostgresFixture.cs`:
+- [x] Create `src/AppForge.Api.Tests/Infrastructure/PostgresFixture.cs`:
   ```csharp
   using Testcontainers.PostgreSql;
 
-  namespace FormForge.Api.Tests.Infrastructure;
+  namespace AppForge.Api.Tests.Infrastructure;
 
   public sealed class PostgresFixture : IAsyncLifetime
   {
       private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
           .WithImage("postgres:17-alpine")
-          .WithDatabase("formforge_test")
+          .WithDatabase("appforge_test")
           .WithUsername("testuser")
           .WithPassword("testpass")
           .Build();
@@ -1182,17 +1182,17 @@ so that I can authenticate subsequent API requests.
   }
   ```
 
-- [x] Create `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`:
+- [x] Create `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`:
   ```csharp
   using System.Net;
   using System.Net.Http.Json;
-  using FormForge.Api.Infrastructure.Persistence;
-  using FormForge.Api.Tests.Infrastructure;
+  using AppForge.Api.Infrastructure.Persistence;
+  using AppForge.Api.Tests.Infrastructure;
   using Microsoft.AspNetCore.Mvc.Testing;
   using Microsoft.EntityFrameworkCore;
   using Microsoft.Extensions.DependencyInjection;
 
-  namespace FormForge.Api.Tests.Features.Auth;
+  namespace AppForge.Api.Tests.Features.Auth;
 
   public sealed class AuthIntegrationTests : IClassFixture<PostgresFixture>, IAsyncLifetime
   {
@@ -1208,14 +1208,14 @@ so that I can authenticate subsequent API requests.
               .WithWebHostBuilder(builder =>
               {
                   builder.UseSetting(
-                      "ConnectionStrings:formforge",
+                      "ConnectionStrings:appforge",
                       _postgres.ConnectionString);
                   builder.UseSetting("Jwt:SigningKey", "test-signing-key-minimum-32-characters!!");
               });
 
           // Run EF Core migrations against the test container
           using var scope = _factory.Services.CreateScope();
-          var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+          var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
           await db.Database.MigrateAsync();
 
           // Seed a test user: email=test@example.com, password=Password1!, is_active=true
@@ -1286,8 +1286,8 @@ so that I can authenticate subsequent API requests.
       {
           // Seed an inactive user
           using var scope = _factory!.Services.CreateScope();
-          var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
-          db.Users.Add(new FormForge.Api.Domain.Entities.User
+          var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
+          db.Users.Add(new AppForge.Api.Domain.Entities.User
           {
               Email = "inactive@example.com",
               DisplayName = "Inactive",
@@ -1327,10 +1327,10 @@ so that I can authenticate subsequent API requests.
 
       private static async Task SeedTestUserAsync(IServiceScope scope)
       {
-          var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+          var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
           if (!await db.Users.AnyAsync())
           {
-              db.Users.Add(new FormForge.Api.Domain.Entities.User
+              db.Users.Add(new AppForge.Api.Domain.Entities.User
               {
                   Email = "test@example.com",
                   DisplayName = "Test User",
@@ -1359,7 +1359,7 @@ so that I can authenticate subsequent API requests.
 - [x] `dotnet test` — all new tests pass; 49 existing tests still pass (zero regressions).
 - [x] `cd web && npm run build` — clean TypeScript + Vite build.
 - [x] Manual verification:
-  - Run `dotnet run --project src/FormForge.AppHost`. Confirm Aspire Dashboard shows all services healthy.
+  - Run `dotnet run --project src/AppForge.AppHost`. Confirm Aspire Dashboard shows all services healthy.
   - Navigate to `http://localhost:5173/login`. Confirm the login form renders.
   - Submit invalid credentials. Confirm inline 401 error appears.
   - Seed a real user via `psql` or direct EF seed, then log in. Confirm redirect to `/`.
@@ -1420,13 +1420,13 @@ Emails are stored lowercase. `AuthService.LoginAsync` normalizes to lowercase be
 
 ### Current code state (files being modified)
 
-**`src/FormForge.Api/Program.cs`** (147 lines) — well understood; see current content in Dev Notes. The new middleware must be inserted in this order after `app.UseMiddleware<CorrelationIdMiddleware>()`:
+**`src/AppForge.Api/Program.cs`** (147 lines) — well understood; see current content in Dev Notes. The new middleware must be inserted in this order after `app.UseMiddleware<CorrelationIdMiddleware>()`:
 ```
 UseCors → UseSecurityHeaders → UseRateLimiter → UseAuthentication → UseAuthorization
 ```
 Then `UseStaticFiles`, `MapOpenApi`, etc. as currently ordered.
 
-**`src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs`** (10 lines) — currently empty shell. Add `DbSet<User>` + `DbSet<RefreshToken>` + full `OnModelCreating`.
+**`src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs`** (10 lines) — currently empty shell. Add `DbSet<User>` + `DbSet<RefreshToken>` + full `OnModelCreating`.
 
 **`web/src/main.tsx`** — replace entirely; currently renders `App.tsx` which is the Vite boilerplate.
 
@@ -1459,7 +1459,7 @@ The SHA-256 hex digest (64 chars) of the raw token is what's stored in `refresh_
 
 **Unit tests (no DB, no containers):**
 - `PasswordHasherTests`, `JwtTokenServiceTests`, `LoginRequestValidatorTests`
-- `FormForgeApiFactory` (the existing fake-DB factory from Story 1.5) is NOT used here — unit tests construct services directly.
+- `AppForgeApiFactory` (the existing fake-DB factory from Story 1.5) is NOT used here — unit tests construct services directly.
 - `JwtTokenServiceTests` uses `new OptionsWrapper<JwtOptions>(new JwtOptions { SigningKey = "..." })`.
 
 **Integration tests (Testcontainers):**
@@ -1473,24 +1473,24 @@ The SHA-256 hex digest (64 chars) of the raw token is what's stored in `refresh_
 ### File structure
 
 **New files (backend):**
-- `src/FormForge.Api/Domain/Entities/User.cs`
-- `src/FormForge.Api/Domain/Entities/RefreshToken.cs`
-- `src/FormForge.Api/Features/Auth/JwtOptions.cs`
-- `src/FormForge.Api/Features/Auth/PasswordHasher.cs`
-- `src/FormForge.Api/Features/Auth/JwtTokenService.cs`
-- `src/FormForge.Api/Features/Auth/AuthService.cs`
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs`
-- `src/FormForge.Api/Features/Auth/Dtos/LoginRequest.cs`
-- `src/FormForge.Api/Features/Auth/Dtos/LoginResponse.cs`
-- `src/FormForge.Api/Features/Auth/Validators/LoginRequestValidator.cs`
-- `src/FormForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs`
-- `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/YYYYMMDDHHMMSS_CreateUsersAndRefreshTokens.cs` (generated)
-- `src/FormForge.Api.Tests/Infrastructure/PostgresFixture.cs`
-- `src/FormForge.Api.Tests/Features/Auth/PasswordHasherTests.cs`
-- `src/FormForge.Api.Tests/Features/Auth/JwtTokenServiceTests.cs`
-- `src/FormForge.Api.Tests/Features/Auth/LoginRequestValidatorTests.cs`
-- `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`
+- `src/AppForge.Api/Domain/Entities/User.cs`
+- `src/AppForge.Api/Domain/Entities/RefreshToken.cs`
+- `src/AppForge.Api/Features/Auth/JwtOptions.cs`
+- `src/AppForge.Api/Features/Auth/PasswordHasher.cs`
+- `src/AppForge.Api/Features/Auth/JwtTokenService.cs`
+- `src/AppForge.Api/Features/Auth/AuthService.cs`
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs`
+- `src/AppForge.Api/Features/Auth/Dtos/LoginRequest.cs`
+- `src/AppForge.Api/Features/Auth/Dtos/LoginResponse.cs`
+- `src/AppForge.Api/Features/Auth/Validators/LoginRequestValidator.cs`
+- `src/AppForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs`
+- `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/YYYYMMDDHHMMSS_CreateUsersAndRefreshTokens.cs` (generated)
+- `src/AppForge.Api.Tests/Infrastructure/PostgresFixture.cs`
+- `src/AppForge.Api.Tests/Features/Auth/PasswordHasherTests.cs`
+- `src/AppForge.Api.Tests/Features/Auth/JwtTokenServiceTests.cs`
+- `src/AppForge.Api.Tests/Features/Auth/LoginRequestValidatorTests.cs`
+- `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`
 
 **New files (frontend):**
 - `web/src/lib/i18n/config.ts`
@@ -1507,12 +1507,12 @@ The SHA-256 hex digest (64 chars) of the raw token is what's stored in `refresh_
 
 **Modified files:**
 - `Directory.Packages.props` — add BCrypt.Net-Next, FluentValidation, NetEscapades.AspNetCore.SecurityHeaders
-- `src/FormForge.Api/FormForge.Api.csproj` — add 3 PackageReferences
-- `src/FormForge.Api.Tests/FormForge.Api.Tests.csproj` — add BCrypt.Net-Next PackageReference
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — add DbSets + OnModelCreating
-- `src/FormForge.Api/Program.cs` — register auth services, CORS, rate limiter, security headers, auth middleware, auth route group
-- `src/FormForge.Api/appsettings.json` — add Jwt section (no signing key)
-- `src/FormForge.Api/appsettings.Development.json` — add Cors.AllowedOrigins
+- `src/AppForge.Api/AppForge.Api.csproj` — add 3 PackageReferences
+- `src/AppForge.Api.Tests/AppForge.Api.Tests.csproj` — add BCrypt.Net-Next PackageReference
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — add DbSets + OnModelCreating
+- `src/AppForge.Api/Program.cs` — register auth services, CORS, rate limiter, security headers, auth middleware, auth route group
+- `src/AppForge.Api/appsettings.json` — add Jwt section (no signing key)
+- `src/AppForge.Api/appsettings.Development.json` — add Cors.AllowedOrigins
 - `web/src/main.tsx` — replace with RouterProvider + QueryClientProvider + i18n
 - `web/src/routes/__root.tsx` — replace with createRootRouteWithContext
 - `web/vite.config.ts` — add server.strictPort + dev proxy
@@ -1527,9 +1527,9 @@ The SHA-256 hex digest (64 chars) of the raw token is what's stored in `refresh_
 - `web/src/assets/hero.png` (if only used by App.tsx)
 
 **Do NOT touch:**
-- `src/FormForge.ServiceDefaults/` — no changes
-- `src/FormForge.AppHost/AppHost.cs` — no changes (VITE_API_BASE_URL is already set correctly; proxy handles the rest)
-- `src/FormForge.Api/Common/Logging/` — do not modify CorrelationIdMiddleware
+- `src/AppForge.ServiceDefaults/` — no changes
+- `src/AppForge.AppHost/AppHost.cs` — no changes (VITE_API_BASE_URL is already set correctly; proxy handles the rest)
+- `src/AppForge.Api/Common/Logging/` — do not modify CorrelationIdMiddleware
 - Any existing migration files
 
 ### Anti-patterns to avoid
@@ -1558,7 +1558,7 @@ Key patterns carried forward:
 - **`InvariantGlobalization=true`** — `StringComparison.Ordinal` / `.OrdinalIgnoreCase`; `ToLowerInvariant()`.
 - **`public partial class Program;`** at bottom of `Program.cs` — must not be duplicated.
 - **Existing test count: 49 tests** — do not regress.
-- **`FormForgeApiFactory`** (in `CorrelationIdMiddlewareTests.cs`) uses a bad connection string to let migration fail silently. The new `AuthIntegrationTests` uses a SEPARATE factory with a real Testcontainers connection string. The two factories are independent; do NOT modify `FormForgeApiFactory`.
+- **`AppForgeApiFactory`** (in `CorrelationIdMiddlewareTests.cs`) uses a bad connection string to let migration fail silently. The new `AuthIntegrationTests` uses a SEPARATE factory with a real Testcontainers connection string. The two factories are independent; do NOT modify `AppForgeApiFactory`.
 - **`#pragma warning disable CA1031`** in `Program.cs:100-102` for migration catch — leave this intact.
 - **deferred-work.md** should be updated to mark closed items.
 
@@ -1641,25 +1641,25 @@ claude-opus-4-7[1m]
 ### File List
 
 **New files (backend):**
-- `src/FormForge.Api/Domain/Entities/User.cs`
-- `src/FormForge.Api/Domain/Entities/RefreshToken.cs`
-- `src/FormForge.Api/Features/Auth/JwtOptions.cs`
-- `src/FormForge.Api/Features/Auth/PasswordHasher.cs`
-- `src/FormForge.Api/Features/Auth/JwtTokenService.cs`
-- `src/FormForge.Api/Features/Auth/AuthService.cs`
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs`
-- `src/FormForge.Api/Features/Auth/Dtos/LoginRequest.cs`
-- `src/FormForge.Api/Features/Auth/Dtos/LoginResponse.cs`
-- `src/FormForge.Api/Features/Auth/Validators/LoginRequestValidator.cs`
-- `src/FormForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs`
-- `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260522223551_CreateUsersAndRefreshTokens.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260522223551_CreateUsersAndRefreshTokens.Designer.cs`
-- `src/FormForge.Api.Tests/Infrastructure/PostgresFixture.cs`
-- `src/FormForge.Api.Tests/Features/Auth/PasswordHasherTests.cs`
-- `src/FormForge.Api.Tests/Features/Auth/JwtTokenServiceTests.cs`
-- `src/FormForge.Api.Tests/Features/Auth/LoginRequestValidatorTests.cs`
-- `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`
+- `src/AppForge.Api/Domain/Entities/User.cs`
+- `src/AppForge.Api/Domain/Entities/RefreshToken.cs`
+- `src/AppForge.Api/Features/Auth/JwtOptions.cs`
+- `src/AppForge.Api/Features/Auth/PasswordHasher.cs`
+- `src/AppForge.Api/Features/Auth/JwtTokenService.cs`
+- `src/AppForge.Api/Features/Auth/AuthService.cs`
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs`
+- `src/AppForge.Api/Features/Auth/Dtos/LoginRequest.cs`
+- `src/AppForge.Api/Features/Auth/Dtos/LoginResponse.cs`
+- `src/AppForge.Api/Features/Auth/Validators/LoginRequestValidator.cs`
+- `src/AppForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs`
+- `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260522223551_CreateUsersAndRefreshTokens.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260522223551_CreateUsersAndRefreshTokens.Designer.cs`
+- `src/AppForge.Api.Tests/Infrastructure/PostgresFixture.cs`
+- `src/AppForge.Api.Tests/Features/Auth/PasswordHasherTests.cs`
+- `src/AppForge.Api.Tests/Features/Auth/JwtTokenServiceTests.cs`
+- `src/AppForge.Api.Tests/Features/Auth/LoginRequestValidatorTests.cs`
+- `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`
 
 **New files (frontend):**
 - `web/src/lib/i18n/config.ts`
@@ -1675,13 +1675,13 @@ claude-opus-4-7[1m]
 
 **Modified files:**
 - `Directory.Packages.props` — add BCrypt.Net-Next, FluentValidation, Microsoft.AspNetCore.Authentication.JwtBearer, NetEscapades.AspNetCore.SecurityHeaders
-- `src/FormForge.Api/FormForge.Api.csproj` — add 4 PackageReferences; `UserSecretsId` added by `dotnet user-secrets init`
-- `src/FormForge.Api.Tests/FormForge.Api.Tests.csproj` — add BCrypt.Net-Next PackageReference
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — add DbSets + OnModelCreating
-- `src/FormForge.Api/Program.cs` — register auth services, CORS, rate limiter, security headers, auth middleware, auth route group
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` — regenerated by EF Core
-- `src/FormForge.Api/appsettings.json` — add Jwt section (no signing key)
-- `src/FormForge.Api/appsettings.Development.json` — add Cors.AllowedOrigins
+- `src/AppForge.Api/AppForge.Api.csproj` — add 4 PackageReferences; `UserSecretsId` added by `dotnet user-secrets init`
+- `src/AppForge.Api.Tests/AppForge.Api.Tests.csproj` — add BCrypt.Net-Next PackageReference
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — add DbSets + OnModelCreating
+- `src/AppForge.Api/Program.cs` — register auth services, CORS, rate limiter, security headers, auth middleware, auth route group
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` — regenerated by EF Core
+- `src/AppForge.Api/appsettings.json` — add Jwt section (no signing key)
+- `src/AppForge.Api/appsettings.Development.json` — add Cors.AllowedOrigins
 - `web/src/main.tsx` — replace with RouterProvider + QueryClientProvider + i18n
 - `web/src/routes/__root.tsx` — replace with createRootRouteWithContext
 - `web/vite.config.ts` — add server.strictPort + dev proxy
@@ -1711,39 +1711,39 @@ _All three decisions resolved on 2026-05-23 — see Patch and Deferred sections.
 
 #### Patch (12)
 
-- [x] [Review][Patch] **CRITICAL — Rate limiter is global, not per-IP (AC-4 violation)** [`src/FormForge.Api/Program.cs` AddRateLimiter] — `AddFixedWindowLimiter("auth-login", ...)` creates a single 10-permit bucket shared by all callers. One attacker burns the bucket and every legitimate user gets 429. AC-4 says "the same IP sends more than 10 login requests"; observable behavior is wrong. Use `AddPolicy("auth-login", ctx => RateLimitPartition.GetFixedWindowLimiter(ctx.Connection.RemoteIpAddress?.ToString() ?? "anon", _ => ...))`.
+- [x] [Review][Patch] **CRITICAL — Rate limiter is global, not per-IP (AC-4 violation)** [`src/AppForge.Api/Program.cs` AddRateLimiter] — `AddFixedWindowLimiter("auth-login", ...)` creates a single 10-permit bucket shared by all callers. One attacker burns the bucket and every legitimate user gets 429. AC-4 says "the same IP sends more than 10 login requests"; observable behavior is wrong. Use `AddPolicy("auth-login", ctx => RateLimitPartition.GetFixedWindowLimiter(ctx.Connection.RemoteIpAddress?.ToString() ?? "anon", _ => ...))`.
 
-- [x] [Review][Patch] **High — No `ForwardedHeaders` middleware; per-IP partitioning will collapse behind any proxy** [`src/FormForge.Api/Program.cs`] — Even after fixing P1, `Connection.RemoteIpAddress` is the proxy's IP in any non-trivial deployment (Aspire ingress, CDN, reverse proxy). Register `UseForwardedHeaders` (with `KnownProxies`/`KnownNetworks` allowlist) before `UseRateLimiter`.
+- [x] [Review][Patch] **High — No `ForwardedHeaders` middleware; per-IP partitioning will collapse behind any proxy** [`src/AppForge.Api/Program.cs`] — Even after fixing P1, `Connection.RemoteIpAddress` is the proxy's IP in any non-trivial deployment (Aspire ingress, CDN, reverse proxy). Register `UseForwardedHeaders` (with `KnownProxies`/`KnownNetworks` allowlist) before `UseRateLimiter`.
 
-- [x] [Review][Patch] **High — Dummy BCrypt hash literal may throw `SaltParseException`, defeating the constant-time guard** [`src/FormForge.Api/Features/Auth/AuthService.cs` `DummyPasswordHash`] — Hand-crafted hash string `$2a$12$...` is not guaranteed to parse cleanly across BCrypt.Net-Next versions; a thrown `SaltParseException` from `Verify()` propagates as 500, creating a status-code oracle for unknown emails. Generate the dummy hash at startup via `BCrypt.HashPassword(Guid.NewGuid().ToString(), 12)` (cached static), and wrap `Verify` in `try { ... } catch (BCrypt.Net.SaltParseException) { return false; }`.
+- [x] [Review][Patch] **High — Dummy BCrypt hash literal may throw `SaltParseException`, defeating the constant-time guard** [`src/AppForge.Api/Features/Auth/AuthService.cs` `DummyPasswordHash`] — Hand-crafted hash string `$2a$12$...` is not guaranteed to parse cleanly across BCrypt.Net-Next versions; a thrown `SaltParseException` from `Verify()` propagates as 500, creating a status-code oracle for unknown emails. Generate the dummy hash at startup via `BCrypt.HashPassword(Guid.NewGuid().ToString(), 12)` (cached static), and wrap `Verify` in `try { ... } catch (BCrypt.Net.SaltParseException) { return false; }`.
 
-- [x] [Review][Patch] **High — `ValidationFilter` skips validation when JSON body fails to bind, falling through to a 500** [`src/FormForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs`] — `context.Arguments.OfType<T>().FirstOrDefault()` returns null for empty bodies / wrong content-type; filter calls `await next(context)` and the handler then throws on `ArgumentNullException.ThrowIfNull(request)` → 500. Should return `Results.Problem(statusCode: 400)` (or a typed validation problem) when `argument is null`.
+- [x] [Review][Patch] **High — `ValidationFilter` skips validation when JSON body fails to bind, falling through to a 500** [`src/AppForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs`] — `context.Arguments.OfType<T>().FirstOrDefault()` returns null for empty bodies / wrong content-type; filter calls `await next(context)` and the handler then throws on `ArgumentNullException.ThrowIfNull(request)` → 500. Should return `Results.Problem(statusCode: 400)` (or a typed validation problem) when `argument is null`.
 
-- [x] [Review][Patch] **Medium — Refresh-cookie `Secure` flag decided by hostname check, not environment** [`src/FormForge.Api/Features/Auth/AuthEndpoints.cs` `SetRefreshCookieAndReturn`] — `Request.Host.Host.Equals("localhost", OrdinalIgnoreCase)` mis-fires for `127.0.0.1`, `[::1]`, container hostnames (`api`, `formforge-api`), and reverse-proxy internal DNS. Inject `IHostEnvironment` and use `Secure = !env.IsDevelopment()`, optionally OR `Request.IsHttps`. Spec's own Dev Notes prescribe "Secure=true in non-Development environments" — the code does not implement that.
+- [x] [Review][Patch] **Medium — Refresh-cookie `Secure` flag decided by hostname check, not environment** [`src/AppForge.Api/Features/Auth/AuthEndpoints.cs` `SetRefreshCookieAndReturn`] — `Request.Host.Host.Equals("localhost", OrdinalIgnoreCase)` mis-fires for `127.0.0.1`, `[::1]`, container hostnames (`api`, `appforge-api`), and reverse-proxy internal DNS. Inject `IHostEnvironment` and use `Secure = !env.IsDevelopment()`, optionally OR `Request.IsHttps`. Spec's own Dev Notes prescribe "Secure=true in non-Development environments" — the code does not implement that.
 
-- [x] [Review][Patch] **Medium — JWT `roles` / `userId` claims won't bind to ASP.NET authorization** [`src/FormForge.Api/Features/Auth/JwtTokenService.cs` + `Program.cs` JWT bearer setup] — Emits bare `"roles"` and `"userId"` claims, but `TokenValidationParameters` doesn't set `RoleClaimType` / `NameClaimType`. `[Authorize(Roles="admin")]` and `User.IsInRole(...)` resolve against `ClaimTypes.Role` (URI) by default and will see zero roles for every authenticated user — silent failure that bites Story 2.6 when the first protected route ships. Set `RoleClaimType = "roles"` and `NameClaimType = "userId"` in `TokenValidationParameters`.
+- [x] [Review][Patch] **Medium — JWT `roles` / `userId` claims won't bind to ASP.NET authorization** [`src/AppForge.Api/Features/Auth/JwtTokenService.cs` + `Program.cs` JWT bearer setup] — Emits bare `"roles"` and `"userId"` claims, but `TokenValidationParameters` doesn't set `RoleClaimType` / `NameClaimType`. `[Authorize(Roles="admin")]` and `User.IsInRole(...)` resolve against `ClaimTypes.Role` (URI) by default and will see zero roles for every authenticated user — silent failure that bites Story 2.6 when the first protected route ships. Set `RoleClaimType = "roles"` and `NameClaimType = "userId"` in `TokenValidationParameters`.
 
-- [x] [Review][Patch] **Medium — Email not trimmed before lowercasing; leading/trailing whitespace causes 401** [`src/FormForge.Api/Features/Auth/AuthService.cs` `LoginAsync`] — Mobile keyboards routinely auto-insert trailing spaces. `email.ToLowerInvariant()` doesn't trim; lookup misses and user sees `INVALID_CREDENTIALS`. Use `email.Trim().ToLowerInvariant()`.
+- [x] [Review][Patch] **Medium — Email not trimmed before lowercasing; leading/trailing whitespace causes 401** [`src/AppForge.Api/Features/Auth/AuthService.cs` `LoginAsync`] — Mobile keyboards routinely auto-insert trailing spaces. `email.ToLowerInvariant()` doesn't trim; lookup misses and user sees `INVALID_CREDENTIALS`. Use `email.Trim().ToLowerInvariant()`.
 
-- [x] [Review][Patch] **Low — Empty `Cors:AllowedOrigins` in production silently fails closed** [`src/FormForge.Api/Program.cs` `AddCors`] — Missing env var produces `[]`; CORS rejects everything with no startup-time signal. Log a critical warning (or throw) when `corsOrigins.Length == 0 && env.IsProduction()`. At minimum, log the active allowlist at startup.
+- [x] [Review][Patch] **Low — Empty `Cors:AllowedOrigins` in production silently fails closed** [`src/AppForge.Api/Program.cs` `AddCors`] — Missing env var produces `[]`; CORS rejects everything with no startup-time signal. Log a critical warning (or throw) when `corsOrigins.Length == 0 && env.IsProduction()`. At minimum, log the active allowlist at startup.
 
-- [x] [Review][Patch] **Low — Rate-limit 429 response is hand-rolled, missing `correlationId` and RFC 7807 fields** [`src/FormForge.Api/Program.cs` `OnRejected`] — Content-Type advertises `application/problem+json` but body has no `type`, no `instance`, and crucially no `correlationId` — diverges from AR-18 / AR-24 error envelope used by all other auth errors. Build via `Results.Problem(...)` or hand-build the payload to include `httpContext.GetCorrelationId()`.
+- [x] [Review][Patch] **Low — Rate-limit 429 response is hand-rolled, missing `correlationId` and RFC 7807 fields** [`src/AppForge.Api/Program.cs` `OnRejected`] — Content-Type advertises `application/problem+json` but body has no `type`, no `instance`, and crucially no `correlationId` — diverges from AR-18 / AR-24 error envelope used by all other auth errors. Build via `Results.Problem(...)` or hand-build the payload to include `httpContext.GetCorrelationId()`.
 
-- [x] [Review][Patch] **Low — `AuthIntegrationTests` share one Postgres container across methods without table reset** [`src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`] — `IClassFixture<PostgresFixture>` is one container per class; tests insert `refresh_tokens` rows that persist across methods. Future tests asserting row counts will flake on order. Truncate `users` + `refresh_tokens` (or use Respawn) in `InitializeAsync` after `MigrateAsync`.
+- [x] [Review][Patch] **Low — `AuthIntegrationTests` share one Postgres container across methods without table reset** [`src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`] — `IClassFixture<PostgresFixture>` is one container per class; tests insert `refresh_tokens` rows that persist across methods. Future tests asserting row counts will flake on order. Truncate `users` + `refresh_tokens` (or use Respawn) in `InitializeAsync` after `MigrateAsync`.
 
 - [x] [Review][Patch] **Low — `httpClient` sends `Content-Type: application/json` on body-less GET/DELETE, forcing CORS preflight** [`web/src/features/auth/httpClient.ts`] — Setting Content-Type with no body is semantically wrong per Fetch spec and triggers OPTIONS preflight. Only add the header when `body !== undefined`.
 
-- [x] [Review][Patch] **Low — JWT `iat` claim — investigated; reviewers' diagnosis was incorrect** [`src/FormForge.Api/Features/Auth/JwtTokenService.cs`] — `JwtSecurityToken` does NOT auto-emit `iat` (only `nbf` from `notBefore` and `exp` from `expires`); removing the explicit claim drops it entirely (test failure proved this). With `ClaimValueTypes.Integer64`, the JWT payload serializer writes `iat` as an unquoted JSON number per RFC 7519, so the "string-typed iat" concern from F5/E14/A3 is a false positive. Fix landed as a regression-locking test (`JwtTokenServiceTests.CreateAccessToken_IatClaim_IsEmittedAsNumericDate`) that asserts the claim's `ValueType == ClaimValueTypes.Integer64`. No code change to `JwtTokenService.cs`.
+- [x] [Review][Patch] **Low — JWT `iat` claim — investigated; reviewers' diagnosis was incorrect** [`src/AppForge.Api/Features/Auth/JwtTokenService.cs`] — `JwtSecurityToken` does NOT auto-emit `iat` (only `nbf` from `notBefore` and `exp` from `expires`); removing the explicit claim drops it entirely (test failure proved this). With `ClaimValueTypes.Integer64`, the JWT payload serializer writes `iat` as an unquoted JSON number per RFC 7519, so the "string-typed iat" concern from F5/E14/A3 is a false positive. Fix landed as a regression-locking test (`JwtTokenServiceTests.CreateAccessToken_IatClaim_IsEmittedAsNumericDate`) that asserts the claim's `ValueType == ClaimValueTypes.Integer64`. No code change to `JwtTokenService.cs`.
 
-- [x] [Review][Patch] **D1 — Cap password validator at BCrypt's 72-byte input limit** [`src/FormForge.Api/Features/Auth/Validators/LoginRequestValidator.cs`] — Replace `MaximumLength(128)` with `MaximumLength(72)` on the `Password` rule so users see a validation error rather than silent truncation of long passphrases. Add a `LoginRequestValidatorTests` case for the 73-char rejection path.
+- [x] [Review][Patch] **D1 — Cap password validator at BCrypt's 72-byte input limit** [`src/AppForge.Api/Features/Auth/Validators/LoginRequestValidator.cs`] — Replace `MaximumLength(128)` with `MaximumLength(72)` on the `Password` rule so users see a validation error rather than silent truncation of long passphrases. Add a `LoginRequestValidatorTests` case for the 73-char rejection path.
 
-- [x] [Review][Patch] **D3 — Make `HstsMaxAgeSeconds` configurable per environment** [`src/FormForge.Api/Program.cs` security-headers block + `appsettings.json` / per-env overrides] — Read `Security:HstsMaxAgeSeconds` from configuration (default 31_536_000 for Production); pass to `AddStrictTransportSecurityMaxAgeIncludeSubDomains(maxAgeInSeconds)`. Allow Staging or preview envs to short-circuit (e.g. 60 seconds) without locking subdomains into HTTPS-only for a year.
+- [x] [Review][Patch] **D3 — Make `HstsMaxAgeSeconds` configurable per environment** [`src/AppForge.Api/Program.cs` security-headers block + `appsettings.json` / per-env overrides] — Read `Security:HstsMaxAgeSeconds` from configuration (default 31_536_000 for Production); pass to `AddStrictTransportSecurityMaxAgeIncludeSubDomains(maxAgeInSeconds)`. Allow Staging or preview envs to short-circuit (e.g. 60 seconds) without locking subdomains into HTTPS-only for a year.
 
 #### Deferred (2)
 
-- [x] [Review][Defer] **Refresh-token hash uniqueness collision crashes login** [`src/FormForge.Api/Features/Auth/AuthService.cs` `LoginAsync` SaveChangesAsync] — `uq_refresh_tokens_token_hash` could throw `DbUpdateException` if RNG ever produced a duplicate 32-byte sequence; probability is astronomical and no current threat model warrants a retry loop. Revisit if a multi-region / replication scenario emerges. Source: edge-hunter.
+- [x] [Review][Defer] **Refresh-token hash uniqueness collision crashes login** [`src/AppForge.Api/Features/Auth/AuthService.cs` `LoginAsync` SaveChangesAsync] — `uq_refresh_tokens_token_hash` could throw `DbUpdateException` if RNG ever produced a duplicate 32-byte sequence; probability is astronomical and no current threat model warrants a retry loop. Revisit if a multi-region / replication scenario emerges. Source: edge-hunter.
 
-- [x] [Review][Defer] **Email Unicode case-folding under `InvariantGlobalization=true`** [`src/FormForge.Api/Features/Auth/AuthService.cs` `LoginAsync`] — `ToLowerInvariant()` does not round-trip Turkish `İ`/`I`, German `ß`, and similar; the plain unique index on `users.email` will not detect case-equivalent duplicates. Deferred for v1 — internal-only userbase, Unicode emails out of scope for v1. Revisit if external users with non-ASCII emails are onboarded.
+- [x] [Review][Defer] **Email Unicode case-folding under `InvariantGlobalization=true`** [`src/AppForge.Api/Features/Auth/AuthService.cs` `LoginAsync`] — `ToLowerInvariant()` does not round-trip Turkish `İ`/`I`, German `ß`, and similar; the plain unique index on `users.email` will not detect case-equivalent duplicates. Deferred for v1 — internal-only userbase, Unicode emails out of scope for v1. Revisit if external users with non-ASCII emails are onboarded.
 
 #### Dismissed as noise (3)
 

@@ -454,7 +454,7 @@ So that I can fully manage Datasets without touching the database.
 - [x] **Task 7 — Build and test verification**
   - [x] `cd web && npx tsc -b --noEmit` → 0 errors
   - [x] `cd web && npx vitest run` → ≥280 passed; the pre-existing i18n-lint failure (4 orphaned `designer.inspector.placeholders.*` + `errors.exportFailed` keys) remains unchanged; no new failures
-  - [x] `dotnet build src/FormForge.Api` → 0 errors, 0 warnings (no backend changes)
+  - [x] `dotnet build src/AppForge.Api` → 0 errors, 0 warnings (no backend changes)
   - [x] `dotnet test` → 913 passed, 2 pre-existing failures unchanged
   - [x] Manual smoke: navigate Admin > Datasets; verify tab appears; create a dataset (Custom Query, valid SELECT); verify it appears in the list with the "Custom Query" badge; click Edit, change the name, save; verify updated name in list; click Audit on the row, verify audit entries appear; click Delete, confirm, verify row disappears
 
@@ -597,10 +597,10 @@ MODIFIED:
 - [Source: `web/src/features/datasets/datasetAuditApi.ts` — httpClient import path `'../auth/httpClient'`]
 - [Source: `web/src/features/datasets/SqlQueryTextarea.tsx` — SQL textarea props and usage]
 - [Source: `web/src/features/datasets/validation.ts` — `datasetNameSchema` for form validation]
-- [Source: `src/FormForge.Api/Features/Datasets/Dtos/DatasetDto.cs` — `DatasetDetail` field names]
-- [Source: `src/FormForge.Api/Features/Datasets/Dtos/DatasetSummaryDto.cs` — `DatasetSummary` field names]
-- [Source: `src/FormForge.Api/Features/Datasets/Dtos/UpdateDatasetRequest.cs` — `int Version` is non-nullable (required on every PUT)]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — preview stub returns HTTP 501]
+- [Source: `src/AppForge.Api/Features/Datasets/Dtos/DatasetDto.cs` — `DatasetDetail` field names]
+- [Source: `src/AppForge.Api/Features/Datasets/Dtos/DatasetSummaryDto.cs` — `DatasetSummary` field names]
+- [Source: `src/AppForge.Api/Features/Datasets/Dtos/UpdateDatasetRequest.cs` — `int Version` is non-nullable (required on every PUT)]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — preview stub returns HTTP 501]
 - [Source: `web/src/routes/_app/admin.tsx` — admin nav tab structure to extend]
 - [Source: AR-57: UNIQUE constraint on dataset_name (audit filter is exact-match safe)]
 - [Source: AR-58: canManageDatasets on platform-admin; no extra guard needed in nav tab]
@@ -618,7 +618,7 @@ claude-opus-4-8 (1M context) — BMad Dev Story workflow
 
 - `npx tsc -b --noEmit` → 0 errors.
 - `npx vitest run` → 281 passed, 1 failed. The single failure is the pre-existing `i18n-lint.test.ts` (exactly one missing key: `designer.inspector.placeholders.label`) — confirmed unchanged by running `node scripts/i18n-check.mjs` directly (1 missing, 89 orphaned warnings). The new `admin.datasets.*` keys are all present in `en.json`; none appear in the missing set.
-- `dotnet build src/FormForge.Api` → 0 warnings, 0 errors.
+- `dotnet build src/AppForge.Api` → 0 warnings, 0 errors.
 - `dotnet test` → 913 passed, 2 failed. The 2 failures are the documented pre-existing `SchemaAuditLogIntegrationTests` / `MutationAuditLogIntegrationTests` DELETE→405 cases (no backend code touched by this story).
 
 ### Completion Notes
@@ -667,7 +667,7 @@ MODIFIED:
 - [x] [Review][Patch] Concurrent Edit clicks on different rows race to overwrite `editTarget` — last `getDataset` to resolve wins, silently replacing the edit form [web/src/routes/_app/admin/datasets.tsx — `DatasetRow` + `DatasetsPage`]
 - [x] [Review][Patch] Delete dialog swallows `mutateAsync` errors — no `.catch()`, dialog stays open with no error message on 404/500/network failure [web/src/routes/_app/admin/datasets.tsx — `AlertDialog` confirm handler]
 - [x] [Review][Patch] Stale `auditDatasetName` after rename — panel stays open with old name; row Audit button can no longer toggle it (name mismatch after invalidation) [web/src/routes/_app/admin/datasets.tsx — `DatasetsPage`]
-- [x] [Review][Defer] `PutDataset_NarrowsColumnSet_Returns200` hard-codes `version = 1` without asserting `created.Version` — pre-existing pattern in test file; low risk [src/FormForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs] — deferred, pre-existing
+- [x] [Review][Defer] `PutDataset_NarrowsColumnSet_Returns200` hard-codes `version = 1` without asserting `created.Version` — pre-existing pattern in test file; low risk [src/AppForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs] — deferred, pre-existing
 - [x] [Review][Defer] `query: null` for QB mode relies on undocumented "null = keep" backend convention — intentional per AC-4, but silent contract; would need backend change to harden [web/src/routes/_app/admin/datasets.tsx — `EditDatasetForm.onSubmit`] — deferred, pre-existing
 - [x] [Review][Defer] `DatasetAuditPanel` `auditPage` can exceed `totalPages` in concurrent external-rename scenario — very edge case, low impact [web/src/routes/_app/admin/datasets.tsx — `DatasetAuditPanel`] — deferred, pre-existing
 

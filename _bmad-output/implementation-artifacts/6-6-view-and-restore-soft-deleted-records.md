@@ -90,7 +90,7 @@ So that accidental deletions can be recovered.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Add restore query builders to `DynamicQueryBuilder.cs`** (AC: 1, 2, 3, 6, 10)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
   - Add two new static methods after `BuildFkColumnName`:
 
   **Method A: `BuildRestoreByIdQuery`** — restores one row by primary key:
@@ -154,7 +154,7 @@ So that accidental deletions can be recovered.
   ```
 
 - [x] **Task 2 — Add `RestoreCascadeAsync` to `SoftDeleteCascade.cs`** (AC: 2, 3, 10)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/SoftDeleteCascade.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/SoftDeleteCascade.cs`
   - Add a new static method after `ExecuteAsync`:
 
   ```csharp
@@ -192,7 +192,7 @@ So that accidental deletions can be recovered.
   ```
 
 - [x] **Task 3 — Add `RestoreRecordHandler` + route registration to `DynamicDataEndpoints.cs`** (AC: 1–10)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
 
   **3a — Add `Problems.RecordNotDeleted()` to the `private static class Problems` block** (after `RecordAlreadyDeleted()`):
   ```csharp
@@ -244,7 +244,7 @@ So that accidental deletions can be recovered.
       string designerId,
       Guid id,
       HttpContext httpContext,
-      FormForgeDbContext db,
+      AppForgeDbContext db,
       ISchemaRegistry schemaRegistry,
       DbConnectionFactory connectionFactory,
       CancellationToken ct)
@@ -423,7 +423,7 @@ So that accidental deletions can be recovered.
   ```
 
 - [x] **Task 4 — Unit tests for the two new query builder methods** (AC: 1, 2, 3, 6, 10)
-  - [x] Modify `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
+  - [x] Modify `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
   - Add to the existing class (after the `BuildSoftDelete*` tests at the end):
 
   Tests to add (3 unit tests):
@@ -434,7 +434,7 @@ So that accidental deletions can be recovered.
   Estimated: +3 unit tests → running total ~493
 
 - [x] **Task 5 — Integration tests: `RestoreIntegrationTests.cs`** (AC: 1–10)
-  - [x] Create `src/FormForge.Api.Tests/Features/DynamicCrud/RestoreIntegrationTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/DynamicCrud/RestoreIntegrationTests.cs`
   - Class signature: `[Collection("DynamicCrudTests")] public sealed class RestoreIntegrationTests : IClassFixture<PostgresFixture>, IAsyncLifetime`
   - `InitializeAsync` / `DisposeAsync` **identical** to `SoftDeleteIntegrationTests` (same TRUNCATE, same dynamic-table DROP loop, same `ReseedSystemRolesAsync` + `SeedTestUsersAsync`)
   - Copy all helper methods from `SoftDeleteIntegrationTests` verbatim (LoginAsync, PostRecordAsync, DeleteRecordAsync, SetupProvisionedDesignerWithTitleAsync, CreateRecordAndGetIdAsync, GetUserIdFromToken, GetRecordAsync, etc.)
@@ -627,7 +627,7 @@ To test AC-2 properly, we need a parent schema with at least one child. The exis
 
 | New file | Path |
 |---|---|
-| `RestoreIntegrationTests.cs` | `src/FormForge.Api.Tests/Features/DynamicCrud/RestoreIntegrationTests.cs` |
+| `RestoreIntegrationTests.cs` | `src/AppForge.Api.Tests/Features/DynamicCrud/RestoreIntegrationTests.cs` |
 | `restoreRecordApi.ts` | `web/src/features/data-entry/restoreRecordApi.ts` |
 | `useRestoreRecord.ts` | `web/src/features/data-entry/useRestoreRecord.ts` |
 
@@ -640,7 +640,7 @@ To test AC-2 properly, we need a parent schema with at least one child. The exis
 | `SoftDeleteCascade.cs` | Add `RestoreCascadeAsync` static method |
 | `DynamicQueryBuilderTests.cs` | Add 3 unit tests for the two new builder methods |
 
-No changes to: `MutationAuditLogEntry.cs` (already supports `"RESTORE"` per its xmldoc from Story 6.3), `FormForgeDbContext.cs`, `Program.cs`, `DynamicRecord.cs`, `DynamicRecordJsonConverter.cs`, `DynamicPayloadValidator.cs`. No new EF migration required.
+No changes to: `MutationAuditLogEntry.cs` (already supports `"RESTORE"` per its xmldoc from Story 6.3), `AppForgeDbContext.cs`, `Program.cs`, `DynamicRecord.cs`, `DynamicRecordJsonConverter.cs`, `DynamicPayloadValidator.cs`. No new EF migration required.
 
 **No new `using` imports needed** in `DynamicDataEndpoints.cs` — `using Npgsql;` was added in Story 6.5.
 
@@ -660,10 +660,10 @@ No changes to: `MutationAuditLogEntry.cs` (already supports `"RESTORE"` per its 
 
 ### References
 
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`] — `DeleteRecordHandler` (lines 660–853) — mirror for `RestoreRecordHandler`: SafeIdentifier → EF binding → registry → actorId extraction; cascade graph pre-loading; SELECT-before-UPDATE; NpgsqlTransaction pattern; try/finally for tx.DisposeAsync and conn.DisposeAsync; Problems inner class for `RecordNotDeleted()`; route registration after `MapDelete`
-- [Source: `src/FormForge.Api/Features/DynamicCrud/SoftDeleteCascade.cs`] — `BuildSchemaGraphAsync` (reused unchanged); `ExecuteAsync` (reference for `RestoreCascadeAsync` structure, though simpler — no per-row recursion)
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`] — `BuildSoftDeleteByIdQuery` (lines 360–397) — parallel structure for `BuildRestoreByIdQuery`; `BuildGetByIdQuery` (lines 203–219) — used inside handler for pre-restore SELECT; `BuildFkColumnName` — used by cascade
-- [Source: `src/FormForge.Api.Tests/Features/DynamicCrud/SoftDeleteIntegrationTests.cs`] — copy all helpers verbatim; TRUNCATE statement; `[Collection("DynamicCrudTests")]`; `ReseedSystemRolesAsync` + `SeedTestUsersAsync`; `GetUserIdFromToken`
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`] — `DeleteRecordHandler` (lines 660–853) — mirror for `RestoreRecordHandler`: SafeIdentifier → EF binding → registry → actorId extraction; cascade graph pre-loading; SELECT-before-UPDATE; NpgsqlTransaction pattern; try/finally for tx.DisposeAsync and conn.DisposeAsync; Problems inner class for `RecordNotDeleted()`; route registration after `MapDelete`
+- [Source: `src/AppForge.Api/Features/DynamicCrud/SoftDeleteCascade.cs`] — `BuildSchemaGraphAsync` (reused unchanged); `ExecuteAsync` (reference for `RestoreCascadeAsync` structure, though simpler — no per-row recursion)
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`] — `BuildSoftDeleteByIdQuery` (lines 360–397) — parallel structure for `BuildRestoreByIdQuery`; `BuildGetByIdQuery` (lines 203–219) — used inside handler for pre-restore SELECT; `BuildFkColumnName` — used by cascade
+- [Source: `src/AppForge.Api.Tests/Features/DynamicCrud/SoftDeleteIntegrationTests.cs`] — copy all helpers verbatim; TRUNCATE statement; `[Collection("DynamicCrudTests")]`; `ReseedSystemRolesAsync` + `SeedTestUsersAsync`; `GetUserIdFromToken`
 - [Architecture: Decision 1.3] — cascade_event_id NULL semantics for restore; individual restore clears unconditionally; cascade restore matches by id; children NOT incidentally restored
 - [Architecture: AR-46 Option C] — `DynamicRecordJsonConverter` handles `cascade_event_id` → `cascadeEventId`; `is_deleted` → `isDeleted: false` automatically
 - [Architecture: Decision 1.6] — `commandTimeout: 5` on all Dapper calls; EF + Dapper separated transactions (audit via EF AFTER restore transaction commits)
@@ -679,10 +679,10 @@ Opus 4.7 (1M context) — `claude-opus-4-7[1m]`
 
 ### Debug Log References
 
-- Build of API: `dotnet build src/FormForge.Api/FormForge.Api.csproj` → 0 warnings, 0 errors after restore handler addition.
+- Build of API: `dotnet build src/AppForge.Api/AppForge.Api.csproj` → 0 warnings, 0 errors after restore handler addition.
 - Unit tests scope: `dotnet test ... --filter "FullyQualifiedName~DynamicQueryBuilderTests"` → 39/39 passed (3 new + 36 existing).
 - Integration tests scope: `dotnet test ... --filter "FullyQualifiedName~RestoreIntegrationTests"` → 8/8 passed in 20.3 s.
-- Full backend regression: `dotnet test src/FormForge.Api.Tests/...` → 502/502 passed in 2 m 18 s.
+- Full backend regression: `dotnet test src/AppForge.Api.Tests/...` → 502/502 passed in 2 m 18 s.
 - Frontend typecheck (`npx tsc -b --noEmit`): no errors from new files (`restoreRecordApi.ts`, `useRestoreRecord.ts`); pre-existing unrelated errors in `Navbar.test.tsx` and `usePollProvisioning.test.tsx` left untouched.
 - Frontend lint (`eslint`) on new files: clean.
 
@@ -701,15 +701,15 @@ Opus 4.7 (1M context) — `claude-opus-4-7[1m]`
 ### File List
 
 **New files:**
-- `src/FormForge.Api.Tests/Features/DynamicCrud/RestoreIntegrationTests.cs`
+- `src/AppForge.Api.Tests/Features/DynamicCrud/RestoreIntegrationTests.cs`
 - `web/src/features/data-entry/restoreRecordApi.ts`
 - `web/src/features/data-entry/useRestoreRecord.ts`
 
 **Modified files:**
-- `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs` (added `BuildRestoreByIdQuery`, `BuildRestoreCascadeChildrenQuery`)
-- `src/FormForge.Api/Features/DynamicCrud/SoftDeleteCascade.cs` (added `RestoreCascadeAsync`)
-- `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` (added `MapPut("/{id:guid}/restore")`, `Problems.RecordNotDeleted()`, `RestoreRecordHandler`)
-- `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` (added 3 unit tests under `Story 6.6` region)
+- `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs` (added `BuildRestoreByIdQuery`, `BuildRestoreCascadeChildrenQuery`)
+- `src/AppForge.Api/Features/DynamicCrud/SoftDeleteCascade.cs` (added `RestoreCascadeAsync`)
+- `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` (added `MapPut("/{id:guid}/restore")`, `Problems.RecordNotDeleted()`, `RestoreRecordHandler`)
+- `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` (added 3 unit tests under `Story 6.6` region)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (6-6 → review)
 - `_bmad-output/implementation-artifacts/6-6-view-and-restore-soft-deleted-records.md` (Status, Tasks/Subtasks checkboxes, Dev Agent Record, File List, Change Log)
 

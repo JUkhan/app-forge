@@ -1302,7 +1302,7 @@ function ImageRenderer({ element }: { element: DesignerElement }) {
   const [failedForSrc, setFailedForSrc] = useState<string | null>(null)
   const imgFailed = failedForSrc === rawSrc
 
-  // FormForge files API stub returns `{ url }`. staleTime caches the URL for
+  // AppForge files API stub returns `{ url }`. staleTime caches the URL for
   // ~50 minutes (typical 1-hour presign window). On <img onError> we invalidate
   // the presign so a transient blip or post-expiry failure refetches a fresh
   // signed URL instead of latching to the fallback UI for the rest of the

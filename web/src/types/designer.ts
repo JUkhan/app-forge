@@ -1,7 +1,7 @@
 // Shared designer types — ported from ESG `@/types/api` and pared down to
 // the surface area the designer feature actually uses. Backend DTOs will be
 // formalised in Story 3.2+; until then these shapes are the authoritative
-// contract for the FormForge designer client.
+// contract for the AppForge designer client.
 
 export interface DesignerElementProperties {
   // Well-known properties (all optional — schema is open)

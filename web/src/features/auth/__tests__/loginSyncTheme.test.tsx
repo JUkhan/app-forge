@@ -121,7 +121,7 @@ describe('useLoginMutation — theme sync on success', () => {
       expiresIn: 900,
       user: {
         userId: '00000000-0000-0000-0000-000000000001',
-        email: 'super@formforge.local',
+        email: 'super@appforge.local',
         displayName: 'Platform Super Admin',
         themePreference: null,
         roles: ['platform-super-admin'],
@@ -141,7 +141,7 @@ describe('useLoginMutation — theme sync on success', () => {
     const { result } = renderHook(() => useLoginMutation('/settings'), { wrapper })
 
     await act(async () => {
-      await result.current.mutateAsync({ email: 'super@formforge.local', password: 'Password1!' })
+      await result.current.mutateAsync({ email: 'super@appforge.local', password: 'Password1!' })
     })
 
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/admin/tenants', replace: true })

@@ -6,14 +6,14 @@ Status: done
 
 As a Developer,
 I want to audit and port the component designer (ComponentDesignerPage, ComponentLibraryPage, DynamicComponent, DesignerCanvas, ElementRenderer, DesignerToolbar) from the ESG Platform reference codebase, refactoring for shadcn/ui, React 19 patterns, TanStack React Query v5, and the new project structure,
-so that the designer is a first-class part of FormForge with no ESG-platform-specific dependencies.
+so that the designer is a first-class part of AppForge with no ESG-platform-specific dependencies.
 
 ## Acceptance Criteria
 
 1. **AC-1 — Source Location & Audit**
    Given the ESG Platform source at `C:\Users\MY\Downloads\esg_platform\BkmeaEsgPlatform\client\src\` (designer components at `components\designer\`, pages at `pages\`)
    When I run the port
-   Then the six files land in FormForge at `web/src/components/designer/` (DesignerCanvas, DynamicComponent, ElementRenderer, DesignerToolbar) and at `web/src/routes/_app/designer.library.tsx` + `web/src/routes/_app/designer.$designerId.tsx` (page wrappers) per Architecture Decision 4.6.
+   Then the six files land in AppForge at `web/src/components/designer/` (DesignerCanvas, DynamicComponent, ElementRenderer, DesignerToolbar) and at `web/src/routes/_app/designer.library.tsx` + `web/src/routes/_app/designer.$designerId.tsx` (page wrappers) per Architecture Decision 4.6.
 
 2. **AC-2 — Component Rendering & Drag-and-Drop**
    Given the ported designer
@@ -52,10 +52,10 @@ so that the designer is a first-class part of FormForge with no ESG-platform-spe
   - [x] Create `web/src/types/designer.ts` with `DesignerElement`, `DesignerElementProperties`, `ComponentSchemaDto`, `ComponentSchemaVersion` interfaces — these replace `@/types/api` DesignerElement and ComponentSchemaDto from the ESG source
   - [x] See **Designer Type Shapes** in Dev Notes for exact interface definitions
 
-- [x] Task 3: Create FormForge designer API module (AC-3)
+- [x] Task 3: Create AppForge designer API module (AC-3)
   - [x] Create `web/src/features/designer/designerApi.ts` — replaces ESG's `@/api/componentDesigner`
   - [x] See **Designer API Module** in Dev Notes for endpoint mapping and function signatures
-  - [x] NOTE: Backend designer endpoints do NOT exist yet (backend work deferred to Story 3.2+). The API module provides the correct FormForge path structure; pages will render loading/error states until the backend is implemented.
+  - [x] NOTE: Backend designer endpoints do NOT exist yet (backend work deferred to Story 3.2+). The API module provides the correct AppForge path structure; pages will render loading/error states until the backend is implemented.
 
 - [x] Task 4: Port utility and helper files (AC-2, AC-3, AC-5, AC-6)
   - [x] Create `web/src/components/designer/dnd.ts` — direct copy from ESG; no ESG-specific content. Update the comment header's reference to `Editor.tsx` if present; keep all exports as-is.
@@ -63,7 +63,7 @@ so that the designer is a first-class part of FormForge with no ESG-platform-spe
   - [x] Create `web/src/components/designer/textInputTypes.ts` — direct copy; verify no ESG-specific imports
   - [x] Create `web/src/components/designer/validation.ts` — port from ESG; update import: `@/types/api` → `@/types/designer`
   - [x] Create `web/src/components/designer/visibility.ts` — port from ESG; update import: `@/types/api` → `@/types/designer`
-  - [x] Create `web/src/components/designer/dynamicDropdown.ts` — port from ESG; replace `@/api/client` apiClient with FormForge `httpClient` from `@/features/auth/httpClient`; update `@/types/api` → `@/types/designer`
+  - [x] Create `web/src/components/designer/dynamicDropdown.ts` — port from ESG; replace `@/api/client` apiClient with AppForge `httpClient` from `@/features/auth/httpClient`; update `@/types/api` → `@/types/designer`
 
 - [x] Task 5: Port Zustand canvas store (AC-2, AC-5)
   - [x] Create `web/src/store/designerCanvas.ts` — port from ESG `src/store/designerCanvas.ts`
@@ -73,8 +73,8 @@ so that the designer is a first-class part of FormForge with no ESG-platform-spe
 - [x] Task 6: Port DesignerToolbar (AC-2, AC-4)
   - [x] Create `web/src/components/designer/DesignerToolbar.tsx` — near-direct copy from ESG
   - [x] The ESG toolbar already uses pure Tailwind + lucide-react; no component library migration needed
-  - [x] Verify all lucide icon names are valid in FormForge's `lucide-react ^1.16.0` (icon names may differ from ESG's `0.575.0` — check: AlignLeft, CalendarDays, CheckSquare, ChevronDown, Columns3, Hash, Image, LayoutList, LayoutPanelTop, MousePointerClick, Palette, Rows3, TextCursorInput, Type, Variable)
-  - [x] Import cn from `@/lib/utils` (already exists in FormForge)
+  - [x] Verify all lucide icon names are valid in AppForge's `lucide-react ^1.16.0` (icon names may differ from ESG's `0.575.0` — check: AlignLeft, CalendarDays, CheckSquare, ChevronDown, Columns3, Hash, Image, LayoutList, LayoutPanelTop, MousePointerClick, Palette, Rows3, TextCursorInput, Type, Variable)
+  - [x] Import cn from `@/lib/utils` (already exists in AppForge)
 
 - [x] Task 7: Port DesignerCanvas (AC-2, AC-4)
   - [x] Create `web/src/components/designer/DesignerCanvas.tsx` — port from ESG
@@ -84,8 +84,8 @@ so that the designer is a first-class part of FormForge with no ESG-platform-spe
 
 - [x] Task 8: Port ElementRenderer (AC-2, AC-4, AC-5)
   - [x] Create `web/src/components/designer/ElementRenderer.tsx` — port from ESG (2043 lines)
-  - [x] Update imports: `@/types/api` → `@/types/designer`, `@/api/client` apiClient → FormForge httpClient, `@/api/files` → FormForge files API stub (see Dev Notes)
-  - [x] **REMOVE** the `DesignerEmbedFrame` import and its usage — DesignerEmbedFrame is ESG-specific (DPP public page embedding), not needed in FormForge
+  - [x] Update imports: `@/types/api` → `@/types/designer`, `@/api/client` apiClient → AppForge httpClient, `@/api/files` → AppForge files API stub (see Dev Notes)
+  - [x] **REMOVE** the `DesignerEmbedFrame` import and its usage — DesignerEmbedFrame is ESG-specific (DPP public page embedding), not needed in AppForge
   - [x] Where ElementRenderer previously passed an `interactive` prop to a Repeater that opened `DesignerEmbedFrame`, replace with a stub/comment marking this for Story 3.9 (DynamicComponent renderer for data entry)
   - [x] Preserve all 14 component type renderers exactly — the canvas preview (`interactive=false`) and form submission (`interactive=true`) modes must both work
 
@@ -110,7 +110,7 @@ so that the designer is a first-class part of FormForge with no ESG-platform-spe
 - [x] Task 12: Create designer library page route (AC-1, AC-3, AC-4, AC-6)
   - [x] Create `web/src/routes/_app/designer.library.tsx` — port from ESG `ComponentLibraryPage.tsx` (785 lines)
   - [x] **Replace react-router-dom** — see Import Replacement Table in Dev Notes
-  - [x] Remove `AxiosError` import — use FormForge `ApiError` from `@/lib/api/apiError`
+  - [x] Remove `AxiosError` import — use AppForge `ApiError` from `@/lib/api/apiError`
   - [x] Remove `VersionAwareViewerModal` — use `ComponentPreviewModal` directly
   - [x] Replace ESG's `Pagination` component — implement inline pagination using the `users.tsx` pattern (prev/next buttons with `Route.useSearch()` + `useNavigate`) or install shadcn pagination
   - [x] Route must export `Route = createFileRoute('/_app/designer/library')({...})`
@@ -142,7 +142,7 @@ so that the designer is a first-class part of FormForge with no ESG-platform-spe
 
 ### This story is FRONTEND-ONLY — no C# backend changes
 
-Backend designer endpoints do not exist yet. The `designerApi.ts` module stubs the correct FormForge API surface; pages will render loading/empty states until the backend is implemented in Story 3.2+. This is intentional and correct.
+Backend designer endpoints do not exist yet. The `designerApi.ts` module stubs the correct AppForge API surface; pages will render loading/empty states until the backend is implemented in Story 3.2+. This is intentional and correct.
 
 ---
 
@@ -164,7 +164,7 @@ pnpm add zustand date-fns
 
 **Port (all to `web/src/components/designer/`):**
 
-| ESG Source | FormForge Target | Notes |
+| ESG Source | AppForge Target | Notes |
 |---|---|---|
 | `components/designer/dnd.ts` | `components/designer/dnd.ts` | Direct copy, trivial path update |
 | `components/designer/schemaShape.ts` | `components/designer/schemaShape.ts` | Update `@/types/api` |
@@ -182,21 +182,21 @@ pnpm add zustand date-fns
 | `pages/ComponentLibraryPage.tsx` | `routes/_app/designer.library.tsx` | Replace react-router-dom; replace Pagination |
 | `pages/ComponentDesignerPage.tsx` | `routes/_app/designer.$designerId.tsx` | Replace react-router-dom; remove useAuth |
 
-**Do NOT port (ESG-specific, not in FormForge scope):**
+**Do NOT port (ESG-specific, not in AppForge scope):**
 
 | ESG Source | Reason |
 |---|---|
-| `components/designer/DesignerEmbedFrame.tsx` | ESG's DPP public-page embedding — not a FormForge concept |
-| `components/designer/VersionAwareDynamicComponent.tsx` | ESG-specific wrapper — FormForge uses DynamicComponent directly |
+| `components/designer/DesignerEmbedFrame.tsx` | ESG's DPP public-page embedding — not a AppForge concept |
+| `components/designer/VersionAwareDynamicComponent.tsx` | ESG-specific wrapper — AppForge uses DynamicComponent directly |
 | `components/designer/VersionAwareViewerModal.tsx` | ESG-specific — use ComponentPreviewModal instead |
-| `components/designer/index.ts` | ESG barrel file — FormForge imports directly |
+| `components/designer/index.ts` | ESG barrel file — AppForge imports directly |
 | `components/designer/useKeyboardDnD.ts` | Story 3.10 — separate story, add stub file with TODO |
 
 ---
 
 ### Import Replacement Table
 
-| ESG Import | FormForge Replacement |
+| ESG Import | AppForge Replacement |
 |---|---|
 | `from 'react-router-dom'` → `useNavigate` | `from '@tanstack/react-router'` → `useNavigate` |
 | `from 'react-router-dom'` → `useParams` | `Route.useParams()` (from the route's own `createFileRoute` export) |
@@ -214,7 +214,7 @@ pnpm add zustand date-fns
 
 ### TanStack Router: Specific API Replacements
 
-The ESG pages use React Router DOM. FormForge uses TanStack Router. Exact replacements:
+The ESG pages use React Router DOM. AppForge uses TanStack Router. Exact replacements:
 
 **In ComponentDesignerPage → `designer.$designerId.tsx`:**
 ```tsx
@@ -223,7 +223,7 @@ const { designerId, version } = useParams<{ designerId?: string; version?: strin
 const navigate = useNavigate()
 navigate(`/designer/${id}`)
 
-// FormForge (TanStack Router)
+// AppForge (TanStack Router)
 export const Route = createFileRoute('/_app/designer/$designerId')({
   component: DesignerPage,
 })
@@ -240,7 +240,7 @@ function DesignerPage() {
 const navigate = useNavigate()
 <Link to={`/designer/${row.designerId}`}>
 
-// FormForge (TanStack Router)
+// AppForge (TanStack Router)
 export const Route = createFileRoute('/_app/designer/library')({
   validateSearch: designerLibrarySearchSchema,
   component: DesignerLibraryPage,
@@ -317,7 +317,7 @@ export interface ComponentSchemaListItem {
 
 ### Designer API Module (`web/src/features/designer/designerApi.ts`)
 
-Map ESG's `componentDesignerApi` calls to FormForge API paths. Backend does not exist yet — these paths are the intended contract for Story 3.2+.
+Map ESG's `componentDesignerApi` calls to AppForge API paths. Backend does not exist yet — these paths are the intended contract for Story 3.2+.
 
 ```ts
 import { httpClient } from '@/features/auth/httpClient'
@@ -353,7 +353,7 @@ export const designerApi = {
 ```
 
 **Files API stub** (`web/src/features/designer/filesApi.ts`):
-ElementRenderer uses `filesApi` for image presigning. Stub it pointing to a FormForge files endpoint — full implementation is a future story.
+ElementRenderer uses `filesApi` for image presigning. Stub it pointing to a AppForge files endpoint — full implementation is a future story.
 ```ts
 import { httpClient } from '@/features/auth/httpClient'
 
@@ -420,7 +420,7 @@ This is correct behavior for Story 3.1 — the data-entry Repeater renderer is S
 
 ### lucide-react Version Note
 
-FormForge uses `lucide-react ^1.16.0`. ESG used `^0.575.0`. A few icon names changed between versions. Before running the build, verify these icons exist (check `node_modules/lucide-react/dist/esm/icons/` or the Lucide changelog):
+AppForge uses `lucide-react ^1.16.0`. ESG used `^0.575.0`. A few icon names changed between versions. Before running the build, verify these icons exist (check `node_modules/lucide-react/dist/esm/icons/` or the Lucide changelog):
 
 - `Variable` — may be renamed; check for `Variable` or `Braces`
 - `LayoutPanelTop` — check exists in 1.x
@@ -498,7 +498,7 @@ If any icon name is not found, substitute the nearest available icon from `lucid
 |---|---|
 | `web/src/types/designer.ts` | DesignerElement, ComponentSchemaDto type definitions |
 | `web/src/store/designerCanvas.ts` | Zustand canvas state store |
-| `web/src/features/designer/designerApi.ts` | FormForge designer API module |
+| `web/src/features/designer/designerApi.ts` | AppForge designer API module |
 | `web/src/features/designer/filesApi.ts` | Files API stub for ElementRenderer image presigning |
 | `web/src/components/designer/dnd.ts` | HTML5 DnD pipeline types/helpers |
 | `web/src/components/designer/schemaShape.ts` | DesignerElement runtime type guard |
@@ -547,7 +547,7 @@ If any icon name is not found, substitute the nearest available icon from `lucid
 - [Source: C:\Users\MY\Downloads\esg_platform\BkmeaEsgPlatform\client\src\pages\ComponentLibraryPage.tsx — library page]
 - [Source: web/src/routes/_app/admin/users.tsx — TanStack Router page pattern to mirror]
 - [Source: web/src/routes/_app/admin.tsx — AdminLayout, beforeLoad guard pattern]
-- [Source: web/src/features/auth/httpClient.ts — FormForge HTTP client to use instead of ESG apiClient]
+- [Source: web/src/features/auth/httpClient.ts — AppForge HTTP client to use instead of ESG apiClient]
 - [Source: web/src/lib/api/apiError.ts — ApiError to use instead of AxiosError]
 
 ## Dev Agent Record
@@ -562,23 +562,23 @@ claude-opus-4-7
 
 ### Completion Notes List
 
-- AC-1 — All 18 target files landed at the spec'd FormForge paths:
+- AC-1 — All 18 target files landed at the spec'd AppForge paths:
   - `web/src/types/designer.ts` (new shared types)
-  - `web/src/features/designer/designerApi.ts` + `filesApi.ts` (FormForge API layer; backend deferred to 3.2+)
+  - `web/src/features/designer/designerApi.ts` + `filesApi.ts` (AppForge API layer; backend deferred to 3.2+)
   - `web/src/store/designerCanvas.ts` (Zustand store; `rootElement` now typed as `DesignerElement | null` so the legacy JSON.parse in `setSchema` was dropped)
   - `web/src/components/designer/{dnd,schemaShape,textInputTypes,validation,visibility,dynamicDropdown}.ts` — utility helpers
   - `web/src/components/designer/{DesignerToolbar,DesignerCanvas,ElementRenderer,DynamicComponent,PropertyInspector,ComponentPreviewModal}.tsx`
   - `web/src/routes/_app/designer.library.tsx`, `web/src/routes/_app/designer.$designerId.tsx`
-- AC-2 — Native HTML5 DnD preserved verbatim in DesignerCanvas (`dnd.ts` MIME renamed to `application/x-formforge-designer`; DropZone/CanvasContainer/CanvasTabsContainer/CanvasRepeaterContainer/CanvasLeaf all carry forward unchanged). All 14 component types render via ElementRenderer's leaf/repeater/tabs branches.
-- AC-3 — Grepped `web/src/components/designer/` and the new routes for `esg|bkmea|useAuth|react-router-dom|@/api/componentDesigner|AxiosError|/api/component-schemas|DPP|DesignerEmbedFrame|VersionAware`. Only a single match remains in source comments: the `application/x-formforge-designer` MIME constant (intentional, formforge-namespaced). All ESG-named imports were replaced with FormForge equivalents.
+- AC-2 — Native HTML5 DnD preserved verbatim in DesignerCanvas (`dnd.ts` MIME renamed to `application/x-appforge-designer`; DropZone/CanvasContainer/CanvasTabsContainer/CanvasRepeaterContainer/CanvasLeaf all carry forward unchanged). All 14 component types render via ElementRenderer's leaf/repeater/tabs branches.
+- AC-3 — Grepped `web/src/components/designer/` and the new routes for `esg|bkmea|useAuth|react-router-dom|@/api/componentDesigner|AxiosError|/api/component-schemas|DPP|DesignerEmbedFrame|VersionAware`. Only a single match remains in source comments: the `application/x-appforge-designer` MIME constant (intentional, appforge-namespaced). All ESG-named imports were replaced with AppForge equivalents.
 - AC-4 — shadcn primitives installed via `pnpm dlx shadcn@latest add input checkbox select textarea label dialog`. PropertyInspector migrated: raw `<input>` → `<Input>`, `<textarea>` → `<Textarea>`, `<input type="checkbox">` → `<Checkbox>`, every `<select>` → shadcn `<Select>` family. Color-picker stays raw `<input type=color>` (shadcn Input doesn't cover color UA chrome). Library page uses `<Button>`, `<Dialog>`, `<Input>`. Designer page uses `<Button>`, `<Input>`.
-- AC-5 — DynamicComponent contract preserved end-to-end: `submitRef`, `onValidityChange`, `onReadyChange`, `shallowEqualInitialData`, Repeater row scoping in `extractBindToKeys`/`extractDefaults`, and the `schema` prop bypass (TanStack `enabled` flag). The only contract-relevant adaptation is dropping `JSON.parse(schema.rootElement)` because FormForge's `ComponentSchemaDto.rootElement` is typed as a parsed `DesignerElement | null` (the runtime `isDesignerElementShape` guard remains as defense against malformed payloads).
+- AC-5 — DynamicComponent contract preserved end-to-end: `submitRef`, `onValidityChange`, `onReadyChange`, `shallowEqualInitialData`, Repeater row scoping in `extractBindToKeys`/`extractDefaults`, and the `schema` prop bypass (TanStack `enabled` flag). The only contract-relevant adaptation is dropping `JSON.parse(schema.rootElement)` because AppForge's `ComponentSchemaDto.rootElement` is typed as a parsed `DesignerElement | null` (the runtime `isDesignerElementShape` guard remains as defense against malformed payloads).
 - AC-6 — `useQuery({ queryKey, queryFn, staleTime, enabled })` and `useMutation({ mutationFn, onSuccess, onError })` v5 object form used throughout new code. No `cacheTime` survived the port (`gcTime` is the v5 spelling; not needed for any current query). Query keys follow tuple convention: `['designer', 'list', page, pageSize]`, `['designer', 'schema', designerId, version]`, `['files-presign', key]`, `['dynamic-dropdown-options', resolvedPath]`, `['component-schema', designerId, version]` (preserved from ESG for DynamicComponent).
 - Build status: `node ./node_modules/vite/bin/vite.js build` — 2446 modules transformed, designer.library / designer.$designerId chunks emit cleanly. `node ./node_modules/typescript/bin/tsc -b --noEmit` — 0 errors. ESLint — 24 errors total, all of the expected `react-refresh/only-export-components` variant (5 pre-existing + 6 new for designer routes), matching the story's AC for `pnpm run lint`.
 - `routeTree.gen.ts` regenerated and includes `_app/designer/library` + `_app/designer/$designerId` under the `_app` route subtree.
 - One workspace-hygiene fix: `pnpm-workspace.yaml` switched from a placeholder `allowBuilds:` map to `ignoredBuiltDependencies: [msw]` so corepack/pnpm-v11 no longer fails its pre-exec deps-status check on the msw postinstall script.
 - Backend not yet present (per Dev Notes): library and designer pages will surface load errors until Story 3.2 lands the designer endpoints; this is the intentional, documented state.
-- One scope-honest deviation: the canvas page's save calls `designerApi.saveVersion(designerId, version || 1, rootElement)` because FormForge's contract has no separate `update`/`updateVersion` split (Story 3.2 owns the backend). The display name is currently only edited in the canvas-store; persistence happens once the backend endpoint accepts a displayName field. Wiring left clearly named so the next story can extend without a contract change.
+- One scope-honest deviation: the canvas page's save calls `designerApi.saveVersion(designerId, version || 1, rootElement)` because AppForge's contract has no separate `update`/`updateVersion` split (Story 3.2 owns the backend). The display name is currently only edited in the canvas-store; persistence happens once the backend endpoint accepts a displayName field. Wiring left clearly named so the next story can extend without a contract change.
 
 ### File List
 
@@ -620,7 +620,7 @@ claude-opus-4-7
 
 | Date | Author | Change |
 |---|---|---|
-| 2026-05-23 | Amelia (claude-opus-4-7) | Initial implementation — ported ESG Platform designer (18 source files) into FormForge: shared types, API + files stubs, Zustand store, 6 utility helpers, 6 designer components, 2 TanStack Router routes, shadcn migration for PropertyInspector + Modal, i18n keys, admin nav link, build verified clean. |
+| 2026-05-23 | Amelia (claude-opus-4-7) | Initial implementation — ported ESG Platform designer (18 source files) into AppForge: shared types, API + files stubs, Zustand store, 6 utility helpers, 6 designer components, 2 TanStack Router routes, shadcn migration for PropertyInspector + Modal, i18n keys, admin nav link, build verified clean. |
 | 2026-05-23 | claude-opus-4-7 | Code review (Blind Hunter + Edge Case Hunter + Acceptance Auditor) on `f47a302~..f47a302`. 38 unique findings: 25 patch applied, 13 deferred (4 decision-needed deferred to post-3.2 backend), 0 dismissed. Build verified clean. Status → done. |
 
 ### Review Findings

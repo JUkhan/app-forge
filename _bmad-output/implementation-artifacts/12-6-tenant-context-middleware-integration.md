@@ -13,15 +13,15 @@ baseline_commit: 'b6fb87fd1e2417aa8d22f68f91e44a7e214462f7'
 
 ## Intent
 
-**Problem:** `ITenantContext` (Story 12.3) resolves the caller's tenant schema, but nothing consumes it yet — `FormForgeDbContext` and `DbConnectionFactory` always connect via the default Postgres `search_path`, so every EF and Dapper call in the app queries `public` regardless of which tenant made the request, and several `information_schema` queries plus the Dataset VIEW manager hardcode `public`/`datasets` as literal schema names.
+**Problem:** `ITenantContext` (Story 12.3) resolves the caller's tenant schema, but nothing consumes it yet — `AppForgeDbContext` and `DbConnectionFactory` always connect via the default Postgres `search_path`, so every EF and Dapper call in the app queries `public` regardless of which tenant made the request, and several `information_schema` queries plus the Dataset VIEW manager hardcode `public`/`datasets` as literal schema names.
 
-**Approach:** Resolve the Postgres `search_path` for both `FormForgeDbContext`'s EF connection and every `DbConnectionFactory`/`IPreviewConnectionFactory`-created Dapper connection from the scoped `ITenantContext` at connection-open time (default `public` when unset), pin the three permanent-public entities (`Tenant`, `PlatformAdmin`, `TenantUserIndexEntry`) to schema `public` explicitly in the EF model, and replace every hardcoded `'public'`/`'datasets'` schema literal in raw SQL with the resolved tenant schema.
+**Approach:** Resolve the Postgres `search_path` for both `AppForgeDbContext`'s EF connection and every `DbConnectionFactory`/`IPreviewConnectionFactory`-created Dapper connection from the scoped `ITenantContext` at connection-open time (default `public` when unset), pin the three permanent-public entities (`Tenant`, `PlatformAdmin`, `TenantUserIndexEntry`) to schema `public` explicitly in the EF model, and replace every hardcoded `'public'`/`'datasets'` schema literal in raw SQL with the resolved tenant schema.
 
 ## Boundaries & Constraints
 
 **Always:**
 - `ITenantContext.SchemaName` drives the `search_path` for both the EF connection and every Dapper connection; when it is null (no tenant claim — platform-super-admin, unauthenticated, or pre-tenant request), the connection stays on `public`. No other fallback exists.
-- Resolve the schema at the moment each physical connection opens (an EF `DbConnectionInterceptor`, and inline in `DbConnectionFactory`/`PreviewConnectionFactory`), never at DbContext/factory construction time — `TenantContextMiddleware` itself resolves `FormForgeDbContext` before `ITenantContext.Set()` runs in the same request scope, so schema resolution must happen per connection-open, not be cached from construction.
+- Resolve the schema at the moment each physical connection opens (an EF `DbConnectionInterceptor`, and inline in `DbConnectionFactory`/`PreviewConnectionFactory`), never at DbContext/factory construction time — `TenantContextMiddleware` itself resolves `AppForgeDbContext` before `ITenantContext.Set()` runs in the same request scope, so schema resolution must happen per connection-open, not be cached from construction.
 - `Tenant`, `PlatformAdmin`, `TenantUserIndexEntry` stay pinned to schema `"public"` explicitly (`ToTable(name, schema: "public")`) so they resolve correctly regardless of search_path.
 - `DbConnectionFactory` and `IPreviewConnectionFactory` move from Singleton to Scoped (both must read the scoped `ITenantContext`); `IPreviewConnectionFactory` targets the tenant's `{schemaName}_datasets` namespace (Story 12.7's naming), falling back to the legacy `datasets` schema only when no tenant is resolved.
 - Every hardcoded `WHERE table_schema = 'public'` / `'datasets'` literal listed in the Code Map is replaced with a bound parameter fed by the resolved schema.
@@ -50,33 +50,33 @@ baseline_commit: 'b6fb87fd1e2417aa8d22f68f91e44a7e214462f7'
 
 ## Code Map
 
-- `src/FormForge.Api/Features/Tenancy/ITenantContext.cs`, `TenantContext.cs` -- existing 12.3 scoped tenant holder; consume as-is.
-- `src/FormForge.Api/Features/Tenancy/TenantContextMiddleware.cs:35-99` -- resolves tenant via `FormForgeDbContext.Tenants` before `Set()` runs; must keep resolving against `public` once `Tenant` is schema-pinned.
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs:9` (ctor), `OnModelCreating` -- zero `HasDefaultSchema`/schema-qualified `ToTable` calls today; every entity implicitly resolves via connection `search_path`.
-- `FormForgeDbContext.cs:440-463` (`Tenant`), `:469-478` (`PlatformAdmin`), `:485-494` (`TenantUserIndexEntry`) -- add explicit `schema: "public"` to each `ToTable(...)`.
-- `src/FormForge.Api/Program.cs:113-114` (`AddDbContext<FormForgeDbContext>`) -- wire a new `DbConnectionInterceptor` (e.g. `Infrastructure/Persistence/TenantSchemaConnectionInterceptor.cs`) via `.AddInterceptors(...)`, resolved per-scope, rewriting `SearchPath` to `{tenantContext.SchemaName ?? "public"}, public` in `ConnectionOpening`/`ConnectionOpeningAsync`.
+- `src/AppForge.Api/Features/Tenancy/ITenantContext.cs`, `TenantContext.cs` -- existing 12.3 scoped tenant holder; consume as-is.
+- `src/AppForge.Api/Features/Tenancy/TenantContextMiddleware.cs:35-99` -- resolves tenant via `AppForgeDbContext.Tenants` before `Set()` runs; must keep resolving against `public` once `Tenant` is schema-pinned.
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs:9` (ctor), `OnModelCreating` -- zero `HasDefaultSchema`/schema-qualified `ToTable` calls today; every entity implicitly resolves via connection `search_path`.
+- `AppForgeDbContext.cs:440-463` (`Tenant`), `:469-478` (`PlatformAdmin`), `:485-494` (`TenantUserIndexEntry`) -- add explicit `schema: "public"` to each `ToTable(...)`.
+- `src/AppForge.Api/Program.cs:113-114` (`AddDbContext<AppForgeDbContext>`) -- wire a new `DbConnectionInterceptor` (e.g. `Infrastructure/Persistence/TenantSchemaConnectionInterceptor.cs`) via `.AddInterceptors(...)`, resolved per-scope, rewriting `SearchPath` to `{tenantContext.SchemaName ?? "public"}, public` in `ConnectionOpening`/`ConnectionOpeningAsync`.
 - `Program.cs:213` (`AddSingleton<DbConnectionFactory>`) → `AddScoped`; `DbConnectionFactory.cs:11-33` -- inject `ITenantContext`, build a `NpgsqlConnectionStringBuilder(ConnectionString) { SearchPath = ... }` before `OpenAsync`.
 - `Program.cs:295` (`AddSingleton<IPreviewConnectionFactory, PreviewConnectionFactory>`) → `AddScoped`, same `SearchPath` treatment targeting `{schemaName}_datasets` (naming from `TenantOnboardingService.cs:70-71`).
-- `src/FormForge.Api/Features/Datasets/DatasetViewManager.cs:18,52-53,58,109` -- replace literal `datasets` schema in every `CREATE/DROP/ALTER VIEW datasets."..."` string with the resolved tenant's `{schema}_datasets` (validate via `SafeIdentifier` before interpolating).
+- `src/AppForge.Api/Features/Datasets/DatasetViewManager.cs:18,52-53,58,109` -- replace literal `datasets` schema in every `CREATE/DROP/ALTER VIEW datasets."..."` string with the resolved tenant's `{schema}_datasets` (validate via `SafeIdentifier` before interpolating).
 - `Features/Datasets/DatasetSourceResolver.cs:193` -- `WHERE table_schema = 'datasets'` → bound parameter.
 - `Features/Datasets/DatasetAllowlist.cs:166,204,249`, `Features/Designer/UniqueConstraintService.cs:141,449,468,496,526`, `Features/Designer/SchemaDriftService.cs:62,202,218`, `Features/DynamicCrud/DynamicDataEndpoints.cs:2351`, `Features/Provisioning/DdlEmitter.cs:254,338`, `Features/Provisioning/TableProvisioningService.cs:216` -- every `WHERE table_schema = 'public'` → bound parameter fed by the resolved tenant schema.
-- `src/FormForge.Api/Features/Auth/AuthService.cs:296-304,364-471` (`IssueLoginTokensAsync`, `RefreshAsync`, `LogoutAsync`) -- `IssueLoginTokensAsync` builds the raw cookie value as `"{tenantId}.{secret}"` (tenantId `""` when the login has no tenant, i.e. the legacy/platform path — cookie value degrades to bare `.{secret}` or keeps today's bare-secret shape for that branch only); `RefreshAsync`/`LogoutAsync` split on the first `.`, resolve+validate the tenant half via `ITenantLookupCache`, then query that schema's `RefreshTokens` (or `public`'s when the prefix is empty).
-- `src/FormForge.Api/Features/Tenancy/TenantLookupCache.cs` (`ITenantLookupCache`) -- reuse as-is from `AuthService` for the refresh/logout tenant validation (same exists/Active check `TenantContextMiddleware` already performs); do not duplicate the lookup logic.
+- `src/AppForge.Api/Features/Auth/AuthService.cs:296-304,364-471` (`IssueLoginTokensAsync`, `RefreshAsync`, `LogoutAsync`) -- `IssueLoginTokensAsync` builds the raw cookie value as `"{tenantId}.{secret}"` (tenantId `""` when the login has no tenant, i.e. the legacy/platform path — cookie value degrades to bare `.{secret}` or keeps today's bare-secret shape for that branch only); `RefreshAsync`/`LogoutAsync` split on the first `.`, resolve+validate the tenant half via `ITenantLookupCache`, then query that schema's `RefreshTokens` (or `public`'s when the prefix is empty).
+- `src/AppForge.Api/Features/Tenancy/TenantLookupCache.cs` (`ITenantLookupCache`) -- reuse as-is from `AuthService` for the refresh/logout tenant validation (same exists/Active check `TenantContextMiddleware` already performs); do not duplicate the lookup logic.
 - `_bmad-output/implementation-artifacts/12-3-tenant-context-resolution.md` (Review Triage Log, Design Notes) -- already names this story as owner of the DbContext-factory fix and the refresh/logout gap; read for rationale, do not re-litigate.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `src/FormForge.Api/Infrastructure/Persistence/TenantSchemaConnectionInterceptor.cs` (new) -- `DbConnectionInterceptor` reading scoped `ITenantContext`, setting `SearchPath` before every physical connection open -- core EF-side mechanism
-- [x] `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` -- pin `Tenant`/`PlatformAdmin`/`TenantUserIndexEntry` to `schema: "public"` -- keeps platform tables resolvable regardless of search_path
-- [x] `src/FormForge.Api/Program.cs` -- wire the interceptor into `AddDbContext<FormForgeDbContext>`; change `DbConnectionFactory`/`IPreviewConnectionFactory` registrations to Scoped -- DI wiring
-- [x] `src/FormForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs` -- inject `ITenantContext`, set `SearchPath` before opening -- Dapper-side mechanism
-- [x] `src/FormForge.Api/Infrastructure/Persistence/PreviewConnectionFactory.cs` -- inject `ITenantContext`, target `{schema}_datasets` -- dataset preview isolation
-- [x] `src/FormForge.Api/Features/Datasets/DatasetViewManager.cs`, `DatasetSourceResolver.cs` -- replace literal `datasets` schema with the resolved tenant dataset schema -- closes the 12.7/12.6 mismatch
-- [x] `src/FormForge.Api/Features/Datasets/DatasetAllowlist.cs`, `Features/Designer/UniqueConstraintService.cs`, `Features/Designer/SchemaDriftService.cs`, `Features/DynamicCrud/DynamicDataEndpoints.cs`, `Features/Provisioning/DdlEmitter.cs`, `Features/Provisioning/TableProvisioningService.cs` -- replace every hardcoded `'public'` `information_schema` literal with the resolved tenant schema -- closes AC2's "never hardcode public" requirement
-- [x] `src/FormForge.Api/Features/Auth/AuthService.cs` -- `IssueLoginTokensAsync` prefixes the raw refresh cookie value with `{tenantId}.`; `RefreshAsync`/`LogoutAsync` parse the prefix, resolve+validate via `ITenantLookupCache`, and query the resolved schema's `RefreshTokens` -- closes the accepted 12.3 gap
-- [x] `src/FormForge.Api.Tests/Features/Tenancy/TenantSchemaRoutingIntegrationTests.cs` (new) -- Testcontainers: provision 2 tenant schemas, assert EF and Dapper queries each resolve to the correct schema, assert isolation across tenants and `public`, assert platform-super-admin/unauthenticated requests are unaffected -- covers the I/O matrix (see Implementation Notes for why the cross-tenant designerId/record HTTP round trip specifically is not exercised here)
-- [x] `src/FormForge.Api.Tests/Features/Auth/AuthServiceRefreshTenantTests.cs` (new) -- covers refresh/logout for a tenant user end-to-end, plus a malformed/unknown-tenant/non-Active-tenant/legacy-format cookie rejected as `REFRESH_TOKEN_INVALID` -- covers the I/O matrix's refresh/logout row
+- [x] `src/AppForge.Api/Infrastructure/Persistence/TenantSchemaConnectionInterceptor.cs` (new) -- `DbConnectionInterceptor` reading scoped `ITenantContext`, setting `SearchPath` before every physical connection open -- core EF-side mechanism
+- [x] `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` -- pin `Tenant`/`PlatformAdmin`/`TenantUserIndexEntry` to `schema: "public"` -- keeps platform tables resolvable regardless of search_path
+- [x] `src/AppForge.Api/Program.cs` -- wire the interceptor into `AddDbContext<AppForgeDbContext>`; change `DbConnectionFactory`/`IPreviewConnectionFactory` registrations to Scoped -- DI wiring
+- [x] `src/AppForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs` -- inject `ITenantContext`, set `SearchPath` before opening -- Dapper-side mechanism
+- [x] `src/AppForge.Api/Infrastructure/Persistence/PreviewConnectionFactory.cs` -- inject `ITenantContext`, target `{schema}_datasets` -- dataset preview isolation
+- [x] `src/AppForge.Api/Features/Datasets/DatasetViewManager.cs`, `DatasetSourceResolver.cs` -- replace literal `datasets` schema with the resolved tenant dataset schema -- closes the 12.7/12.6 mismatch
+- [x] `src/AppForge.Api/Features/Datasets/DatasetAllowlist.cs`, `Features/Designer/UniqueConstraintService.cs`, `Features/Designer/SchemaDriftService.cs`, `Features/DynamicCrud/DynamicDataEndpoints.cs`, `Features/Provisioning/DdlEmitter.cs`, `Features/Provisioning/TableProvisioningService.cs` -- replace every hardcoded `'public'` `information_schema` literal with the resolved tenant schema -- closes AC2's "never hardcode public" requirement
+- [x] `src/AppForge.Api/Features/Auth/AuthService.cs` -- `IssueLoginTokensAsync` prefixes the raw refresh cookie value with `{tenantId}.`; `RefreshAsync`/`LogoutAsync` parse the prefix, resolve+validate via `ITenantLookupCache`, and query the resolved schema's `RefreshTokens` -- closes the accepted 12.3 gap
+- [x] `src/AppForge.Api.Tests/Features/Tenancy/TenantSchemaRoutingIntegrationTests.cs` (new) -- Testcontainers: provision 2 tenant schemas, assert EF and Dapper queries each resolve to the correct schema, assert isolation across tenants and `public`, assert platform-super-admin/unauthenticated requests are unaffected -- covers the I/O matrix (see Implementation Notes for why the cross-tenant designerId/record HTTP round trip specifically is not exercised here)
+- [x] `src/AppForge.Api.Tests/Features/Auth/AuthServiceRefreshTenantTests.cs` (new) -- covers refresh/logout for a tenant user end-to-end, plus a malformed/unknown-tenant/non-Active-tenant/legacy-format cookie rejected as `REFRESH_TOKEN_INVALID` -- covers the I/O matrix's refresh/logout row
 
 **Acceptance Criteria:**
 - Given any authenticated tenant request past `ITenantContext` resolution, when a static-schema query runs via EF or a dynamic query runs via Dapper, then both resolve against the same tenant schema with no independent schema resolution.
@@ -89,7 +89,7 @@ baseline_commit: 'b6fb87fd1e2417aa8d22f68f91e44a7e214462f7'
 Work picked up mid-flight: most of the Code Map's Dapper/EF schema-literal call sites
 (DatasetAllowlist, DatasetViewManager, DatasetSourceResolver, UniqueConstraintService,
 SchemaDriftService, DdlEmitter, TableProvisioningService, DbConnectionFactory,
-PreviewConnectionFactory, FormForgeDbContext's schema pins, Program.cs DI/Scoped
+PreviewConnectionFactory, AppForgeDbContext's schema pins, Program.cs DI/Scoped
 changes) already existed uncommitted when this pass started. This pass completed the
 remaining work and fixed three bugs found while verifying it end-to-end:
 
@@ -104,7 +104,7 @@ remaining work and fixed three bugs found while verifying it end-to-end:
    connect** (Npgsql's `Persist Security Info=false` default strips it). EF Core reuses
    the same `NpgsqlConnection` object across open/close cycles within one DbContext's
    lifetime, so the *second* query in any request failed with "No password has been
-   provided". Fixed by capturing the base `formforge` connection string once (from
+   provided". Fixed by capturing the base `appforge` connection string once (from
    `IConfiguration`, mirroring `DbConnectionFactory`) instead of reading it back off the
    connection. This would have broken every authenticated request in any real deployment,
    not just tests — caught only because `TenantAwareLoginIntegrationTests`'s existing
@@ -127,7 +127,7 @@ story's Code Map/Boundaries — each is its own future story's tenant-awareness 
   service with its own DI scope that never passes through `TenantContextMiddleware`, so
   its `ITenantContext` is always unset — a menu-less "Table Provisioned" admin job
   silently targets `public` regardless of which tenant enqueued it.
-- `PermissionService` (Singleton) resolves its own `FormForgeDbContext` via
+- `PermissionService` (Singleton) resolves its own `AppForgeDbContext` via
   `IServiceScopeFactory.CreateScope()` — a fresh scope with an unrelated, always-unset
   `ITenantContext` — so `GetCrudFlagsAsync`/`GetEffectivePermissionsAsync` always query
   `public.user_roles`/`public.users`, never the tenant's own schema. Every
@@ -158,7 +158,7 @@ Reviewed by blind-hunter, edge-case-hunter, and verification-gap layers against 
 | 3 | Four near-identical `NpgsqlConnectionStringBuilder`+`SearchPath` implementations (`DbConnectionFactory`, `PreviewConnectionFactory`, `TenantSchemaConnectionInterceptor`, `AuthService.ResolveRefreshCookieAsync`) | low | rejected | Real duplication, named risk (pooling/timeout settings would need replicating in 4 places) but fix requires extracting a new shared abstraction — more than a direct correction. |
 | 4 | `DbConnectionFactory`/`TenantSchemaConnectionInterceptor` build `SearchPath = "{schema}, public"` even when `schema == "public"`, producing redundant `"public, public"` | low | patch | Confirmed in code (`DbConnectionFactory.cs:31`, `TenantSchemaConnectionInterceptor.cs:69`); harmless but a direct one-line fix. |
 | 5 | `PermissionService` (Singleton, own `IServiceScopeFactory.CreateScope()`) and `ProvisioningBackgroundService` never see the request's resolved `ITenantContext` — every `RequirePermission`-gated `/api/data/*` route 403s for tenant users regardless of this story, and background table provisioning always targets `public` | high (verified) | defer | Confirmed by reading `PermissionService.ComputePermissionsAsync` directly: it opens a fresh DI scope whose `ITenantContext` is never `Set()`, so `db.Users`/`db.UserRoles` resolve against `public`, where a tenant user's rows don't exist. Real and severe, but the frozen Boundaries explicitly exclude it: "Do not retrofit feature business logic... each epic's own future stories own further tenant-awareness work; this story only builds the shared mechanism." Already disclosed in this story's own Implementation Notes. |
-| 6 | `AuthService.ResolveRefreshCookieAsync`'s `CA2000` suppression has no try/catch between `new NpgsqlConnection(...)` and `return` — if `FormForgeDbContext` construction throws, `tenantConnection` leaks | low | rejected | `DbContextOptionsBuilder.UseNpgsql()`/`new FormForgeDbContext(options)` do not open a connection or throw under normal conditions (EF's DbContext ctor is inert until first query) — the trigger condition is not reachable in practice. Fix (wrapping in try/catch/dispose) is more than a direct correction. |
+| 6 | `AuthService.ResolveRefreshCookieAsync`'s `CA2000` suppression has no try/catch between `new NpgsqlConnection(...)` and `return` — if `AppForgeDbContext` construction throws, `tenantConnection` leaks | low | rejected | `DbContextOptionsBuilder.UseNpgsql()`/`new AppForgeDbContext(options)` do not open a connection or throw under normal conditions (EF's DbContext ctor is inert until first query) — the trigger condition is not reachable in practice. Fix (wrapping in try/catch/dispose) is more than a direct correction. |
 | 7 | `ITenantLookupCache` staleness window means a tenant suspended shortly after being cached still resolves as Active for refresh/logout until TTL expiry | false | rejected | Same cache/TTL `TenantContextMiddleware` has used for every authenticated request since Story 12.3 — not a new window this story introduces. The frozen Boundaries explicitly mandate reusing it verbatim: "resolve and validate it via `ITenantLookupCache` (the same exists/Active check `TenantContextMiddleware` performs)." |
 | 8 | `DatasetAllowlist.BuildCatalogAsync` captures `var schema = TenantSchema;` but the final per-table column query re-reads the `TenantSchema` property instead of reusing the local | low | patch | Confirmed in diff; harmless (property is stable within a request) but a direct one-line fix. |
 | 9 | `TableProvisioningService.GetExistingTableNamesAsync` computes `tenantContext.SchemaName ?? "public"` inline, while sibling services touched by this same diff (`SchemaDriftService`, `UniqueConstraintService`, `DdlEmitter`) expose a `Schema` property for the identical expression | low | patch | Confirmed pattern inconsistency introduced by this diff; trivial one-line-property fix. |
@@ -173,17 +173,17 @@ Reviewed by blind-hunter, edge-case-hunter, and verification-gap layers against 
 
 ## Design Notes
 
-EF Core opens the physical Npgsql connection lazily, per operation, under implicit connection management (the default here) — not once at DbContext construction. That is what makes the `DbConnectionInterceptor` approach correct despite `FormForgeDbContext` being Scoped and `TenantContextMiddleware` resolving it before `ITenantContext.Set()` runs: the middleware's own query opens its connection while `SchemaName` is still null (correctly landing on `public`, where `Tenants` lives), and every later query in the same request — after `Set()` has run — opens its own fresh connection through the same interceptor, which by then reads the resolved schema. No DbContext split and no change to `TenantContextMiddleware` itself is needed.
+EF Core opens the physical Npgsql connection lazily, per operation, under implicit connection management (the default here) — not once at DbContext construction. That is what makes the `DbConnectionInterceptor` approach correct despite `AppForgeDbContext` being Scoped and `TenantContextMiddleware` resolving it before `ITenantContext.Set()` runs: the middleware's own query opens its connection while `SchemaName` is still null (correctly landing on `public`, where `Tenants` lives), and every later query in the same request — after `Set()` has run — opens its own fresh connection through the same interceptor, which by then reads the resolved schema. No DbContext split and no change to `TenantContextMiddleware` itself is needed.
 
 `DbConnectionFactory`/`PreviewConnectionFactory` don't need an interceptor — Dapper callers already call `CreateOpenConnectionAsync()` fresh per use, so reading `ITenantContext` inline, at call time, is sufficient.
 
 ## Verification
 
 **Commands run:**
-- `dotnet build` -- 0 errors, 0 warnings (both `FormForge.Api` and `FormForge.Api.Tests`).
-- `dotnet ef migrations add PinPlatformTablesToPublicSchema --project src/FormForge.Api` -- generated, then hand-edited to an intentional no-op (see Implementation Notes #3); `FormForgeDbContextModelSnapshot.cs` reflects the `schema: "public"` pins.
-- `dotnet test src/FormForge.Api.Tests --filter "FullyQualifiedName~Tenancy|FullyQualifiedName~Auth"` -- 182/182 passed.
-- `dotnet test src/FormForge.Api.Tests` (full suite) -- 1199/1201 passed. The 2 failures
+- `dotnet build` -- 0 errors, 0 warnings (both `AppForge.Api` and `AppForge.Api.Tests`).
+- `dotnet ef migrations add PinPlatformTablesToPublicSchema --project src/AppForge.Api` -- generated, then hand-edited to an intentional no-op (see Implementation Notes #3); `AppForgeDbContextModelSnapshot.cs` reflects the `schema: "public"` pins.
+- `dotnet test src/AppForge.Api.Tests --filter "FullyQualifiedName~Tenancy|FullyQualifiedName~Auth"` -- 182/182 passed.
+- `dotnet test src/AppForge.Api.Tests` (full suite) -- 1199/1201 passed. The 2 failures
   (`SchemaAuditLogIntegrationTests.GetSchemaAuditLog_AppendOnly_DeleteVerb_Returns405`,
   `MutationAuditLogIntegrationTests.GetMutationAuditLog_AppendOnly_DeleteVerb_Returns405`)
   are in files this story never touches (Audit feature, unrelated to tenant schema

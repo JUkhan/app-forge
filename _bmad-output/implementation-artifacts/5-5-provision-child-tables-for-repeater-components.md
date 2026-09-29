@@ -42,8 +42,8 @@ So that one-to-many relationships are correctly modeled.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — New `CycleDetector.cs`** (AC: 4)
-  - [x] Create `src/FormForge.Api/Features/Provisioning/CycleDetector.cs`
-  - [x] Inject `FormForgeDbContext db` (constructor injection; registered as scoped)
+  - [x] Create `src/AppForge.Api/Features/Provisioning/CycleDetector.cs`
+  - [x] Inject `AppForgeDbContext db` (constructor injection; registered as scoped)
   - [x] Expose `Task<bool> HasCycleAsync(string rootDesignerId, int rootVersion, CancellationToken ct)`
   - [x] Implementation — DFS cycle detection:
     1. Load RootElement for `(rootDesignerId, rootVersion)` from `db.ComponentSchemaVersions`
@@ -58,7 +58,7 @@ So that one-to-many relationships are correctly modeled.
   - [x] The root `rootDesignerId` itself is seeded into `inStack` before the first recursive call so a self-reference (`rootDesignerId` appears as a child of itself) is detected immediately
 
 - [x] **Task 2 — Add `BindMenuOutcome.RepeaterCycle` and wire `CycleDetector` into `MenuService`** (AC: 4)
-  - [x] In `src/FormForge.Api/Features/Menus/MenuService.cs`:
+  - [x] In `src/AppForge.Api/Features/Menus/MenuService.cs`:
     - Add `RepeaterCycle` to `BindMenuOutcome` enum:
       ```csharp
       internal enum BindMenuOutcome { Success, MenuNotFound, DesignerNotFound, VersionNotPublished, RepeaterCycle }
@@ -72,7 +72,7 @@ So that one-to-many relationships are correctly modeled.
   - [x] **`RetryBindingAsync` is NOT changed** — retry re-enqueues the binding that was already validated; cycle-detection runs only on fresh binds
 
 - [x] **Task 3 — Handle `RepeaterCycle` in `MenuAdminEndpoints.cs`** (AC: 4)
-  - [x] In `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs`, in `BindDesignerHandler`, add to the outcome switch:
+  - [x] In `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs`, in `BindDesignerHandler`, add to the outcome switch:
     ```csharp
     BindMenuOutcome.RepeaterCycle => Results.Problem(
         title: "Circular Repeater reference detected",
@@ -299,22 +299,22 @@ So that one-to-many relationships are correctly modeled.
   Call this after `EnsureParentFkIndexAsync` for each successfully provisioned child.
 
 - [x] **Task 5 — Register `CycleDetector` in `Program.cs`** (AC: 4)
-  - [x] In `src/FormForge.Api/Program.cs`, add before the existing provisioning block:
+  - [x] In `src/AppForge.Api/Program.cs`, add before the existing provisioning block:
     ```csharp
     builder.Services.AddScoped<CycleDetector>();
     ```
-  - [x] `CycleDetector` injects `FormForgeDbContext` (scoped) — must be registered as scoped (matching `MenuService` and `DdlEmitter`)
+  - [x] `CycleDetector` injects `AppForgeDbContext` (scoped) — must be registered as scoped (matching `MenuService` and `DdlEmitter`)
   - [x] No changes to `ChannelReader`/`ChannelWriter`/`ProvisioningService`/`ProvisioningBackgroundService` registrations
 
 - [x] **Task 6 — Add i18n key for `REPEATER_CYCLE`** (AC: 4)
-  - [x] In `web/src/lib/i18n/locales/en.json` (the actual SPA i18n path; story spec called this `src/FormForge.Spa/src/i18n/en.json` but that folder does not exist), add inside the `admin.menus` block (after `noBinding`):
+  - [x] In `web/src/lib/i18n/locales/en.json` (the actual SPA i18n path; story spec called this `src/AppForge.Spa/src/i18n/en.json` but that folder does not exist), add inside the `admin.menus` block (after `noBinding`):
     ```json
     "repeaterCycle": "This Designer version cannot be bound — it contains a circular Repeater reference."
     ```
   - [x] No other frontend changes required; the SPA generic `bindError` fallback handles unknown codes, but having the key allows the SPA to show a descriptive message if `REPEATER_CYCLE` is added to the `useBindDesignerMutation` error branches in a future story
 
 - [x] **Task 7 — New `CycleDetectorTests.cs` (integration tests)** (AC: 4)
-  - [x] Create `src/FormForge.Api.Tests/Features/Provisioning/CycleDetectorTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/Provisioning/CycleDetectorTests.cs`
   - [x] Use `PostgresFixture` + `WebApplicationFactory` for real-DB tests (consistent with project pattern)
   - [x] ~5 tests:
     1. `HasCycle_NoRepeater_ReturnsFalse` — designer with no Repeater components → false
@@ -439,7 +439,7 @@ visited = {}
 
 This seeds `rootDesignerId` as "on the stack" so any child that eventually references back to `rootDesignerId` is immediately detected as a cycle.
 
-The cycle detector reads the DB with `AsNoTracking` to avoid polluting the request's `FormForgeDbContext` change tracker.
+The cycle detector reads the DB with `AsNoTracking` to avoid polluting the request's `AppForgeDbContext` change tracker.
 
 ### Why `MenuService` Injects `CycleDetector` (Not `DdlEmitter`)
 
@@ -486,19 +486,19 @@ Add as a private helper method on `ProvisioningIntegrationTests`.
 
 These files MUST be read completely before writing Story 5.5 code:
 
-1. `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs` — the core file being restructured
-2. `src/FormForge.Api/Features/Menus/MenuService.cs` — `BindDesignerAsync` method + `BindMenuOutcome` enum
-3. `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` — `BindDesignerHandler` outcome switch
-4. `src/FormForge.Api/Features/SchemaRegistry/RootElementParser.cs` — `ParseFull` return type
-5. `src/FormForge.Api/Features/SchemaRegistry/SchemaRegistryEntry.cs` — `ChildRepeaterDesignerIds` field
-6. `src/FormForge.Api/Program.cs` — DI registration block for provisioning services
-7. `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs` — test class structure, helper methods, cleanup logic
-8. `src/FormForge.Spa/src/i18n/en.json` — for adding `admin.menus.repeaterCycle`
+1. `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs` — the core file being restructured
+2. `src/AppForge.Api/Features/Menus/MenuService.cs` — `BindDesignerAsync` method + `BindMenuOutcome` enum
+3. `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` — `BindDesignerHandler` outcome switch
+4. `src/AppForge.Api/Features/SchemaRegistry/RootElementParser.cs` — `ParseFull` return type
+5. `src/AppForge.Api/Features/SchemaRegistry/SchemaRegistryEntry.cs` — `ChildRepeaterDesignerIds` field
+6. `src/AppForge.Api/Program.cs` — DI registration block for provisioning services
+7. `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs` — test class structure, helper methods, cleanup logic
+8. `src/AppForge.Spa/src/i18n/en.json` — for adding `admin.menus.repeaterCycle`
 
 ### Project Structure Notes
 
-- `CycleDetector.cs` goes in `src/FormForge.Api/Features/Provisioning/` (alongside `DdlEmitter.cs`, `ProvisioningJob.cs`, etc.)
-- `CycleDetectorTests.cs` goes in `src/FormForge.Api.Tests/Features/Provisioning/` (the architecture file lists this filename explicitly)
+- `CycleDetector.cs` goes in `src/AppForge.Api/Features/Provisioning/` (alongside `DdlEmitter.cs`, `ProvisioningJob.cs`, etc.)
+- `CycleDetectorTests.cs` goes in `src/AppForge.Api.Tests/Features/Provisioning/` (the architecture file lists this filename explicitly)
 - `BuildFkColumnName` and `BuildIndexName` are `private static` helpers on `DdlEmitter` — not exposed in any interface
 - `ProvisionChildTablesAsync` is a `private async Task` on `DdlEmitter` (not static — it uses `db` and `logger` from the instance)
 
@@ -518,9 +518,9 @@ Story 5.5 adds no new static-schema columns or tables. All DDL is dynamic (child
 - **FR-27 AC-2 / AC-3 / AC-4 / AC-5** — child table FK + index + cycle detection + same-transaction: `_bmad-output/planning-artifacts/prd.md`
 - **AR-52** (ProvisioningRecoveryService + cycle detection) + **Decision 1.6** (EF/Dapper transaction boundary): `_bmad-output/planning-artifacts/architecture.md`
 - **Naming convention**: `parent_{parentDesignerId}_id` (FK column) and `idx_{childDesignerId}_parent` (index): `architecture.md` naming conventions section
-- **`DdlEmitter.cs`** — Story 5.4 file being extended: `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`
-- **`RootElementParser.ParseFull`** — already extracts `ChildRepeaterIds`: `src/FormForge.Api/Features/SchemaRegistry/RootElementParser.cs`
-- **`ProvisioningIntegrationTests.cs`** — test patterns to follow: `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`
+- **`DdlEmitter.cs`** — Story 5.4 file being extended: `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`
+- **`RootElementParser.ParseFull`** — already extracts `ChildRepeaterIds`: `src/AppForge.Api/Features/SchemaRegistry/RootElementParser.cs`
+- **`ProvisioningIntegrationTests.cs`** — test patterns to follow: `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`
 - **Previous story file**: `_bmad-output/implementation-artifacts/5-4-evolve-schema-with-a-new-designer-version.md`
 
 ## Dev Agent Record
@@ -537,7 +537,7 @@ claude-opus-4-7[1m] via Claude Code (BMad dev-story workflow)
 ### Completion Notes List
 
 - Implemented all 8 tasks exactly as written in the spec. No spec deviations.
-- **Frontend i18n path adjustment:** the story spec called for `src/FormForge.Spa/src/i18n/en.json` but that folder does not exist in this repo — the actual SPA i18n bundle is `web/src/lib/i18n/locales/en.json`. The `repeaterCycle` key was added there inside the `admin.menus` block immediately after `noBinding`, matching the story's intent (the messageKey emitted by the 422 handler is `admin.menus.repeaterCycle`).
+- **Frontend i18n path adjustment:** the story spec called for `src/AppForge.Spa/src/i18n/en.json` but that folder does not exist in this repo — the actual SPA i18n bundle is `web/src/lib/i18n/locales/en.json`. The `repeaterCycle` key was added there inside the `admin.menus` block immediately after `noBinding`, matching the story's intent (the messageKey emitted by the 422 handler is `admin.menus.repeaterCycle`).
 - **DdlEmitter transaction restructure (Task 4):** the previously self-contained transactions inside `CreateTableAsync` and `AddMissingColumnsAsync` were lifted into a single outer transaction in `EmitAsync`. The renamed `*Core` methods now take `(connection, tx, tableName, columns)` and execute DDL only — no `BeginTransactionAsync`/`Commit`/`Rollback`/`Dispose`. The outer transaction is committed once both parent and all child DDL (recursive) succeed, or rolled back as a whole on any exception. `AddMissingColumnsCoreAsync` now passes the supplied `tx` to its `information_schema.columns` SELECT so the read sees DDL emitted earlier in the same transaction (PostgreSQL DDL is transactional and visible to subsequent statements in the same tx).
 - **CycleDetector design (Task 1):** the root `designerId` is seeded into `inStack` before any recursion so a self-reference fires immediately on the first child lookup. Unpublished children are silently skipped (the provisioner would also skip them, so they cannot contribute to a cycle in the produced schema). `OrderByDescending(v => v.Version).FirstOrDefaultAsync` resolves to PG's filtered unique index `uq_one_published_per_designer` for the latest Published lookup.
 - **Belt-and-suspenders cycle defence in DdlEmitter:** `ProvisionChildTablesAsync` carries a `provisionedIds` HashSet seeded with the root designerId so a fan-in (two parents referencing the same child) provisions the shared child once, and a runtime back-edge that somehow escaped the bind-time `CycleDetector` (e.g. a designer mutated between bind and dispatch) is silently dropped here instead of looping forever.
@@ -550,22 +550,22 @@ claude-opus-4-7[1m] via Claude Code (BMad dev-story workflow)
 ### File List
 
 **New files (backend):**
-- `src/FormForge.Api/Features/Provisioning/CycleDetector.cs`
+- `src/AppForge.Api/Features/Provisioning/CycleDetector.cs`
 
 **Modified files (backend):**
-- `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`
-- `src/FormForge.Api/Features/Menus/MenuService.cs`
-- `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs`
-- `src/FormForge.Api/Program.cs`
+- `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`
+- `src/AppForge.Api/Features/Menus/MenuService.cs`
+- `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs`
+- `src/AppForge.Api/Program.cs`
 
 **Modified files (frontend):**
-- `web/src/lib/i18n/locales/en.json` (story spec called this `src/FormForge.Spa/src/i18n/en.json`; the SPA actually lives under `web/`)
+- `web/src/lib/i18n/locales/en.json` (story spec called this `src/AppForge.Spa/src/i18n/en.json`; the SPA actually lives under `web/`)
 
 **New files (tests):**
-- `src/FormForge.Api.Tests/Features/Provisioning/CycleDetectorTests.cs`
+- `src/AppForge.Api.Tests/Features/Provisioning/CycleDetectorTests.cs`
 
 **Modified files (tests):**
-- `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`
+- `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`
 
 **Modified files (sprint tracking):**
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`

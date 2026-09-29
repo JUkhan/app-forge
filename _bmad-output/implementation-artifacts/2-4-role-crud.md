@@ -154,11 +154,11 @@ so that I can define what each Role is permitted to do on each data module.
 
 ### Task 1 — Domain entities: `Role`, `RolePermission`, `UserRole`
 
-Create three files under `src/FormForge.Api/Domain/Entities/`.
+Create three files under `src/AppForge.Api/Domain/Entities/`.
 
 **`Role.cs`:**
 ```csharp
-namespace FormForge.Api.Domain.Entities;
+namespace AppForge.Api.Domain.Entities;
 
 internal sealed class Role
 {
@@ -176,7 +176,7 @@ internal sealed class Role
 
 **`RolePermission.cs`:**
 ```csharp
-namespace FormForge.Api.Domain.Entities;
+namespace AppForge.Api.Domain.Entities;
 
 internal sealed class RolePermission
 {
@@ -193,7 +193,7 @@ internal sealed class RolePermission
 
 **`UserRole.cs`:**
 ```csharp
-namespace FormForge.Api.Domain.Entities;
+namespace AppForge.Api.Domain.Entities;
 
 internal sealed class UserRole
 {
@@ -207,9 +207,9 @@ internal sealed class UserRole
 
 > **Why `UserRole` is created in this story:** The `user_roles` table is referenced in AC-6 (DELETE 409 check) and AC-8 (role-names query). The entity and migration must exist here even though assignment endpoints are Story 2.5. The `user_roles` table will be empty until 2.5 runs.
 
-### Task 2 — Update `FormForgeDbContext`
+### Task 2 — Update `AppForgeDbContext`
 
-Add `DbSet<Role>`, `DbSet<RolePermission>`, and `DbSet<UserRole>` to `FormForgeDbContext`. Also add a navigation property `public ICollection<UserRole> UserRoles { get; set; } = [];` to the `User` entity (in `User.cs`).
+Add `DbSet<Role>`, `DbSet<RolePermission>`, and `DbSet<UserRole>` to `AppForgeDbContext`. Also add a navigation property `public ICollection<UserRole> UserRoles { get; set; } = [];` to the `User` entity (in `User.cs`).
 
 Add these mappings inside `OnModelCreating`, after the existing `RefreshToken` block:
 
@@ -269,11 +269,11 @@ modelBuilder.Entity<UserRole>(e =>
 });
 ```
 
-Also add `DbSet<Role> Roles => Set<Role>();`, `DbSet<RolePermission> RolePermissions => Set<RolePermission>();`, and `DbSet<UserRole> UserRoles => Set<UserRole>();` to the `FormForgeDbContext` property declarations.
+Also add `DbSet<Role> Roles => Set<Role>();`, `DbSet<RolePermission> RolePermissions => Set<RolePermission>();`, and `DbSet<UserRole> UserRoles => Set<UserRole>();` to the `AppForgeDbContext` property declarations.
 
 ### Task 3 — EF Core migration with system role seeding
 
-Run `dotnet ef migrations add CreateRolesRolePermissionsAndUserRoles --project src/FormForge.Api` to generate the migration scaffold. After generation, add `HasData` seeding to the `roles` table inside the `Up` method. Use deterministic UUIDs so re-running the migration is idempotent:
+Run `dotnet ef migrations add CreateRolesRolePermissionsAndUserRoles --project src/AppForge.Api` to generate the migration scaffold. After generation, add `HasData` seeding to the `roles` table inside the `Up` method. Use deterministic UUIDs so re-running the migration is idempotent:
 
 ```csharp
 migrationBuilder.InsertData(
@@ -302,7 +302,7 @@ migrationBuilder.InsertData(
 
 ### Task 4 — `RequireAuth` and `RequirePlatformAdmin` route group extensions
 
-Update `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs`. Extend the existing `AddValidationFilter<T>` method with two new extension methods on `RouteGroupBuilder`:
+Update `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs`. Extend the existing `AddValidationFilter<T>` method with two new extension methods on `RouteGroupBuilder`:
 
 ```csharp
 internal static RouteGroupBuilder RequireAuth(this RouteGroupBuilder group)
@@ -380,18 +380,18 @@ app.MapGroup("/api/admin")
 Add the using for the new feature namespace at the top of the file:
 
 ```csharp
-using FormForge.Api.Features.Roles;
-using FormForge.Api.Features.Roles.Dtos;
-using FormForge.Api.Features.Roles.Validators;
+using AppForge.Api.Features.Roles;
+using AppForge.Api.Features.Roles.Dtos;
+using AppForge.Api.Features.Roles.Validators;
 ```
 
 ### Task 6 — DTOs
 
-Create `src/FormForge.Api/Features/Roles/Dtos/`.
+Create `src/AppForge.Api/Features/Roles/Dtos/`.
 
 **`PermissionRecord.cs`:**
 ```csharp
-namespace FormForge.Api.Features.Roles.Dtos;
+namespace AppForge.Api.Features.Roles.Dtos;
 
 internal sealed record PermissionRecord(
     string ResourceId,
@@ -403,7 +403,7 @@ internal sealed record PermissionRecord(
 
 **`CreateRoleRequest.cs`:**
 ```csharp
-namespace FormForge.Api.Features.Roles.Dtos;
+namespace AppForge.Api.Features.Roles.Dtos;
 
 internal sealed record CreateRoleRequest(
     string Name,
@@ -413,7 +413,7 @@ internal sealed record CreateRoleRequest(
 
 **`UpdateRoleRequest.cs`:**
 ```csharp
-namespace FormForge.Api.Features.Roles.Dtos;
+namespace AppForge.Api.Features.Roles.Dtos;
 
 internal sealed record UpdateRoleRequest(
     string Name,
@@ -423,7 +423,7 @@ internal sealed record UpdateRoleRequest(
 
 **`RoleListItem.cs`:**
 ```csharp
-namespace FormForge.Api.Features.Roles.Dtos;
+namespace AppForge.Api.Features.Roles.Dtos;
 
 internal sealed record RoleListItem(
     Guid Id,
@@ -435,7 +435,7 @@ internal sealed record RoleListItem(
 
 **`RoleResponse.cs`:**
 ```csharp
-namespace FormForge.Api.Features.Roles.Dtos;
+namespace AppForge.Api.Features.Roles.Dtos;
 
 internal sealed record RoleResponse(
     Guid Id,
@@ -449,14 +449,14 @@ internal sealed record RoleResponse(
 
 ### Task 7 — Validators
 
-Create `src/FormForge.Api/Features/Roles/Validators/`.
+Create `src/AppForge.Api/Features/Roles/Validators/`.
 
 **`CreateRoleRequestValidator.cs`:**
 ```csharp
 using FluentValidation;
-using FormForge.Api.Features.Roles.Dtos;
+using AppForge.Api.Features.Roles.Dtos;
 
-namespace FormForge.Api.Features.Roles.Validators;
+namespace AppForge.Api.Features.Roles.Validators;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
     Justification = "Registered via DI as IValidator<CreateRoleRequest>.")]
@@ -489,9 +489,9 @@ internal sealed class CreateRoleRequestValidator : AbstractValidator<CreateRoleR
 **`UpdateRoleRequestValidator.cs`:**
 ```csharp
 using FluentValidation;
-using FormForge.Api.Features.Roles.Dtos;
+using AppForge.Api.Features.Roles.Dtos;
 
-namespace FormForge.Api.Features.Roles.Validators;
+namespace AppForge.Api.Features.Roles.Validators;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
     Justification = "Registered via DI as IValidator<UpdateRoleRequest>.")]
@@ -525,15 +525,15 @@ internal sealed class UpdateRoleRequestValidator : AbstractValidator<UpdateRoleR
 
 ### Task 8 — `IRoleService` and `RoleService`
 
-Create `src/FormForge.Api/Features/Roles/RoleService.cs`. This is the service layer containing all business logic; endpoints are thin delegates to this service.
+Create `src/AppForge.Api/Features/Roles/RoleService.cs`. This is the service layer containing all business logic; endpoints are thin delegates to this service.
 
 ```csharp
-using FormForge.Api.Domain.Entities;
-using FormForge.Api.Features.Roles.Dtos;
-using FormForge.Api.Infrastructure.Persistence;
+using AppForge.Api.Domain.Entities;
+using AppForge.Api.Features.Roles.Dtos;
+using AppForge.Api.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FormForge.Api.Features.Roles;
+namespace AppForge.Api.Features.Roles;
 
 internal enum CreateRoleOutcome { Success, DuplicateName }
 internal sealed record CreateRoleResult(CreateRoleOutcome Outcome, Guid? RoleId = null);
@@ -555,7 +555,7 @@ internal interface IRoleService
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
     Justification = "Registered via DI.")]
-internal sealed class RoleService(FormForgeDbContext db) : IRoleService
+internal sealed class RoleService(AppForgeDbContext db) : IRoleService
 {
     public async Task<PagedResult<RoleListItem>> GetRolesAsync(int page, int pageSize, CancellationToken ct)
     {
@@ -725,9 +725,9 @@ internal sealed class RoleService(FormForgeDbContext db) : IRoleService
 
 > **Why `db.RolePermissions.RemoveRange(role.Permissions)` instead of clearing the collection:** Clearing an EF navigation collection does not delete the rows unless cascade-delete is configured. `RemoveRange` explicitly marks each `RolePermission` entity for deletion, which is deterministic and visible in the generated SQL. The FK `ON DELETE CASCADE` on `role_permissions → roles` would also handle the DELETE case, but the explicit RemoveRange keeps the UpdateRoleAsync intent clear.
 
-> **Note on `PagedResult<T>`:** This record is not yet defined in the codebase. Define it in `src/FormForge.Api/Common/` as:
+> **Note on `PagedResult<T>`:** This record is not yet defined in the codebase. Define it in `src/AppForge.Api/Common/` as:
 > ```csharp
-> namespace FormForge.Api.Common;
+> namespace AppForge.Api.Common;
 > internal sealed record PagedResult<T>(
 >     IReadOnlyList<T> Data,
 >     long Total,
@@ -737,14 +737,14 @@ internal sealed class RoleService(FormForgeDbContext db) : IRoleService
 >     public int TotalPages => (int)Math.Ceiling((double)Total / PageSize);
 > }
 > ```
-> Place at `src/FormForge.Api/Common/PagedResult.cs`. This will be reused by all future list endpoints.
+> Place at `src/AppForge.Api/Common/PagedResult.cs`. This will be reused by all future list endpoints.
 
 ### Task 9 — `AdminEndpoints` dispatcher and `RoleEndpoints`
 
-Create `src/FormForge.Api/Features/Roles/AdminEndpoints.cs` (the top-level admin dispatcher, expanded by future stories):
+Create `src/AppForge.Api/Features/Roles/AdminEndpoints.cs` (the top-level admin dispatcher, expanded by future stories):
 
 ```csharp
-namespace FormForge.Api.Features.Roles;
+namespace AppForge.Api.Features.Roles;
 
 internal static class AdminEndpoints
 {
@@ -757,15 +757,15 @@ internal static class AdminEndpoints
 }
 ```
 
-Create `src/FormForge.Api/Features/Roles/RoleEndpoints.cs`:
+Create `src/AppForge.Api/Features/Roles/RoleEndpoints.cs`:
 
 ```csharp
-using FormForge.Api.Common.Endpoints;
-using FormForge.Api.Features.Roles.Dtos;
-using FormForge.Api.Features.Roles.Validators;
+using AppForge.Api.Common.Endpoints;
+using AppForge.Api.Features.Roles.Dtos;
+using AppForge.Api.Features.Roles.Validators;
 using Microsoft.AspNetCore.Http.HttpResults;
 
-namespace FormForge.Api.Features.Roles;
+namespace AppForge.Api.Features.Roles;
 
 internal static class RoleEndpoints
 {
@@ -925,13 +925,13 @@ internal static class RoleEndpoints
 }
 ```
 
-> **`Produces<PagedResult<RoleListItem>>` compile resolution:** `PagedResult<T>` must be in a namespace visible from `RoleEndpoints.cs`. Add a `using FormForge.Api.Common;` import.
+> **`Produces<PagedResult<RoleListItem>>` compile resolution:** `PagedResult<T>` must be in a namespace visible from `RoleEndpoints.cs`. Add a `using AppForge.Api.Common;` import.
 
 > **`Results.Problem` with `extensions`:** The ProblemDetails middleware (set up in `Program.cs` via `AddProblemDetails`) already injects `correlationId` into every ProblemDetails response. The `extensions` dictionary adds `code` and `messageKey` per AR-18.
 
 ### Task 10 — Update `AuthService` to query roles from the database (AC-8)
 
-In `src/FormForge.Api/Features/Auth/AuthService.cs`, replace **both** occurrences of:
+In `src/AppForge.Api/Features/Auth/AuthService.cs`, replace **both** occurrences of:
 
 ```csharp
 // Story 2.4 will populate role names from the roles + user_roles tables.
@@ -953,11 +953,11 @@ In `LoginAsync` the `user` variable already holds the authenticated user (line ~
 
 Also remove the now-obsolete comment on the `LoginAsync` occurrence. The query returns an empty array for users with no assignments, which is behaviorally identical to the previous `Array.Empty<string>()` for the seeded-but-unassigned state. No tests should regress.
 
-> **Add to `FormForgeDbContext` usings in `AuthService.cs` if not present:** `using FormForge.Api.Domain.Entities;` is already present. The new query uses `db.UserRoles` (a new DbSet) — no new using required, just the new DbSet registered in Task 2.
+> **Add to `AppForgeDbContext` usings in `AuthService.cs` if not present:** `using AppForge.Api.Domain.Entities;` is already present. The new query uses `db.UserRoles` (a new DbSet) — no new using required, just the new DbSet registered in Task 2.
 
 ### Task 11 — Integration tests for role endpoints
 
-Create `src/FormForge.Api.Tests/Features/Roles/RoleIntegrationTests.cs`. Follow the same fixture pattern as `AuthIntegrationTests` — share the `PostgresFixture` via `IClassFixture<PostgresFixture>`, use `HandleCookies = false`, truncate between tests.
+Create `src/AppForge.Api.Tests/Features/Roles/RoleIntegrationTests.cs`. Follow the same fixture pattern as `AuthIntegrationTests` — share the `PostgresFixture` via `IClassFixture<PostgresFixture>`, use `HandleCookies = false`, truncate between tests.
 
 The test class needs a helper to obtain a platform-admin JWT. Seed a test user with the `platform-admin` role in `InitializeAsync`, then call `POST /api/auth/login` and capture the `AccessToken`.
 
@@ -1016,25 +1016,25 @@ _Three-reviewer code review on commit `8a55795` (2026-05-23) — Blind Hunter, E
 
 **Patches (11)** — fixable without further input:
 
-- [x] [Review][Patch] **Rate limiter middleware runs BEFORE authentication, so admin per-user partitioning silently degrades to per-IP — AC-7 violated.** [`src/FormForge.Api/Program.cs:285-287`] AC-7 mandates `correlation → auth → rate limit → validation → handler`. Current order is `UseRateLimiter` (285) → `UseAuthentication` (286) → `UseAuthorization` (287). When the partition factory reads `httpContext.User.FindFirst("userId")`, the principal is still anonymous → falls back to `RemoteIpAddress`. Multiple admins behind one NAT share one 120/min bucket. Move `UseRateLimiter()` to run after `UseAuthorization()`. (sources: blind+edge+auditor)
-- [x] [Review][Patch] **Concurrent `POST /api/admin/roles` with the same name returns 500 instead of 409.** [`src/FormForge.Api/Features/Roles/RoleService.cs:67-97`] `AnyAsync` check + `SaveChangesAsync` is non-atomic. Two concurrent requests both pass the existence check, the second insert violates `uq_roles_name` and Npgsql throws `DbUpdateException` (PostgresException 23505). No catch handler → unhandled → 500. Wrap `SaveChangesAsync` in try/catch, inspect `inner is PostgresException { SqlState: "23505" }` on `uq_roles_name`, and return `CreateRoleOutcome.DuplicateName`. Same fix in `UpdateRoleAsync` (lines 123-129). (sources: blind+edge)
-- [x] [Review][Patch] **Duplicate `resourceId` in `Permissions` returns 500 instead of 422.** [`src/FormForge.Api/Features/Roles/Validators/CreateRoleRequestValidator.cs` + `UpdateRoleRequestValidator.cs`] Validators do not enforce distinct ResourceIds. Service normalizes with `.Trim().ToLowerInvariant()` then inserts duplicate rows; `uq_role_permissions_role_resource` throws an unhandled `DbUpdateException`. Add `RuleFor(x => x.Permissions).Must(p => p == null || p.Select(x => x.ResourceId.Trim().ToLowerInvariant()).Distinct().Count() == p.Count).WithMessage("Duplicate resourceId in permissions.")` to both validators. (sources: blind+edge)
-- [x] [Review][Patch] **Null `permissions` JSON property crashes with `NullReferenceException` → 500.** [`src/FormForge.Api/Features/Roles/Dtos/CreateRoleRequest.cs` + validators + `RoleService.cs:84,141`] Positional record default for `IReadOnlyList<>` is `null`. Service's `foreach (var p in request.Permissions)` NREs. `RuleForEach` on a null collection silently no-ops in FluentValidation. Add `RuleFor(x => x.Permissions).NotNull()` to both validators. (sources: edge)
-- [x] [Review][Patch] **Page-number integer overflow → 500.** [`src/FormForge.Api/Features/Roles/RoleService.cs:37`] `(page - 1) * pageSize` is `int * int`; for `page = int.MaxValue` and `pageSize = 100`, the product overflows to a negative number and `Skip(negative)` throws `ArgumentOutOfRangeException`. Cast one operand to `long` and use `.Skip((int)Math.Min(int.MaxValue, ((long)page - 1) * pageSize))`, or clamp `page` to `Math.Min(page, MaxPage)` derived from `total`. (sources: edge)
-- [x] [Review][Patch] **Unbounded `Permissions` array size.** [`src/FormForge.Api/Features/Roles/Validators/*.cs`] No upper bound on `Permissions.Count`. Kestrel caps body at 30MB but a 30MB valid payload is still iterated and inserted row-by-row. Add `RuleFor(x => x.Permissions).Must(p => p == null || p.Count <= 200).WithMessage("Too many permissions in one request (max 200).")` to both validators. (sources: edge)
-- [x] [Review][Patch] **`ResourceId` regex admits trailing underscore and lone underscore.** [`src/FormForge.Api/Features/Roles/Validators/CreateRoleRequestValidator.cs:27` + `UpdateRoleRequestValidator.cs:27`] Current `^[a-z_][a-z0-9_]{0,61}[a-z0-9_]?$|^[a-z_]$` accepts `"incident_report_"` (trailing `_`) and `"_"` (lone `_`) — neither matches the snake_case convention. Tighten to `^[a-z][a-z0-9_]{0,61}[a-z0-9]$|^[a-z]$`. (sources: edge)
-- [x] [Review][Patch] **Role-name regex allows consecutive hyphens (`a--b`).** [`src/FormForge.Api/Features/Roles/Validators/CreateRoleRequestValidator.cs:15` + `UpdateRoleRequestValidator.cs:15`] Add `.Must(name => string.IsNullOrEmpty(name) || !name.Contains("--", StringComparison.Ordinal)).WithMessage("Role name cannot contain consecutive hyphens.")` after the existing `.Matches(...)` rule. (sources: blind)
-- [x] [Review][Patch] **`CreateRoleHandler` issues a redundant second `GetRoleAsync` after success — race window where the row may already be deleted, producing 201 with `null` body.** [`src/FormForge.Api/Features/Roles/RoleEndpoints.cs:84-86` + `RoleService.cs:61-100`] Change `CreateRoleAsync` to return the freshly-persisted `RoleResponse` (or extend `CreateRoleResult` to carry it). Eliminate the second roundtrip in the handler. (sources: blind+edge)
-- [x] [Review][Patch] **`Description = ""` is stored as empty string (not null), breaking round-trip idempotency.** [`src/FormForge.Api/Features/Roles/RoleService.cs:79,133`] Validator's `When(x => x.Description is not null)` accepts `""`. Service writes `"".Trim() == ""`. Normalize to null: `Description = request.Description?.Trim() is { Length: > 0 } d ? d : null`. (sources: edge)
-- [x] [Review][Patch] **`GET /api/admin/roles/{id}` returns `permissions` in arbitrary order.** [`src/FormForge.Api/Features/Roles/RoleService.cs:194`] `Include(r => r.Permissions)` has no ORDER BY → Postgres returns rows in heap order; successive GETs may differ. SPA diffing will see spurious changes. Add `.OrderBy(p => p.ResourceId)` inside `ToResponse`. (sources: edge)
+- [x] [Review][Patch] **Rate limiter middleware runs BEFORE authentication, so admin per-user partitioning silently degrades to per-IP — AC-7 violated.** [`src/AppForge.Api/Program.cs:285-287`] AC-7 mandates `correlation → auth → rate limit → validation → handler`. Current order is `UseRateLimiter` (285) → `UseAuthentication` (286) → `UseAuthorization` (287). When the partition factory reads `httpContext.User.FindFirst("userId")`, the principal is still anonymous → falls back to `RemoteIpAddress`. Multiple admins behind one NAT share one 120/min bucket. Move `UseRateLimiter()` to run after `UseAuthorization()`. (sources: blind+edge+auditor)
+- [x] [Review][Patch] **Concurrent `POST /api/admin/roles` with the same name returns 500 instead of 409.** [`src/AppForge.Api/Features/Roles/RoleService.cs:67-97`] `AnyAsync` check + `SaveChangesAsync` is non-atomic. Two concurrent requests both pass the existence check, the second insert violates `uq_roles_name` and Npgsql throws `DbUpdateException` (PostgresException 23505). No catch handler → unhandled → 500. Wrap `SaveChangesAsync` in try/catch, inspect `inner is PostgresException { SqlState: "23505" }` on `uq_roles_name`, and return `CreateRoleOutcome.DuplicateName`. Same fix in `UpdateRoleAsync` (lines 123-129). (sources: blind+edge)
+- [x] [Review][Patch] **Duplicate `resourceId` in `Permissions` returns 500 instead of 422.** [`src/AppForge.Api/Features/Roles/Validators/CreateRoleRequestValidator.cs` + `UpdateRoleRequestValidator.cs`] Validators do not enforce distinct ResourceIds. Service normalizes with `.Trim().ToLowerInvariant()` then inserts duplicate rows; `uq_role_permissions_role_resource` throws an unhandled `DbUpdateException`. Add `RuleFor(x => x.Permissions).Must(p => p == null || p.Select(x => x.ResourceId.Trim().ToLowerInvariant()).Distinct().Count() == p.Count).WithMessage("Duplicate resourceId in permissions.")` to both validators. (sources: blind+edge)
+- [x] [Review][Patch] **Null `permissions` JSON property crashes with `NullReferenceException` → 500.** [`src/AppForge.Api/Features/Roles/Dtos/CreateRoleRequest.cs` + validators + `RoleService.cs:84,141`] Positional record default for `IReadOnlyList<>` is `null`. Service's `foreach (var p in request.Permissions)` NREs. `RuleForEach` on a null collection silently no-ops in FluentValidation. Add `RuleFor(x => x.Permissions).NotNull()` to both validators. (sources: edge)
+- [x] [Review][Patch] **Page-number integer overflow → 500.** [`src/AppForge.Api/Features/Roles/RoleService.cs:37`] `(page - 1) * pageSize` is `int * int`; for `page = int.MaxValue` and `pageSize = 100`, the product overflows to a negative number and `Skip(negative)` throws `ArgumentOutOfRangeException`. Cast one operand to `long` and use `.Skip((int)Math.Min(int.MaxValue, ((long)page - 1) * pageSize))`, or clamp `page` to `Math.Min(page, MaxPage)` derived from `total`. (sources: edge)
+- [x] [Review][Patch] **Unbounded `Permissions` array size.** [`src/AppForge.Api/Features/Roles/Validators/*.cs`] No upper bound on `Permissions.Count`. Kestrel caps body at 30MB but a 30MB valid payload is still iterated and inserted row-by-row. Add `RuleFor(x => x.Permissions).Must(p => p == null || p.Count <= 200).WithMessage("Too many permissions in one request (max 200).")` to both validators. (sources: edge)
+- [x] [Review][Patch] **`ResourceId` regex admits trailing underscore and lone underscore.** [`src/AppForge.Api/Features/Roles/Validators/CreateRoleRequestValidator.cs:27` + `UpdateRoleRequestValidator.cs:27`] Current `^[a-z_][a-z0-9_]{0,61}[a-z0-9_]?$|^[a-z_]$` accepts `"incident_report_"` (trailing `_`) and `"_"` (lone `_`) — neither matches the snake_case convention. Tighten to `^[a-z][a-z0-9_]{0,61}[a-z0-9]$|^[a-z]$`. (sources: edge)
+- [x] [Review][Patch] **Role-name regex allows consecutive hyphens (`a--b`).** [`src/AppForge.Api/Features/Roles/Validators/CreateRoleRequestValidator.cs:15` + `UpdateRoleRequestValidator.cs:15`] Add `.Must(name => string.IsNullOrEmpty(name) || !name.Contains("--", StringComparison.Ordinal)).WithMessage("Role name cannot contain consecutive hyphens.")` after the existing `.Matches(...)` rule. (sources: blind)
+- [x] [Review][Patch] **`CreateRoleHandler` issues a redundant second `GetRoleAsync` after success — race window where the row may already be deleted, producing 201 with `null` body.** [`src/AppForge.Api/Features/Roles/RoleEndpoints.cs:84-86` + `RoleService.cs:61-100`] Change `CreateRoleAsync` to return the freshly-persisted `RoleResponse` (or extend `CreateRoleResult` to carry it). Eliminate the second roundtrip in the handler. (sources: blind+edge)
+- [x] [Review][Patch] **`Description = ""` is stored as empty string (not null), breaking round-trip idempotency.** [`src/AppForge.Api/Features/Roles/RoleService.cs:79,133`] Validator's `When(x => x.Description is not null)` accepts `""`. Service writes `"".Trim() == ""`. Normalize to null: `Description = request.Description?.Trim() is { Length: > 0 } d ? d : null`. (sources: edge)
+- [x] [Review][Patch] **`GET /api/admin/roles/{id}` returns `permissions` in arbitrary order.** [`src/AppForge.Api/Features/Roles/RoleService.cs:194`] `Include(r => r.Permissions)` has no ORDER BY → Postgres returns rows in heap order; successive GETs may differ. SPA diffing will see spurious changes. Add `.OrderBy(p => p.ResourceId)` inside `ToResponse`. (sources: edge)
 
 **Deferred (5)** — real but not actionable in this story:
 
-- [x] [Review][Defer] **Race between `DELETE role` and `POST user-role assignment` silently destroys the new assignment via `ON DELETE CASCADE`.** [`src/FormForge.Api/Features/Roles/RoleService.cs:158-184`] — deferred: needs transactional locking (`SELECT … FOR UPDATE`) or a `Role.RowVersion` concurrency token. Story 2.5 introduces the assignment endpoints — fix it there alongside the new write path.
-- [x] [Review][Defer] **No optimistic-concurrency token on `Role` updates — concurrent PUTs silently last-write-win.** [`src/FormForge.Api/Domain/Entities/Role.cs` + `RoleService.cs:102-156`] — deferred: requires schema change (`xmin` mapped as `RowVersion` or a dedicated column) plus ETag/If-Match flow. Out of scope for Story 2.4 acceptance criteria; reconsider during Story 2.5/2.6 admin hardening pass.
-- [x] [Review][Defer] **`CreateRoleHandler` hardcodes `/api/admin/roles/{id}` in `Location` header — won't honor a host path-base prefix.** [`src/FormForge.Api/Features/Roles/RoleEndpoints.cs:85`] — deferred: app currently has no path-base prefix and `LinkGenerator` wiring is broader than this story. Defensive-only.
-- [x] [Review][Defer] **`AuthService.LoginAsync` / `RefreshAsync` add a second DB roundtrip for roles instead of `.Include(u => u.UserRoles).ThenInclude(ur => ur.Role)`.** [`src/FormForge.Api/Features/Auth/AuthService.cs:100-102,190-191`] — deferred: hot-path perf optimization; current shape matches spec wording exactly. Revisit during a broader auth-perf pass.
-- [x] [Review][Defer] **`RefreshAsync` race with `IsActive` deactivation — a just-deactivated admin can still mint a fresh 15-min access token.** [`src/FormForge.Api/Features/Auth/AuthService.cs`] — deferred: pre-existing limitation, not introduced by Story 2.4. Token-revocation strategy is a separate concern.
+- [x] [Review][Defer] **Race between `DELETE role` and `POST user-role assignment` silently destroys the new assignment via `ON DELETE CASCADE`.** [`src/AppForge.Api/Features/Roles/RoleService.cs:158-184`] — deferred: needs transactional locking (`SELECT … FOR UPDATE`) or a `Role.RowVersion` concurrency token. Story 2.5 introduces the assignment endpoints — fix it there alongside the new write path.
+- [x] [Review][Defer] **No optimistic-concurrency token on `Role` updates — concurrent PUTs silently last-write-win.** [`src/AppForge.Api/Domain/Entities/Role.cs` + `RoleService.cs:102-156`] — deferred: requires schema change (`xmin` mapped as `RowVersion` or a dedicated column) plus ETag/If-Match flow. Out of scope for Story 2.4 acceptance criteria; reconsider during Story 2.5/2.6 admin hardening pass.
+- [x] [Review][Defer] **`CreateRoleHandler` hardcodes `/api/admin/roles/{id}` in `Location` header — won't honor a host path-base prefix.** [`src/AppForge.Api/Features/Roles/RoleEndpoints.cs:85`] — deferred: app currently has no path-base prefix and `LinkGenerator` wiring is broader than this story. Defensive-only.
+- [x] [Review][Defer] **`AuthService.LoginAsync` / `RefreshAsync` add a second DB roundtrip for roles instead of `.Include(u => u.UserRoles).ThenInclude(ur => ur.Role)`.** [`src/AppForge.Api/Features/Auth/AuthService.cs:100-102,190-191`] — deferred: hot-path perf optimization; current shape matches spec wording exactly. Revisit during a broader auth-perf pass.
+- [x] [Review][Defer] **`RefreshAsync` race with `IsActive` deactivation — a just-deactivated admin can still mint a fresh 15-min access token.** [`src/AppForge.Api/Features/Auth/AuthService.cs`] — deferred: pre-existing limitation, not introduced by Story 2.4. Token-revocation strategy is a separate concern.
 
 **Dismissed (12, recorded for traceability):** ORDER BY name without tiebreaker (unique idx already), `MapGet("/")` trailing-slash (normalized by routing, tests green), N+1 on `r.Permissions.Count` (EF 8+ subquery is correct), reseed-system-roles parallelism (xUnit class fixture serializes within a class), `MapInboundClaims = false` "fragile coupling" (debug-logged + token writer is centralized), `RequireAuth + RequirePlatformAdmin` redundancy (intentional for readability), system-role protection check after `Include` (bounded by new Permissions count cap), `PagedResult.TotalPages` int overflow (unrealistic for `roles` table), case-sensitive validator regex (matches AC-3 lowercase example), TRUNCATE list maintenance (acceptable test convention), `DeleteRoleAsync` doesn't load Permissions (FK cascade handles it), auditor's `token.User` loading note (not a violation per the auditor itself).
 
@@ -1078,45 +1078,45 @@ _Three-reviewer code review on commit `8a55795` (2026-05-23) — Blind Hunter, E
 
 ### Current code state — files being modified
 
-**`src/FormForge.Api/Domain/Entities/User.cs`** — Add `public ICollection<UserRole> UserRoles { get; set; } = [];` navigation property.
+**`src/AppForge.Api/Domain/Entities/User.cs`** — Add `public ICollection<UserRole> UserRoles { get; set; } = [];` navigation property.
 
-**`src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs`** — Add three new DbSets; add three new `modelBuilder.Entity<>` blocks inside `OnModelCreating`.
+**`src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs`** — Add three new DbSets; add three new `modelBuilder.Entity<>` blocks inside `OnModelCreating`.
 
-**`src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs`** — Add `RequireAuth()` and `RequirePlatformAdmin()` extension methods on `RouteGroupBuilder`.
+**`src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs`** — Add `RequireAuth()` and `RequirePlatformAdmin()` extension methods on `RouteGroupBuilder`.
 
-**`src/FormForge.Api/Program.cs`** — Add authorization policy, admin rate-limit policy, role service registrations, admin route group registration.
+**`src/AppForge.Api/Program.cs`** — Add authorization policy, admin rate-limit policy, role service registrations, admin route group registration.
 
-**`src/FormForge.Api/Features/Auth/AuthService.cs`** — Replace two `Array.Empty<string>()` occurrences with real `db.UserRoles` queries.
+**`src/AppForge.Api/Features/Auth/AuthService.cs`** — Replace two `Array.Empty<string>()` occurrences with real `db.UserRoles` queries.
 
 ### New files
 
 | File | Purpose |
 |------|---------|
-| `src/FormForge.Api/Domain/Entities/Role.cs` | Role entity |
-| `src/FormForge.Api/Domain/Entities/RolePermission.cs` | Per-resource CRUD flags entity |
-| `src/FormForge.Api/Domain/Entities/UserRole.cs` | User↔Role join entity |
-| `src/FormForge.Api/Common/PagedResult.cs` | Shared pagination response record |
-| `src/FormForge.Api/Features/Roles/RoleService.cs` | IRoleService + RoleService |
-| `src/FormForge.Api/Features/Roles/AdminEndpoints.cs` | Top-level admin route dispatcher |
-| `src/FormForge.Api/Features/Roles/RoleEndpoints.cs` | /api/admin/roles endpoint handlers |
-| `src/FormForge.Api/Features/Roles/Dtos/PermissionRecord.cs` | DTO |
-| `src/FormForge.Api/Features/Roles/Dtos/CreateRoleRequest.cs` | DTO |
-| `src/FormForge.Api/Features/Roles/Dtos/UpdateRoleRequest.cs` | DTO |
-| `src/FormForge.Api/Features/Roles/Dtos/RoleListItem.cs` | DTO |
-| `src/FormForge.Api/Features/Roles/Dtos/RoleResponse.cs` | DTO |
-| `src/FormForge.Api/Features/Roles/Validators/CreateRoleRequestValidator.cs` | FluentValidation |
-| `src/FormForge.Api/Features/Roles/Validators/UpdateRoleRequestValidator.cs` | FluentValidation |
-| `src/FormForge.Api.Tests/Features/Roles/RoleIntegrationTests.cs` | Integration tests |
-| `src/FormForge.Api/Infrastructure/Persistence/Migrations/2026XXXXXX_CreateRolesRolePermissionsAndUserRoles.cs` | Generated migration |
+| `src/AppForge.Api/Domain/Entities/Role.cs` | Role entity |
+| `src/AppForge.Api/Domain/Entities/RolePermission.cs` | Per-resource CRUD flags entity |
+| `src/AppForge.Api/Domain/Entities/UserRole.cs` | User↔Role join entity |
+| `src/AppForge.Api/Common/PagedResult.cs` | Shared pagination response record |
+| `src/AppForge.Api/Features/Roles/RoleService.cs` | IRoleService + RoleService |
+| `src/AppForge.Api/Features/Roles/AdminEndpoints.cs` | Top-level admin route dispatcher |
+| `src/AppForge.Api/Features/Roles/RoleEndpoints.cs` | /api/admin/roles endpoint handlers |
+| `src/AppForge.Api/Features/Roles/Dtos/PermissionRecord.cs` | DTO |
+| `src/AppForge.Api/Features/Roles/Dtos/CreateRoleRequest.cs` | DTO |
+| `src/AppForge.Api/Features/Roles/Dtos/UpdateRoleRequest.cs` | DTO |
+| `src/AppForge.Api/Features/Roles/Dtos/RoleListItem.cs` | DTO |
+| `src/AppForge.Api/Features/Roles/Dtos/RoleResponse.cs` | DTO |
+| `src/AppForge.Api/Features/Roles/Validators/CreateRoleRequestValidator.cs` | FluentValidation |
+| `src/AppForge.Api/Features/Roles/Validators/UpdateRoleRequestValidator.cs` | FluentValidation |
+| `src/AppForge.Api.Tests/Features/Roles/RoleIntegrationTests.cs` | Integration tests |
+| `src/AppForge.Api/Infrastructure/Persistence/Migrations/2026XXXXXX_CreateRolesRolePermissionsAndUserRoles.cs` | Generated migration |
 
 ### Do NOT touch
 
-- `src/FormForge.Api/Features/Auth/JwtTokenService.cs` — already accepts `IReadOnlyList<string> roleNames`; no change needed.
-- `src/FormForge.Api/Features/Auth/AuthMetrics.cs` — no new metrics in this story.
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs` — no changes.
+- `src/AppForge.Api/Features/Auth/JwtTokenService.cs` — already accepts `IReadOnlyList<string> roleNames`; no change needed.
+- `src/AppForge.Api/Features/Auth/AuthMetrics.cs` — no new metrics in this story.
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs` — no changes.
 - Any existing EF Core migration files.
 - `web/src/**` — no frontend work in this story; UI is Story 2.8.
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` — updated automatically by `dotnet ef migrations add`.
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` — updated automatically by `dotnet ef migrations add`.
 
 ### Anti-patterns to avoid
 
@@ -1179,7 +1179,7 @@ Recent commits (most recent first):
   - AR-15 / AR-22 — Rate limiting + route groups
   - AR-25 — `/health` platform-admin guard (Story 2.6)
 - `_bmad-output/implementation-artifacts/2-3-logout.md` — carry-forward patterns (HandleCookies, TRUNCATE order, CA1812)
-- `src/FormForge.Api/Features/Auth/AuthService.cs:100-102` and `:190-191` — the two `Array.Empty<string>()` placeholders replaced in Task 10
+- `src/AppForge.Api/Features/Auth/AuthService.cs:100-102` and `:190-191` — the two `Array.Empty<string>()` placeholders replaced in Task 10
 
 ---
 
@@ -1231,7 +1231,7 @@ Claude Opus 4.7 (1M context) via Claude Code, bmad-dev-story workflow.
    in both `LoginAsync` and `RefreshAsync`. EF generates a flat `INNER JOIN` (confirmed
    in test logs). Empty array for unassigned users — same behavior as before, just
    from a real query.
-5. **`PagedResult<T>`** placed at `src/FormForge.Api/Common/PagedResult.cs`. The
+5. **`PagedResult<T>`** placed at `src/AppForge.Api/Common/PagedResult.cs`. The
    `TotalPages` getter guards against `PageSize <= 0` returning 0 instead of throwing
    `DivideByZeroException`.
 6. **No `RolePermissionsChanged` event emission** in Story 2.4 — `IDomainEventBus`
@@ -1246,31 +1246,31 @@ Claude Opus 4.7 (1M context) via Claude Code, bmad-dev-story workflow.
 ### File List
 
 **New files:**
-- `src/FormForge.Api/Domain/Entities/Role.cs`
-- `src/FormForge.Api/Domain/Entities/RolePermission.cs`
-- `src/FormForge.Api/Domain/Entities/UserRole.cs`
-- `src/FormForge.Api/Common/PagedResult.cs`
-- `src/FormForge.Api/Features/Roles/RoleService.cs`
-- `src/FormForge.Api/Features/Roles/AdminEndpoints.cs`
-- `src/FormForge.Api/Features/Roles/RoleEndpoints.cs`
-- `src/FormForge.Api/Features/Roles/Dtos/PermissionRecord.cs`
-- `src/FormForge.Api/Features/Roles/Dtos/CreateRoleRequest.cs`
-- `src/FormForge.Api/Features/Roles/Dtos/UpdateRoleRequest.cs`
-- `src/FormForge.Api/Features/Roles/Dtos/RoleListItem.cs`
-- `src/FormForge.Api/Features/Roles/Dtos/RoleResponse.cs`
-- `src/FormForge.Api/Features/Roles/Validators/CreateRoleRequestValidator.cs`
-- `src/FormForge.Api/Features/Roles/Validators/UpdateRoleRequestValidator.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260523021147_CreateRolesRolePermissionsAndUserRoles.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260523021147_CreateRolesRolePermissionsAndUserRoles.Designer.cs`
-- `src/FormForge.Api.Tests/Features/Roles/RoleIntegrationTests.cs`
+- `src/AppForge.Api/Domain/Entities/Role.cs`
+- `src/AppForge.Api/Domain/Entities/RolePermission.cs`
+- `src/AppForge.Api/Domain/Entities/UserRole.cs`
+- `src/AppForge.Api/Common/PagedResult.cs`
+- `src/AppForge.Api/Features/Roles/RoleService.cs`
+- `src/AppForge.Api/Features/Roles/AdminEndpoints.cs`
+- `src/AppForge.Api/Features/Roles/RoleEndpoints.cs`
+- `src/AppForge.Api/Features/Roles/Dtos/PermissionRecord.cs`
+- `src/AppForge.Api/Features/Roles/Dtos/CreateRoleRequest.cs`
+- `src/AppForge.Api/Features/Roles/Dtos/UpdateRoleRequest.cs`
+- `src/AppForge.Api/Features/Roles/Dtos/RoleListItem.cs`
+- `src/AppForge.Api/Features/Roles/Dtos/RoleResponse.cs`
+- `src/AppForge.Api/Features/Roles/Validators/CreateRoleRequestValidator.cs`
+- `src/AppForge.Api/Features/Roles/Validators/UpdateRoleRequestValidator.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260523021147_CreateRolesRolePermissionsAndUserRoles.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260523021147_CreateRolesRolePermissionsAndUserRoles.Designer.cs`
+- `src/AppForge.Api.Tests/Features/Roles/RoleIntegrationTests.cs`
 
 **Modified files:**
-- `src/FormForge.Api/Domain/Entities/User.cs` — added `UserRoles` navigation
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — added 3 DbSets + 3 entity mapping blocks
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` — regenerated by `dotnet ef migrations add`
-- `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs` — added `RequireAuth()` + `RequirePlatformAdmin()`
-- `src/FormForge.Api/Program.cs` — `MapInboundClaims = false`, `platform-admin` authz policy, `admin` rate-limit policy, role service registrations, `/api/admin` route group, new usings
-- `src/FormForge.Api/Features/Auth/AuthService.cs` — replaced both `Array.Empty<string>()` placeholders with `db.UserRoles` join
+- `src/AppForge.Api/Domain/Entities/User.cs` — added `UserRoles` navigation
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — added 3 DbSets + 3 entity mapping blocks
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` — regenerated by `dotnet ef migrations add`
+- `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs` — added `RequireAuth()` + `RequirePlatformAdmin()`
+- `src/AppForge.Api/Program.cs` — `MapInboundClaims = false`, `platform-admin` authz policy, `admin` rate-limit policy, role service registrations, `/api/admin` route group, new usings
+- `src/AppForge.Api/Features/Auth/AuthService.cs` — replaced both `Array.Empty<string>()` placeholders with `db.UserRoles` join
 - `.editorconfig` — widened Migrations-folder analyzer suppressions to include CA1814 + CA1861
 
 ### Change Log

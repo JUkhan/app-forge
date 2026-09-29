@@ -17,8 +17,8 @@ so that I can hide items without deleting them.
 ## Tasks / Subtasks
 
 - [x] Task 1 — Backend: DTO + Validator (AC: 1, 2)
-  - [x] Create `src/FormForge.Api/Features/Menus/Dtos/ToggleMenuActiveRequest.cs` — positional record `ToggleMenuActiveRequest(bool? IsActive)`. Nullable bool so a missing `isActive` key deserializes to null → validator NotNull rule fires 422 instead of silently treating it as `false`. Mirrors `AssignMenuRolesRequest(IReadOnlyList<Guid>? RoleIds)` nullable-envelope pattern.
-  - [x] Create `src/FormForge.Api/Features/Menus/Validators/ToggleMenuActiveRequestValidator.cs` — `AbstractValidator<ToggleMenuActiveRequest>` with a single `RuleFor(x => x.IsActive).NotNull()` rule. Registered by DI scan (no manual registration needed — same as all other validators).
+  - [x] Create `src/AppForge.Api/Features/Menus/Dtos/ToggleMenuActiveRequest.cs` — positional record `ToggleMenuActiveRequest(bool? IsActive)`. Nullable bool so a missing `isActive` key deserializes to null → validator NotNull rule fires 422 instead of silently treating it as `false`. Mirrors `AssignMenuRolesRequest(IReadOnlyList<Guid>? RoleIds)` nullable-envelope pattern.
+  - [x] Create `src/AppForge.Api/Features/Menus/Validators/ToggleMenuActiveRequestValidator.cs` — `AbstractValidator<ToggleMenuActiveRequest>` with a single `RuleFor(x => x.IsActive).NotNull()` rule. Registered by DI scan (no manual registration needed — same as all other validators).
 
 - [x] Task 2 — Backend: Service method (AC: 1)
   - [x] Add `internal enum ToggleMenuActiveOutcome { Success, NotFound }` and `internal sealed record ToggleMenuActiveResult(ToggleMenuActiveOutcome Outcome)` to `MenuService.cs` (at top with the other outcome enums).
@@ -166,13 +166,13 @@ Key patterns to carry forward:
 ### Project Structure Notes
 
 **Backend new files:**
-- `src/FormForge.Api/Features/Menus/Dtos/ToggleMenuActiveRequest.cs`
-- `src/FormForge.Api/Features/Menus/Validators/ToggleMenuActiveRequestValidator.cs`
+- `src/AppForge.Api/Features/Menus/Dtos/ToggleMenuActiveRequest.cs`
+- `src/AppForge.Api/Features/Menus/Validators/ToggleMenuActiveRequestValidator.cs`
 
 **Backend modified files:**
-- `src/FormForge.Api/Features/Menus/MenuService.cs` — add outcome enum, result record, interface method, implementation
-- `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` — add PATCH route + handler
-- `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — add 5 tests
+- `src/AppForge.Api/Features/Menus/MenuService.cs` — add outcome enum, result record, interface method, implementation
+- `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` — add PATCH route + handler
+- `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — add 5 tests
 
 **Frontend modified files:**
 - `web/src/features/auth/httpClient.ts` — add `patch` method
@@ -227,14 +227,14 @@ claude-opus-4-7
 ### File List
 
 **Created:**
-- `src/FormForge.Api/Features/Menus/Dtos/ToggleMenuActiveRequest.cs`
-- `src/FormForge.Api/Features/Menus/Validators/ToggleMenuActiveRequestValidator.cs`
+- `src/AppForge.Api/Features/Menus/Dtos/ToggleMenuActiveRequest.cs`
+- `src/AppForge.Api/Features/Menus/Validators/ToggleMenuActiveRequestValidator.cs`
 
 **Modified (backend):**
-- `src/FormForge.Api/Features/Menus/MenuService.cs` — added `ToggleMenuActiveOutcome` enum, `ToggleMenuActiveResult` record, interface method, implementation
-- `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` — added `PATCH /{id:guid}/active` route registration + `ToggleActiveHandler`
-- `src/FormForge.Api/Program.cs` — registered `IValidator<ToggleMenuActiveRequest>` in DI
-- `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — added 5 PATCH active integration tests
+- `src/AppForge.Api/Features/Menus/MenuService.cs` — added `ToggleMenuActiveOutcome` enum, `ToggleMenuActiveResult` record, interface method, implementation
+- `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` — added `PATCH /{id:guid}/active` route registration + `ToggleActiveHandler`
+- `src/AppForge.Api/Program.cs` — registered `IValidator<ToggleMenuActiveRequest>` in DI
+- `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — added 5 PATCH active integration tests
 
 **Modified (frontend):**
 - `web/src/features/auth/httpClient.ts` — added `patch` method to the `httpClient` export

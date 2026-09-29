@@ -15,7 +15,7 @@ baseline_commit: '02b51c5df88081a43d3df797a8cbe1458bcb51b2'
 
 **Problem:** Story 12.2's `ITenantProvisioningService.ProvisionSchemaAsync` deliberately stops once a tenant's schema exists and the static migration set has been replayed into it — the tenant row stays `status = 'Provisioning'` forever unless something finishes the job. A tenant in that state has no Dataset Manager namespace, no admin user, and is not usable.
 
-**Approach:** Add `ITenantOnboardingService.OnboardTenantAsync`, a second, independently callable step that assumes Story 12.2's work is already done for the given tenant and finishes onboarding: create the tenant-scoped `{schema_name}_datasets` Dataset VIEW namespace, scope `formforge_preview`'s grants to the tenant's own schema, seed the tenant's first user against the tenant-admin role the migration replay already seeded, fire the existing best-effort welcome-email flow, then set `status = 'Active'`. Add `TenantProvisioningRecoveryService`, mirroring the existing `ProvisioningRecoveryService` startup-scan shape, to flag (never silently retry) any tenant still stuck at `'Provisioning'` when the API starts.
+**Approach:** Add `ITenantOnboardingService.OnboardTenantAsync`, a second, independently callable step that assumes Story 12.2's work is already done for the given tenant and finishes onboarding: create the tenant-scoped `{schema_name}_datasets` Dataset VIEW namespace, scope `appforge_preview`'s grants to the tenant's own schema, seed the tenant's first user against the tenant-admin role the migration replay already seeded, fire the existing best-effort welcome-email flow, then set `status = 'Active'`. Add `TenantProvisioningRecoveryService`, mirroring the existing `ProvisioningRecoveryService` startup-scan shape, to flag (never silently retry) any tenant still stuck at `'Provisioning'` when the API starts.
 
 ## Boundaries & Constraints
 
@@ -30,7 +30,7 @@ baseline_commit: '02b51c5df88081a43d3df797a8cbe1458bcb51b2'
 - Do not build an HTTP endpoint or wire this into an admin UI — Story 12.5 consumes both this service and Story 12.2's later.
 - Do not touch `ITenantContext`, JWT claims, or login (Story 12.3), or `platform_admins` (Story 12.4).
 - Do not make `DatasetSqlGenerator`, `DatasetAllowlist`, `DatasetViewManager`, or `DdlEmitter`'s preview-role grant tenant-schema-aware at query time — that rewiring is Story 12.6's job. This story only provisions the new tenant's own namespace and grants.
-- Do not modify the global `public` schema's `datasets` namespace or its existing `formforge_preview` grants.
+- Do not modify the global `public` schema's `datasets` namespace or its existing `appforge_preview` grants.
 - Do not rename the seeded role's `name` column value from `"platform-admin"` to `"tenant-admin"` — a cosmetic/terminology change out of scope here.
 - Do not implement retry/resume logic in the recovery service — flag only, per FR-75 AC-3.
 
@@ -38,7 +38,7 @@ baseline_commit: '02b51c5df88081a43d3df797a8cbe1458bcb51b2'
 
 | Scenario | Input / State | Expected Output / Behavior | Error Handling |
 |----------|--------------|---------------------------|----------------|
-| Happy path | Tenant with schema+migrations already applied (12.2 done); valid admin email/display name/temporary password | `{schema_name}_datasets` schema exists; `formforge_preview` scoped to `{schema_name}` (sensitive tables revoked, `users` column-restricted); first user + tenant-admin `UserRole` exist in the tenant schema; welcome email attempted; `Tenant.Status == 'Active'` | N/A |
+| Happy path | Tenant with schema+migrations already applied (12.2 done); valid admin email/display name/temporary password | `{schema_name}_datasets` schema exists; `appforge_preview` scoped to `{schema_name}` (sensitive tables revoked, `users` column-restricted); first user + tenant-admin `UserRole` exist in the tenant schema; welcome email attempted; `Tenant.Status == 'Active'` | N/A |
 | Onboarding DDL/seed step fails | Grant/revoke or user-seed step throws | `Tenant.Status` remains `'Provisioning'`; exception propagates to caller | Exception surfaces; no partial state is hidden |
 | Welcome email fails or times out | SMTP unconfigured, connect/auth error, or 3s timeout | Onboarding still completes; `Tenant.Status` still becomes `'Active'` | Failure is caught and logged inside the existing email-send try/catch; never rethrown |
 | Duplicate admin email across tenants | `adminEmail` already exists in another tenant's own schema | Succeeds — each tenant's `users` table is schema-isolated, no cross-tenant uniqueness constraint applies | N/A |
@@ -48,29 +48,29 @@ baseline_commit: '02b51c5df88081a43d3df797a8cbe1458bcb51b2'
 
 ## Code Map
 
-- `Features/Tenancy/ITenantProvisioningService.cs`, `TenantProvisioningService.cs` (Story 12.2) — reuse its patterns (`DbConnectionFactory.CreateOpenConnectionAsync` + Dapper `ExecuteAsync` for raw DDL; schema-scoped `NpgsqlConnectionStringBuilder{SearchPath=...}` + fresh `FormForgeDbContext` for schema-scoped EF work); do not call or modify it — precondition is that it already ran.
+- `Features/Tenancy/ITenantProvisioningService.cs`, `TenantProvisioningService.cs` (Story 12.2) — reuse its patterns (`DbConnectionFactory.CreateOpenConnectionAsync` + Dapper `ExecuteAsync` for raw DDL; schema-scoped `NpgsqlConnectionStringBuilder{SearchPath=...}` + fresh `AppForgeDbContext` for schema-scoped EF work); do not call or modify it — precondition is that it already ran.
 - `Infrastructure/Persistence/DbConnectionFactory.cs` — `CreateOpenConnectionAsync(ct)`, `DdlCommandTimeoutSeconds` (60s); reuse for the new DDL.
-- Migrations `20260602234849_CreateDatasetManagerFoundation.cs` (lines 137-166) + `20260605164457_RestrictPreviewRoleUsersColumns.cs` — source of the exact `formforge_preview` grant/revoke SQL to replicate schema-qualified against `"{schema_name}"` instead of `public`: bulk `GRANT SELECT ON ALL TABLES`, then guarded per-table `REVOKE SELECT` on `users, roles, refresh_tokens, password_reset_tokens, mfa_backup_codes, mfa_sessions, schema_audit_log, mutation_audit_log, dataset_audit_log, custom_dataset`, then column-level `GRANT SELECT (id, display_name, email, is_active)` on `.users`. Same `IF EXISTS (pg_roles...)` / `to_regclass` guards as the migrations.
+- Migrations `20260602234849_CreateDatasetManagerFoundation.cs` (lines 137-166) + `20260605164457_RestrictPreviewRoleUsersColumns.cs` — source of the exact `appforge_preview` grant/revoke SQL to replicate schema-qualified against `"{schema_name}"` instead of `public`: bulk `GRANT SELECT ON ALL TABLES`, then guarded per-table `REVOKE SELECT` on `users, roles, refresh_tokens, password_reset_tokens, mfa_backup_codes, mfa_sessions, schema_audit_log, mutation_audit_log, dataset_audit_log, custom_dataset`, then column-level `GRANT SELECT (id, display_name, email, is_active)` on `.users`. Same `IF EXISTS (pg_roles...)` / `to_regclass` guards as the migrations.
 - `Features/Auth/EmailService.cs` (`IEmailService.TrySendWelcomeEmailAsync`) + `Features/Users/UserEndpoints.cs` (~131-169) — best-effort call shape to replicate: linked CTS with `CancelAfter(3s)`, catch-and-swallow, never rethrows. No `HttpContext` here — use `smtpOptions.Value.BaseUrl` as `loginBaseUrl`, `tenant.Id.ToString()` as correlation id.
 - `Features/Users/UserService.cs` (`CreateUserAsync`, ~line 299) — `User` construction + `IPasswordHasher.Hash(password)` shape to mirror for the tenant's first user.
 - Migration `20260523021147_CreateRolesRolePermissionsAndUserRoles.cs` (~100-121) — confirms the tenant-admin role (deterministic id `00000000-0000-0000-0000-000000000001`) already exists in every tenant schema post-replay; do not re-seed it.
 - `Domain/Entities/Tenant.cs`, `User.cs`, `UserRole.cs` — `Tenant.Status` is a plain `string`; set to `"Active"` as a literal.
 - `Features/Provisioning/ProvisioningRecoveryService.cs` — `BackgroundService` + `[LoggerMessage]` shape to mirror for `TenantProvisioningRecoveryService`, except this one logs-and-flags instead of re-enqueueing (no consumer channel exists for tenant onboarding).
 - `Program.cs:227` (`AddScoped<ITenantProvisioningService,...>`) and `:204` (`AddHostedService<ProvisioningRecoveryService>()`) — register the two new services adjacent.
-- `FormForge.Api.Tests/Infrastructure/PostgresFixture.cs` — Testcontainers fixture to reuse.
+- `AppForge.Api.Tests/Infrastructure/PostgresFixture.cs` — Testcontainers fixture to reuse.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `src/FormForge.Api/Features/Tenancy/ITenantOnboardingService.cs` -- define `Task OnboardTenantAsync(Tenant tenant, string adminEmail, string adminDisplayName, string adminTemporaryPassword, CancellationToken ct)` -- narrow contract; caller supplies the first user's identity, same as `CreateUserRequest` requires today (no server-side password generation exists in this codebase)
-- [x] `src/FormForge.Api/Features/Tenancy/TenantOnboardingService.cs` -- implement the sequence in Intent/Approach: `CREATE SCHEMA "{schema_name}_datasets"`, scoped `formforge_preview` grant/revoke, seed first user + `UserRole` against the existing tenant-admin role id in a schema-scoped `FormForgeDbContext`, best-effort welcome email, then `Tenant.Status = "Active"` + `SaveChangesAsync`
-- [x] `src/FormForge.Api/Features/Tenancy/TenantProvisioningRecoveryService.cs` -- `BackgroundService` scanning `Tenants.Where(t => t.Status == "Provisioning")` at startup, logging each at Warning level; no retry, no status mutation
-- [x] `src/FormForge.Api/Program.cs` -- register `ITenantOnboardingService`/`TenantOnboardingService` (scoped) and `TenantProvisioningRecoveryService` (hosted service) -- wiring only
-- [x] `src/FormForge.Api.Tests/Features/Tenancy/TenantOnboardingServiceTests.cs` -- integration tests covering the happy path and the email-failure/DDL-failure edge cases in the I/O matrix
-- [x] `src/FormForge.Api.Tests/Features/Tenancy/TenantProvisioningRecoveryServiceTests.cs` -- covers the recovery-scan scenario in the I/O matrix
+- [x] `src/AppForge.Api/Features/Tenancy/ITenantOnboardingService.cs` -- define `Task OnboardTenantAsync(Tenant tenant, string adminEmail, string adminDisplayName, string adminTemporaryPassword, CancellationToken ct)` -- narrow contract; caller supplies the first user's identity, same as `CreateUserRequest` requires today (no server-side password generation exists in this codebase)
+- [x] `src/AppForge.Api/Features/Tenancy/TenantOnboardingService.cs` -- implement the sequence in Intent/Approach: `CREATE SCHEMA "{schema_name}_datasets"`, scoped `appforge_preview` grant/revoke, seed first user + `UserRole` against the existing tenant-admin role id in a schema-scoped `AppForgeDbContext`, best-effort welcome email, then `Tenant.Status = "Active"` + `SaveChangesAsync`
+- [x] `src/AppForge.Api/Features/Tenancy/TenantProvisioningRecoveryService.cs` -- `BackgroundService` scanning `Tenants.Where(t => t.Status == "Provisioning")` at startup, logging each at Warning level; no retry, no status mutation
+- [x] `src/AppForge.Api/Program.cs` -- register `ITenantOnboardingService`/`TenantOnboardingService` (scoped) and `TenantProvisioningRecoveryService` (hosted service) -- wiring only
+- [x] `src/AppForge.Api.Tests/Features/Tenancy/TenantOnboardingServiceTests.cs` -- integration tests covering the happy path and the email-failure/DDL-failure edge cases in the I/O matrix
+- [x] `src/AppForge.Api.Tests/Features/Tenancy/TenantProvisioningRecoveryServiceTests.cs` -- covers the recovery-scan scenario in the I/O matrix
 
 **Acceptance Criteria:**
-- Given a tenant whose schema and static tables already exist, when `OnboardTenantAsync` completes successfully, then `information_schema.schemata` contains `"{schema_name}_datasets"` and `formforge_preview` can `SELECT` from `"{schema_name}".users` only its four allowed columns (verified by querying grants, not just absence of exceptions).
+- Given a tenant whose schema and static tables already exist, when `OnboardTenantAsync` completes successfully, then `information_schema.schemata` contains `"{schema_name}_datasets"` and `appforge_preview` can `SELECT` from `"{schema_name}".users` only its four allowed columns (verified by querying grants, not just absence of exceptions).
 - Given onboarding completes successfully, when the tenant schema's `users`/`user_roles` tables are queried, then exactly one user exists with a `UserRole` referencing role id `00000000-0000-0000-0000-000000000001`.
 - Given onboarding completes successfully regardless of whether the welcome email succeeded, when the tenant row is re-read, then `Status == "Active"`.
 - Given a tenant stuck at `Status == "Provisioning"`, when the API starts, then `TenantProvisioningRecoveryService` logs it and does not change its status or attempt any DDL.
@@ -78,14 +78,14 @@ baseline_commit: '02b51c5df88081a43d3df797a8cbe1458bcb51b2'
 ## Implementation Notes
 
 - `UserRole` seeding uses navigation-based fixup (`UserRole.User = adminUser`, not `UserId = adminUser.Id`) because `User.Id` is store-generated (`gen_random_uuid()`) and still the CLR default at construction time; setting `UserId` directly failed `SaveChangesAsync` with an "unknown value" error. Only the navigation lets EF resolve the FK once both rows insert together.
-- Activation re-fetches the tenant through the service's own `FormForgeDbContext` (`db.Tenants.FirstOrDefaultAsync(t => t.Id == tenant.Id)`) rather than mutating the caller's `tenant` instance directly, so the update works whether or not that instance is already tracked by this context.
-- Full `FormForge.Api.Tests` suite run (1151 tests): 1149 passed, 2 pre-existing failures (`SchemaAuditLogIntegrationTests`/`MutationAuditLogIntegrationTests` DELETE-verb 405 checks) confirmed unrelated via a stash/rerun against the pre-Story-12.7 baseline — same 2 failures occur without this story's changes. Not this story's scope to fix (no Audit code touched).
+- Activation re-fetches the tenant through the service's own `AppForgeDbContext` (`db.Tenants.FirstOrDefaultAsync(t => t.Id == tenant.Id)`) rather than mutating the caller's `tenant` instance directly, so the update works whether or not that instance is already tracked by this context.
+- Full `AppForge.Api.Tests` suite run (1151 tests): 1149 passed, 2 pre-existing failures (`SchemaAuditLogIntegrationTests`/`MutationAuditLogIntegrationTests` DELETE-verb 405 checks) confirmed unrelated via a stash/rerun against the pre-Story-12.7 baseline — same 2 failures occur without this story's changes. Not this story's scope to fix (no Audit code touched).
 
 ## Spec Change Log
 
 ## Review Triage Log
 
-- **[patch, medium]** `TenantOnboardingServiceTests`'s own `RevokedTables` array (lines 26-31) omits `"mfa_sessions"`, unlike production `TenantOnboardingService.RevokedTables` (lines 41-46) which does revoke SELECT on it for the tenant schema — a future regression that stops revoking `formforge_preview`'s access to `mfa_sessions` would ship with no test catching it. (verification-gap, pre-verified; corroborated by blind-hunter + edge-case-hunter)
+- **[patch, medium]** `TenantOnboardingServiceTests`'s own `RevokedTables` array (lines 26-31) omits `"mfa_sessions"`, unlike production `TenantOnboardingService.RevokedTables` (lines 41-46) which does revoke SELECT on it for the tenant schema — a future regression that stops revoking `appforge_preview`'s access to `mfa_sessions` would ship with no test catching it. (verification-gap, pre-verified; corroborated by blind-hunter + edge-case-hunter)
 - **[patch, medium]** No test builds a `WebApplicationFactory` with the real `AddHostedService<TenantProvisioningRecoveryService>()` registration intact — `TenantProvisioningRecoveryServiceTests.InitializeAsync` unconditionally removes it and drives a manually-constructed instance instead, unlike the precedent `ProvisioningRecoveryIntegrationTests` sets for the sibling service (which has both a real-registration recovery test and a real-registration scan-failure/host-still-starts test). The actual startup wiring is never exercised. (verification-gap, pre-verified)
 - **[patch, medium]** `TenantOnboardingService.OnboardTenantAsync` builds `datasetsSchemaName = $"{schemaName}_datasets"` and never re-validates the combined length against Postgres's 63-byte identifier limit, unlike `schemaName` itself (capped at 63 by `SafeIdentifier`'s regex). A `schema_name` of roughly 55+ characters — valid input today — produces a `_datasets` name Postgres silently truncates, risking a cross-tenant `CREATE SCHEMA` collision that fails loudly but confusingly. Confirmed newly introduced by this story (12.2 never appends a suffix to `schemaName`). (blind-hunter + edge-case-hunter, duplicate claims, merged)
 - **[patch, low]** `TenantProvisioningRecoveryService`'s warning log message ("...onboarding did not complete...") narrows the diagnosis to Story 12.7's own step, but the class's own leading comment correctly notes a stuck tenant could equally mean Story 12.2's schema-provisioning step crashed before onboarding ever began — the operator-facing message doesn't reflect that ambiguity. Trivial reword, no behavior change. (blind-hunter)
@@ -104,4 +104,4 @@ DDL (schema+grants) and EF seeding are separate operations on separate connectio
 
 **Commands:**
 - `dotnet build` -- expected: 0 errors, 0 warnings
-- `dotnet test src/FormForge.Api.Tests --filter "TenantOnboardingServiceTests|TenantProvisioningRecoveryServiceTests"` -- expected: all pass, including a real query confirming the `_datasets` schema, scoped grants, and seeded user/role exist (not just "no exception thrown")
+- `dotnet test src/AppForge.Api.Tests --filter "TenantOnboardingServiceTests|TenantProvisioningRecoveryServiceTests"` -- expected: all pass, including a real query confirming the `_datasets` schema, scoped grants, and seeded user/role exist (not just "no exception thrown")

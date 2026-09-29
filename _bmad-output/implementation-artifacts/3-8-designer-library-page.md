@@ -51,7 +51,7 @@ Then the `DynamicComponent` renders that version in-place (read-only)
 - [x] Task 1: Backend — Add `CreatorDisplayName` to designer list (AC-1)
   - [x] Update `DesignerListItem` record in `DesignerService.cs`: add `string? CreatorDisplayName` as the last constructor parameter
   - [x] Update `ListAsync` projection: add `s.Creator != null ? s.Creator.DisplayName : null` as the value
-  - [x] Verify `FormForgeDbContext` has the `ComponentSchema → User` FK navigation configured — EF Core must generate a LEFT JOIN in the `.Select()` projection without an explicit `.Include()`
+  - [x] Verify `AppForgeDbContext` has the `ComponentSchema → User` FK navigation configured — EF Core must generate a LEFT JOIN in the `.Select()` projection without an explicit `.Include()`
   - [x] Update `ComponentSchemaListItem` TypeScript interface in `web/src/types/designer.ts`: add `creatorDisplayName?: string | null`
 
 - [x] Task 2: Backend — Duplicate endpoint (AC-2)
@@ -157,7 +157,7 @@ The `ComponentSchema` entity already has `public User? Creator { get; set; }` na
     s.Creator != null ? s.Creator.DisplayName : null))   // ADD THIS
 ```
 
-If EF Core throws a translation error, check `FormForgeDbContext.OnModelCreating()` for whether the `ComponentSchema → User` FK relationship is explicitly configured. If it is, the projection works. If not, add `.HasOne(s => s.Creator).WithMany().HasForeignKey(s => s.CreatedBy).IsRequired(false)` in the entity configuration block.
+If EF Core throws a translation error, check `AppForgeDbContext.OnModelCreating()` for whether the `ComponentSchema → User` FK relationship is explicitly configured. If it is, the projection works. If not, add `.HasOne(s => s.Creator).WithMany().HasForeignKey(s => s.CreatedBy).IsRequired(false)` in the entity configuration block.
 
 No migration is needed (schema unchanged; FK column already exists as `CreatedBy`).
 
@@ -439,9 +439,9 @@ From Story 3.6:
 ### Project Structure — Files to Change
 
 **Backend — modified**
-- `src/FormForge.Api/Features/Designer/DesignerService.cs` — add `DuplicateOutcome`/`DuplicateResult`, `DuplicateAsync` implementation; update `DesignerListItem` record; update `ListAsync` projection
-- `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs` — add `DuplicateDesignerHandler`, `DuplicateConflictProblem()`, register route
-- `src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` — 4 new tests + update list assertion for `creatorDisplayName`
+- `src/AppForge.Api/Features/Designer/DesignerService.cs` — add `DuplicateOutcome`/`DuplicateResult`, `DuplicateAsync` implementation; update `DesignerListItem` record; update `ListAsync` projection
+- `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs` — add `DuplicateDesignerHandler`, `DuplicateConflictProblem()`, register route
+- `src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` — 4 new tests + update list assertion for `creatorDisplayName`
 
 **Frontend — modified**
 - `web/src/types/designer.ts` — add `creatorDisplayName?: string | null` to `ComponentSchemaListItem`
@@ -477,7 +477,7 @@ claude-opus-4-7
 
 ### Completion Notes List
 
-- **AC-1 Creator column** — Backend `DesignerListItem` record gained `CreatorDisplayName`; `ListAsync` projection LEFT-JOINs through the existing `ComponentSchema.Creator` FK navigation (no `.Include()` needed, no migration needed — the FK column existed and was wired in `FormForgeDbContext.OnModelCreating`). Frontend `ComponentSchemaListItem` mirrors the field; the Creator cell renders `creatorDisplayName ?? '—'` and the `TableSkeleton` `cols` advances from 6 to 7.
+- **AC-1 Creator column** — Backend `DesignerListItem` record gained `CreatorDisplayName`; `ListAsync` projection LEFT-JOINs through the existing `ComponentSchema.Creator` FK navigation (no `.Include()` needed, no migration needed — the FK column existed and was wired in `AppForgeDbContext.OnModelCreating`). Frontend `ComponentSchemaListItem` mirrors the field; the Creator cell renders `creatorDisplayName ?? '—'` and the `TableSkeleton` `cols` advances from 6 to 7.
 - **AC-2 Duplicate endpoint** — `POST /api/designers/{id}/duplicate` (platform-admin) probes `{id}_copy`, `{id}_copy2…{id}_copy9` for the first untaken slot, copies the source's latest `RootElement` into a fresh `v1 Draft`, and returns `201 Created` with the new `DesignerResponse`. `DuplicateConflict` surfaces as `409` with `DUPLICATE_CONFLICT` / `designers.duplicateConflict`. Candidate-length guard skips candidates > 63 chars (the column cap) so very long source IDs fail cleanly as `DuplicateConflict` rather than as a DB truncation error. Race-window duplicate catch on `PK_component_schemas` mirrors the `CreateAsync` pattern.
 - **AC-2 New Version flow** — Frontend `RowMenu` adds a "New Version" menu item that opens a confirmation Dialog ("Create v{N+1}"). Save fires a chained mutation: `getSchema(id)` → `createVersion(id, schema.rootElement)`. Success invalidates `['designer', 'list']`, toasts the new version number, closes the dialog, and navigates to the canvas. Errors funnel through the shared `errorMessage()` helper so `ApiError.messageKey` (e.g., `designers.fieldKeyInvalid`) wins over the route fallback.
 - **AC-2 Duplicate wiring** — `duplicateMutation.onError` now uses the same `errorMessage()` helper. The frontend `duplicateSchema` stub already hit the correct URL, so no `designerApi.ts` change was needed.
@@ -488,10 +488,10 @@ claude-opus-4-7
 ### File List
 
 **Backend**
-- `src/FormForge.Api/Features/Designer/Dtos/DesignerListItem.cs` (modified)
-- `src/FormForge.Api/Features/Designer/DesignerService.cs` (modified)
-- `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs` (modified)
-- `src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` (modified)
+- `src/AppForge.Api/Features/Designer/Dtos/DesignerListItem.cs` (modified)
+- `src/AppForge.Api/Features/Designer/DesignerService.cs` (modified)
+- `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs` (modified)
+- `src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs` (modified)
 
 **Frontend**
 - `web/src/types/designer.ts` (modified)
@@ -503,10 +503,10 @@ claude-opus-4-7
 
 - [x] [Review][Patch] VersionFlyout cache not invalidated after New Version success — flyout shows stale `versions[]` for up to 30s [`web/src/routes/_app/designer.library.tsx:228`] — fixed: `newVersionMutation.onSuccess` also invalidates `['designer','schema', row.designerId]`
 - [x] [Review][Patch] VersionFlyout has no error branch — network failure falls through to empty-state and hides the failure [`web/src/routes/_app/designer.library.tsx:148-169`] — fixed: added `isError` branch + `versionHistoryError` i18n key + Vitest coverage
-- [x] [Review][Patch] DuplicateAsync's 23505 catch returns conflict instead of advancing to the next free slot; backend comment claims SPA will retry but it doesn't [`src/FormForge.Api/Features/Designer/DesignerService.cs:472-486`] — fixed: candidate loop now wraps the SaveChanges and walks to the next slot on PK conflict; only returns `DuplicateConflict` after exhausting all candidates
-- [x] [Review][Patch] Misleading "too many copies" error when source designerId ≥58 chars makes all candidates `>63` chars and silently get skipped [`src/FormForge.Api/Features/Designer/DesignerService.cs:432`] — fixed: filter candidates by length up front; new `DuplicateOutcome.SourceIdTooLong` → 422 with `DUPLICATE_ID_TOO_LONG` / `designers.duplicateIdTooLong`; integration test added
+- [x] [Review][Patch] DuplicateAsync's 23505 catch returns conflict instead of advancing to the next free slot; backend comment claims SPA will retry but it doesn't [`src/AppForge.Api/Features/Designer/DesignerService.cs:472-486`] — fixed: candidate loop now wraps the SaveChanges and walks to the next slot on PK conflict; only returns `DuplicateConflict` after exhausting all candidates
+- [x] [Review][Patch] Misleading "too many copies" error when source designerId ≥58 chars makes all candidates `>63` chars and silently get skipped [`src/AppForge.Api/Features/Designer/DesignerService.cs:432`] — fixed: filter candidates by length up front; new `DuplicateOutcome.SourceIdTooLong` → 422 with `DUPLICATE_ID_TOO_LONG` / `designers.duplicateIdTooLong`; integration test added
 - [x] [Review][Patch] Two separate `QueryClient` instances per render in tests — `client={makeQC()}` and `qc={makeQC()}` are different clients [`web/src/routes/_app/-designer.library.test.tsx:213-215, 237-239, 255-257`] — fixed: hoisted a single `const qc = makeQC()` per test and threaded it to both
-- [x] [Review][Defer] DuplicateAsync produces stuttering `_copy_copy` chains when source already ends in `_copy[N]?` [`src/FormForge.Api/Features/Designer/DesignerService.cs:427`] — deferred, pre-existing
+- [x] [Review][Defer] DuplicateAsync produces stuttering `_copy_copy` chains when source already ends in `_copy[N]?` [`src/AppForge.Api/Features/Designer/DesignerService.cs:427`] — deferred, pre-existing
 - [x] [Review][Defer] VersionFlyout listbox semantics broken — `role="listbox"`/`role="option"` without keyboard handling, tabIndex, or Escape close [`web/src/routes/_app/designer.library.tsx:144-169`] — deferred to Story 7.4 (Accessibility Compliance)
 - [x] [Review][Defer] Long `creatorDisplayName` (up to 200 chars) breaks table layout — no truncate/`max-w` styling [`web/src/routes/_app/designer.library.tsx:638`] — deferred to Story 7.4
 - [x] [Review][Defer] `fixed inset-0 z-40` click-outside backdrop traps other rows' triggers — first click on row B closes row A without opening B [`web/src/routes/_app/designer.library.tsx:139-143, 290-297`] — deferred, UX papercut
@@ -514,11 +514,11 @@ claude-opus-4-7
 - [x] [Review][Defer] `getSchema` → `createVersion` two-step is non-atomic — network drop between awaits leaves user without a recovery path [`web/src/routes/_app/designer.library.tsx:222-226`] — deferred, inherent
 - [x] [Review][Defer] `getSchema` with null `rootElement` posts an empty Draft and shows the wrong error toast on validation failure [`web/src/routes/_app/designer.library.tsx:222-226`] — deferred, depends on post-3.2 invariant break
 - [x] [Review][Defer] Newly duplicated copy's id (`_copy` vs `_copy2`…) is not surfaced in the success toast — user has no way to find the new copy except by scanning the list [`web/src/routes/_app/designer.library.tsx:209`] — deferred, UX polish
-- [x] [Review][Defer] Stale/corrupt source `RootElement` is copied verbatim — propagates broken-state pattern to new rows [`src/FormForge.Api/Features/Designer/DesignerService.cs:417, 461`] — deferred, pre-existing data-integrity issue
+- [x] [Review][Defer] Stale/corrupt source `RootElement` is copied verbatim — propagates broken-state pattern to new rows [`src/AppForge.Api/Features/Designer/DesignerService.cs:417, 461`] — deferred, pre-existing data-integrity issue
 - [x] [Review][Defer] Cross-tab duplicate creation invisible until 30s `staleTime` expires — no `refetchOnWindowFocus` opt-in [`web/src/routes/_app/designer.library.tsx:106-117, 537-540`] — deferred, design intent
-- [x] [Review][Defer] Backend authz ordering not tested (e.g., viewer hits unknown id — 403 vs 404 ordering) [`src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs`] — deferred, minor coverage gap
-- [x] [Review][Defer] `Guid.Empty` userId not rejected by the duplicate handler — depends on JWT issuer to never emit `00000000-…` [`src/FormForge.Api/Features/Designer/DesignerEndpoints.cs:187`] — deferred, defensive
-- [x] [Review][Defer] `rootElementJson` size not bounded before copy — a 100 MB source throws unmapped `DbUpdateException` → 500 [`src/FormForge.Api/Features/Designer/DesignerService.cs:461`] — deferred, defensive (covered by 3.6's request-size-limit deferral)
+- [x] [Review][Defer] Backend authz ordering not tested (e.g., viewer hits unknown id — 403 vs 404 ordering) [`src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs`] — deferred, minor coverage gap
+- [x] [Review][Defer] `Guid.Empty` userId not rejected by the duplicate handler — depends on JWT issuer to never emit `00000000-…` [`src/AppForge.Api/Features/Designer/DesignerEndpoints.cs:187`] — deferred, defensive
+- [x] [Review][Defer] `rootElementJson` size not bounded before copy — a 100 MB source throws unmapped `DbUpdateException` → 500 [`src/AppForge.Api/Features/Designer/DesignerService.cs:461`] — deferred, defensive (covered by 3.6's request-size-limit deferral)
 
 ## Change Log
 

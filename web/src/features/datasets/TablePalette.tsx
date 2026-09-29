@@ -13,7 +13,7 @@ function PaletteEntry({ table }: { table: CatalogTable }) {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     // The list carries names + counts only; the canvas fetches this table's columns
     // on drop (lazy load). Serialize the lightweight descriptor for the drop handler.
-    e.dataTransfer.setData('application/formforge-table', JSON.stringify(table))
+    e.dataTransfer.setData('application/appforge-table', JSON.stringify(table))
     e.dataTransfer.effectAllowed = 'copy'
   }
 

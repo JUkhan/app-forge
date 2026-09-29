@@ -37,11 +37,11 @@ so that I have full traceability of DDL history.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Add `Notes` to `SchemaAuditLogEntry` + fix index direction + EF migration** (AC: 1, 3)
-  - [x] In `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`, add a new property after `ColumnsDiff`:
+  - [x] In `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`, add a new property after `ColumnsDiff`:
     ```csharp
     public string? Notes { get; set; }  // free-text annotation; always null for system-generated rows in v1
     ```
-  - [x] In `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs`, inside the `SchemaAuditLogEntry` config block:
+  - [x] In `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs`, inside the `SchemaAuditLogEntry` config block:
     - Add property mapping immediately after `ColumnsDiff`:
       ```csharp
       e.Property(a => a.Notes).HasColumnName("notes");
@@ -53,7 +53,7 @@ so that I have full traceability of DDL history.
        .IsDescending(false, true);
       ```
       This replaces the existing `.HasDatabaseName("idx_schema_audit_log_designer_id_created_at")` line (no `.IsDescending()` call). EF will detect the diff and drop the old ASC index, creating the new DESC one in the migration.
-  - [x] Run: `dotnet ef migrations add AddNotesAndDescIndexToSchemaAuditLog --project src/FormForge.Api --startup-project src/FormForge.Api --no-build`
+  - [x] Run: `dotnet ef migrations add AddNotesAndDescIndexToSchemaAuditLog --project src/AppForge.Api --startup-project src/AppForge.Api --no-build`
   - [x] Open the generated migration file and manually add to both `Up()` and `Down()`:
     ```csharp
     ArgumentNullException.ThrowIfNull(migrationBuilder);
@@ -63,9 +63,9 @@ so that I have full traceability of DDL history.
   - [x] Run `dotnet build` — must be clean (0 errors, 0 warnings)
 
 - [x] **Task 2 — DTO: `SchemaAuditEntryDto`** (AC: 1)
-  - [x] Create `src/FormForge.Api/Features/Audit/Dtos/SchemaAuditEntryDto.cs`:
+  - [x] Create `src/AppForge.Api/Features/Audit/Dtos/SchemaAuditEntryDto.cs`:
     ```csharp
-    namespace FormForge.Api.Features.Audit.Dtos;
+    namespace AppForge.Api.Features.Audit.Dtos;
 
     internal sealed record SchemaAuditEntryDto(
         Guid Id,
@@ -85,19 +85,19 @@ so that I have full traceability of DDL history.
   - This record is serialized by `System.Text.Json` with default Web camelCase options (same pipeline as all other endpoints). `ToVersion = 0` is serialized as-is; the display sentinel interpretation is the frontend's responsibility.
 
 - [x] **Task 3 — `AuditService.cs`** (AC: 1, 2)
-  - [x] Create `src/FormForge.Api/Features/Audit/AuditService.cs`:
+  - [x] Create `src/AppForge.Api/Features/Audit/AuditService.cs`:
     ```csharp
     using System.Diagnostics.CodeAnalysis;
-    using FormForge.Api.Common;
-    using FormForge.Api.Features.Audit.Dtos;
-    using FormForge.Api.Features.Provisioning;
-    using FormForge.Api.Infrastructure.Persistence;
+    using AppForge.Api.Common;
+    using AppForge.Api.Features.Audit.Dtos;
+    using AppForge.Api.Features.Provisioning;
+    using AppForge.Api.Infrastructure.Persistence;
     using Microsoft.EntityFrameworkCore;
 
-    namespace FormForge.Api.Features.Audit;
+    namespace AppForge.Api.Features.Audit;
 
     [SuppressMessage("Performance", "CA1812", Justification = "Registered via DI.")]
-    internal sealed class AuditService(FormForgeDbContext db)
+    internal sealed class AuditService(AppForgeDbContext db)
     {
         public async Task<PagedResult<SchemaAuditEntryDto>?> GetSchemaAuditLogAsync(
             string designerId,
@@ -167,12 +167,12 @@ so that I have full traceability of DDL history.
     - All `db.*` calls use `.ConfigureAwait(false)` per the codebase convention.
 
 - [x] **Task 4 — `AuditEndpoints.cs`** (AC: 1, 2)
-  - [x] Create `src/FormForge.Api/Features/Audit/AuditEndpoints.cs`:
+  - [x] Create `src/AppForge.Api/Features/Audit/AuditEndpoints.cs`:
     ```csharp
-    using FormForge.Api.Common;
-    using FormForge.Api.Features.Audit.Dtos;
+    using AppForge.Api.Common;
+    using AppForge.Api.Features.Audit.Dtos;
 
-    namespace FormForge.Api.Features.Audit;
+    namespace AppForge.Api.Features.Audit;
 
     internal static class AuditEndpoints
     {
@@ -208,7 +208,7 @@ so that I have full traceability of DDL history.
   - This mirrors the handler pattern in `DesignerAdminEndpoints.cs` (using the same `DESIGNER_NOT_FOUND` code and `admin.designers.notFound` message key already defined by Story 5.6).
 
 - [x] **Task 5 — Wire audit endpoint into `DesignerAdminEndpoints.cs`** (AC: 1, 2)
-  - [x] In `src/FormForge.Api/Features/Designer/DesignerAdminEndpoints.cs`, add `using FormForge.Api.Features.Audit;` at the top.
+  - [x] In `src/AppForge.Api/Features/Designer/DesignerAdminEndpoints.cs`, add `using AppForge.Api.Features.Audit;` at the top.
   - [x] In `MapDesignerAdminEndpoints()`, add after the existing `MapDelete` for columns:
     ```csharp
     group.MapGet("/{designerId}/audit", AuditEndpoints.GetSchemaAuditLogHandler)
@@ -219,12 +219,12 @@ so that I have full traceability of DDL history.
   - No other route methods (PUT, POST, DELETE) are added on `/{designerId}/audit` — this satisfies AC-2 (append-only: the absence of a DELETE mapping causes ASP.NET to return 405 Method Not Allowed automatically).
 
 - [x] **Task 6 — Register `AuditService` in `Program.cs`** (AC: 1)
-  - [x] In `src/FormForge.Api/Program.cs`, add after the `SchemaDriftService` registration (around line 174):
+  - [x] In `src/AppForge.Api/Program.cs`, add after the `SchemaDriftService` registration (around line 174):
     ```csharp
     // Story 5.7 — schema audit log view: paginated DDL history per designer
     builder.Services.AddScoped<AuditService>();
     ```
-  - [x] Add `using FormForge.Api.Features.Audit;` if not already present (check the existing using block in `Program.cs`).
+  - [x] Add `using AppForge.Api.Features.Audit;` if not already present (check the existing using block in `Program.cs`).
 
 - [x] **Task 7 — Frontend: API client** (AC: 1)
   - [x] Create `web/src/features/admin/designers/designerAuditApi.ts`:
@@ -356,7 +356,7 @@ so that I have full traceability of DDL history.
   - TanStack Router auto-discovers this file — no manual route registration needed. Route is secured by the `/_app` auth guard (same as all other `_app` routes).
 
 - [x] **Task 12 — Tests** (AC: 1–3)
-  - [x] Create `src/FormForge.Api.Tests/Features/Audit/SchemaAuditLogIntegrationTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/Audit/SchemaAuditLogIntegrationTests.cs`
   - Class fixture: `IClassFixture<PostgresFixture>, IAsyncLifetime` — same setup pattern as `ProvisioningIntegrationTests.cs` (copy `InitializeAsync` / `DisposeAsync`, seed users + roles, authenticate as admin)
   - The `InitializeAsync` TRUNCATE already covers `schema_audit_log` (verified in `ProvisioningIntegrationTests.cs` line 49)
 
@@ -378,8 +378,8 @@ so that I have full traceability of DDL history.
 ### Architecture compliance — critical constraints
 
 - **`SafeIdentifier.TryCreate` must be the guard** for `designerId` on the API boundary (NFR-6). `AuditService.GetSchemaAuditLogAsync` validates the identifier and returns null (→ 404). No SQL is executed against an invalid identifier.
-- **EF reads only — no DDL in this story.** `AuditService` uses `FormForgeDbContext` with `AsNoTracking()` for all queries. This is a pure read story; no new DDL is emitted, no audit rows are written. All actor-name resolution is done via a second EF `SELECT` against `users` (not a JOIN, to preserve audit rows for deleted actors).
-- **`AuditService` is Scoped** (injects `FormForgeDbContext` which is Scoped). Registered in `Program.cs` with `AddScoped<AuditService>()`.
+- **EF reads only — no DDL in this story.** `AuditService` uses `AppForgeDbContext` with `AsNoTracking()` for all queries. This is a pure read story; no new DDL is emitted, no audit rows are written. All actor-name resolution is done via a second EF `SELECT` against `users` (not a JOIN, to preserve audit rows for deleted actors).
+- **`AuditService` is Scoped** (injects `AppForgeDbContext` which is Scoped). Registered in `Program.cs` with `AddScoped<AuditService>()`.
 - **No deletion endpoint** — AC-2 is satisfied by construction: the router only maps `GET /{designerId}/audit`. ASP.NET Core's Minimal API returns HTTP 405 automatically for unmapped HTTP methods on a route that exists with other methods.
 - **`toVersion = 0` is a sentinel, not a real version** — see Story 5.6 Dev Notes. The API exposes it as-is (integer 0). The frontend view must NOT render it as "version 0" — use `t('admin.designers.audit.versionDropSentinel')` instead.
 - **No-op ALTER rows** (`columnsAdded = []`) — Story 5.3 deferred item. The view must display them faithfully; do NOT suppress or filter them. The admin may see "ALTER, Columns Added: —" which is correct — it records an idempotent re-bind.
@@ -388,23 +388,23 @@ so that I have full traceability of DDL history.
 
 | New file | Path |
 |---|---|
-| EF migration | `src/FormForge.Api/Infrastructure/Persistence/Migrations/{{timestamp}}_AddNotesAndDescIndexToSchemaAuditLog.cs` |
-| `AuditService.cs` | `src/FormForge.Api/Features/Audit/AuditService.cs` |
-| `SchemaAuditEntryDto.cs` | `src/FormForge.Api/Features/Audit/Dtos/SchemaAuditEntryDto.cs` |
-| `AuditEndpoints.cs` | `src/FormForge.Api/Features/Audit/AuditEndpoints.cs` |
+| EF migration | `src/AppForge.Api/Infrastructure/Persistence/Migrations/{{timestamp}}_AddNotesAndDescIndexToSchemaAuditLog.cs` |
+| `AuditService.cs` | `src/AppForge.Api/Features/Audit/AuditService.cs` |
+| `SchemaAuditEntryDto.cs` | `src/AppForge.Api/Features/Audit/Dtos/SchemaAuditEntryDto.cs` |
+| `AuditEndpoints.cs` | `src/AppForge.Api/Features/Audit/AuditEndpoints.cs` |
 | `designerAuditApi.ts` | `web/src/features/admin/designers/designerAuditApi.ts` |
 | `useSchemaAuditLogQuery.ts` | `web/src/features/admin/designers/useSchemaAuditLogQuery.ts` |
 | `SchemaAuditLogView.tsx` | `web/src/features/admin/designers/SchemaAuditLogView.tsx` |
 | `designers.$designerId.audit.tsx` | `web/src/routes/_app/admin/designers.$designerId.audit.tsx` |
-| `SchemaAuditLogIntegrationTests.cs` | `src/FormForge.Api.Tests/Features/Audit/SchemaAuditLogIntegrationTests.cs` |
+| `SchemaAuditLogIntegrationTests.cs` | `src/AppForge.Api.Tests/Features/Audit/SchemaAuditLogIntegrationTests.cs` |
 
 ### File locations — modified files
 
 | Modified file | Change |
 |---|---|
 | `SchemaAuditLogEntry.cs` | Add `string? Notes` property |
-| `FormForgeDbContext.cs` | Add `Notes` property mapping; update composite index to `IsDescending(false, true)` + rename |
-| `FormForgeDbContextModelSnapshot.cs` | Regenerated by `dotnet ef` |
+| `AppForgeDbContext.cs` | Add `Notes` property mapping; update composite index to `IsDescending(false, true)` + rename |
+| `AppForgeDbContextModelSnapshot.cs` | Regenerated by `dotnet ef` |
 | `DesignerAdminEndpoints.cs` | Add `using` for `Audit` namespace; add `GET /{designerId}/audit` mapping |
 | `Program.cs` | Register `AuditService` scoped |
 | `en.json` | Add `admin.designers.audit.*` keys |
@@ -482,20 +482,20 @@ From `deferred-work.md`:
 
 ### Project Structure Notes
 
-- New `src/FormForge.Api/Features/Audit/` folder created — matches architecture spec `Features/{Provisioning,SchemaRegistry,Audit}/`
+- New `src/AppForge.Api/Features/Audit/` folder created — matches architecture spec `Features/{Provisioning,SchemaRegistry,Audit}/`
 - `AuditEndpoints.cs` exports a single static `GetSchemaAuditLogHandler` method called from `DesignerAdminEndpoints.MapDesignerAdminEndpoints()` — consistent with how `SchemaDriftService` is invoked via `DesignerAdminEndpoints.GetDriftHandler`
 - Frontend file `designerAuditApi.ts` lives alongside `designerAdminApi.ts` (drift) in `web/src/features/admin/designers/` — same feature-folder pattern established by Story 5.6
 - `SchemaAuditLogView.tsx` parallels `SchemaDriftView.tsx` in the same folder — same naming convention
 
 ### References
 
-- [Source: `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`] — entity shape; all columns mapped; `toVersion = 0` sentinel for DROP; `Notes` is new (Task 1)
-- [Source: `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs:230-260`] — `SchemaAuditLogEntry` EF config block; `HasColumnType("text[]")` pattern for `ColumnsAdded`/`ColumnsDropped`; index configuration to update
-- [Source: `src/FormForge.Api/Common/PagedResult.cs`] — `PagedResult<T>(Data, Total, Page, PageSize)` record with computed `TotalPages`
-- [Source: `src/FormForge.Api/Features/Designer/DesignerAdminEndpoints.cs`] — handler pattern to replicate; `DesignerNotFoundProblem()` helper (already uses `"DESIGNER_NOT_FOUND"` code and `"admin.designers.notFound"` messageKey — reuse, do NOT re-define)
-- [Source: `src/FormForge.Api/Features/Designer/SchemaDriftService.cs`] — `[SuppressMessage("Performance", "CA1812")]`, `SafeIdentifier.TryCreate` pattern, `ConfigureAwait(false)` convention
-- [Source: `src/FormForge.Api/Features/Roles/AdminEndpoints.cs`] — `MapAdminEndpoints()` shows the `/designers` sub-group is already wired to `MapDesignerAdminEndpoints()` — no change to `AdminEndpoints.cs` needed
-- [Source: `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs:1-80`] — test infrastructure template: fixture setup, TRUNCATE, role seeding, client auth
+- [Source: `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`] — entity shape; all columns mapped; `toVersion = 0` sentinel for DROP; `Notes` is new (Task 1)
+- [Source: `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs:230-260`] — `SchemaAuditLogEntry` EF config block; `HasColumnType("text[]")` pattern for `ColumnsAdded`/`ColumnsDropped`; index configuration to update
+- [Source: `src/AppForge.Api/Common/PagedResult.cs`] — `PagedResult<T>(Data, Total, Page, PageSize)` record with computed `TotalPages`
+- [Source: `src/AppForge.Api/Features/Designer/DesignerAdminEndpoints.cs`] — handler pattern to replicate; `DesignerNotFoundProblem()` helper (already uses `"DESIGNER_NOT_FOUND"` code and `"admin.designers.notFound"` messageKey — reuse, do NOT re-define)
+- [Source: `src/AppForge.Api/Features/Designer/SchemaDriftService.cs`] — `[SuppressMessage("Performance", "CA1812")]`, `SafeIdentifier.TryCreate` pattern, `ConfigureAwait(false)` convention
+- [Source: `src/AppForge.Api/Features/Roles/AdminEndpoints.cs`] — `MapAdminEndpoints()` shows the `/designers` sub-group is already wired to `MapDesignerAdminEndpoints()` — no change to `AdminEndpoints.cs` needed
+- [Source: `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs:1-80`] — test infrastructure template: fixture setup, TRUNCATE, role seeding, client auth
 - [Source: `web/src/routes/_app/admin/designers.$designerId.drift.tsx`] — route file template to copy for audit route
 - [Source: `web/src/features/admin/designers/SchemaDriftView.tsx`] — component pattern for styling, i18n hooks, TanStack Query integration, loading/error/empty states
 - [Source: `web/src/features/admin/designers/designerAdminApi.ts`] — `httpClient.get<T>` usage pattern
@@ -513,10 +513,10 @@ Opus 4.7 (1M context)
 
 ### Debug Log References
 
-- `dotnet build src/FormForge.Api/FormForge.Api.csproj -warnaserror` → 0 warnings, 0 errors (twice — once after entity/DbContext edits, once after migration generation).
-- `dotnet ef migrations add AddNotesAndDescIndexToSchemaAuditLog --project src/FormForge.Api --startup-project src/FormForge.Api --no-build` → migration `20260525213857_AddNotesAndDescIndexToSchemaAuditLog` emitted with `DropIndex` + `AddColumn` + `CreateIndex(descending: [false, true])` exactly as Dev Notes required.
-- `dotnet build src/FormForge.Api.Tests/FormForge.Api.Tests.csproj -warnaserror` → 0 warnings, 0 errors after adding `SchemaAuditLogIntegrationTests.cs`.
-- `dotnet test src/FormForge.Api.Tests/FormForge.Api.Tests.csproj --no-build --nologo` → 404 passed / 0 failed (~+8 new audit integration tests).
+- `dotnet build src/AppForge.Api/AppForge.Api.csproj -warnaserror` → 0 warnings, 0 errors (twice — once after entity/DbContext edits, once after migration generation).
+- `dotnet ef migrations add AddNotesAndDescIndexToSchemaAuditLog --project src/AppForge.Api --startup-project src/AppForge.Api --no-build` → migration `20260525213857_AddNotesAndDescIndexToSchemaAuditLog` emitted with `DropIndex` + `AddColumn` + `CreateIndex(descending: [false, true])` exactly as Dev Notes required.
+- `dotnet build src/AppForge.Api.Tests/AppForge.Api.Tests.csproj -warnaserror` → 0 warnings, 0 errors after adding `SchemaAuditLogIntegrationTests.cs`.
+- `dotnet test src/AppForge.Api.Tests/AppForge.Api.Tests.csproj --no-build --nologo` → 404 passed / 0 failed (~+8 new audit integration tests).
 - `npm run build` (in `web/`) → production bundle built; new chunk `designers._designerId.audit-U5wuAzbn.js` (3.85 kB) emitted. Pre-existing TS errors in `Navbar.test.tsx` and `usePollProvisioning.test.tsx` are baseline and unrelated to this story.
 
 ### Completion Notes List
@@ -528,7 +528,7 @@ Opus 4.7 (1M context)
 - **Service shape — `AuditService` returns `null` for invalid `designerId`** instead of throwing; the handler maps null → 404 with the standardized `DESIGNER_NOT_FOUND` problem envelope. Empty pages return a real `PagedResult` so the SPA's table renders the empty-state copy instead of an error state.
 - **Actor-name resolution is a second SELECT, not a JOIN**, so audit rows belonging to deleted users still appear (with `actorName: null`). Per page that's 2 DB round-trips, not N+1.
 - **Notes column is reserved for future manual annotations.** v1 always writes `null`; no codepath currently sets it. Adding it now lets Story 6.x admin tooling annotate rows without another migration.
-- **`Program.cs` registration order** kept consistent with sibling services: `SchemaDriftService` then `AuditService`, both `AddScoped` since both inject the scoped `FormForgeDbContext`.
+- **`Program.cs` registration order** kept consistent with sibling services: `SchemaDriftService` then `AuditService`, both `AddScoped` since both inject the scoped `AppForgeDbContext`.
 - **EF migration generation was clean** — EF detected the index-direction change and emitted the `DropIndex` + new `CreateIndex` automatically, so the manual `DropIndex` fallback path noted in the story Dev Notes was unnecessary.
 - **Frontend build**: pre-existing TypeScript errors in `Navbar.test.tsx` (missing `@testing-library/jest-dom` type) and `usePollProvisioning.test.tsx` (literal type narrowing) are unrelated to Story 5.7 and were present at HEAD before this story. The production bundle (`vite build`) succeeds and emits the new audit route chunk.
 - **`SchemaAuditLogView` styling** matches `SchemaDriftView` — inline flex, monospace for identifiers/correlation IDs, no new CSS files or dependencies. The sentinel handling (`toVersion === 0`, `fromVersion === null`, null actor, empty columns array) is done in the row renderer; the JSON payload is exposed in the DTO but intentionally not surfaced in the table view (too verbose).
@@ -537,19 +537,19 @@ Opus 4.7 (1M context)
 ### File List
 
 **New (backend):**
-- `src/FormForge.Api/Features/Audit/AuditService.cs`
-- `src/FormForge.Api/Features/Audit/AuditEndpoints.cs`
-- `src/FormForge.Api/Features/Audit/Dtos/SchemaAuditEntryDto.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260525213857_AddNotesAndDescIndexToSchemaAuditLog.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260525213857_AddNotesAndDescIndexToSchemaAuditLog.Designer.cs`
-- `src/FormForge.Api.Tests/Features/Audit/SchemaAuditLogIntegrationTests.cs`
+- `src/AppForge.Api/Features/Audit/AuditService.cs`
+- `src/AppForge.Api/Features/Audit/AuditEndpoints.cs`
+- `src/AppForge.Api/Features/Audit/Dtos/SchemaAuditEntryDto.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260525213857_AddNotesAndDescIndexToSchemaAuditLog.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260525213857_AddNotesAndDescIndexToSchemaAuditLog.Designer.cs`
+- `src/AppForge.Api.Tests/Features/Audit/SchemaAuditLogIntegrationTests.cs`
 
 **Modified (backend):**
-- `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs` — added `Notes` property.
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — added `Notes` mapping; changed composite index to `IsDescending(false, true)` and renamed to `idx_schema_audit_log_designer_id_created_at_desc`.
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` — regenerated by `dotnet ef`.
-- `src/FormForge.Api/Features/Designer/DesignerAdminEndpoints.cs` — added `using` for `Common` / `Audit` / `Audit.Dtos`; wired `MapGet("/{designerId}/audit", AuditEndpoints.GetSchemaAuditLogHandler)`.
-- `src/FormForge.Api/Program.cs` — added `using FormForge.Api.Features.Audit;` and `AddScoped<AuditService>()`.
+- `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs` — added `Notes` property.
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — added `Notes` mapping; changed composite index to `IsDescending(false, true)` and renamed to `idx_schema_audit_log_designer_id_created_at_desc`.
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` — regenerated by `dotnet ef`.
+- `src/AppForge.Api/Features/Designer/DesignerAdminEndpoints.cs` — added `using` for `Common` / `Audit` / `Audit.Dtos`; wired `MapGet("/{designerId}/audit", AuditEndpoints.GetSchemaAuditLogHandler)`.
+- `src/AppForge.Api/Program.cs` — added `using AppForge.Api.Features.Audit;` and `AddScoped<AuditService>()`.
 
 **New (frontend):**
 - `web/src/features/admin/designers/designerAuditApi.ts`
@@ -566,7 +566,7 @@ Opus 4.7 (1M context)
 ### Review Findings
 
 - [x] [Review][Patch] `keepPreviousData` — no loading indicator during page transitions [web/src/features/admin/designers/SchemaAuditLogView.tsx:19]
-- [x] [Review][Patch] Test: `ColumnsDropped` null-forgive causes `NullReferenceException` instead of clean assertion failure [src/FormForge.Api.Tests/Features/Audit/SchemaAuditLogIntegrationTests.cs:321]
+- [x] [Review][Patch] Test: `ColumnsDropped` null-forgive causes `NullReferenceException` instead of clean assertion failure [src/AppForge.Api.Tests/Features/Audit/SchemaAuditLogIntegrationTests.cs:321]
 - [x] [Review][Defer] Double `page`/`pageSize` clamping in handler AND service — redundant dead-code; divergence risk if one side changes [AuditEndpoints.cs:22-23 / AuditService.cs:27-28] — deferred, pre-existing
 - [x] [Review][Defer] `fromVersion = null` renders bare `'—'` literal instead of a `t()` i18n key — inconsistent with all other sentinel renders [SchemaAuditLogView.tsx:128] — deferred, pre-existing
 - [x] [Review][Defer] Missing test: no-op ALTER row (`columnsAdded = []`) appears in audit response unfilitered — Story 5.3 deferred item not covered by any of the 8 integration tests — deferred, pre-existing

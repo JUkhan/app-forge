@@ -93,7 +93,7 @@ const baseHref = pathToFileURL(repoRoot + '/').href;
 const doc = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <base href="${baseHref}">
-<title>FormForge User Guide</title>
+<title>AppForge User Guide</title>
 <style>${css}</style>
 </head><body>${html}</body></html>`;
 

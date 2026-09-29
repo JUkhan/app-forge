@@ -1,4 +1,4 @@
-// Mirrors the backend DTOs at src/FormForge.Api/Features/Tenancy/Dtos/.
+// Mirrors the backend DTOs at src/AppForge.Api/Features/Tenancy/Dtos/.
 // Keep in sync when the wire shape changes.
 
 export type TenantStatus = 'Provisioning' | 'Active' | 'Suspended' | 'Error'

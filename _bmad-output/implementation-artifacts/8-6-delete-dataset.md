@@ -40,7 +40,7 @@ so that its row and backing PostgreSQL VIEW are removed atomically.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Add `DeleteDatasetOutcome` enum and result type to `DatasetService.cs`**
-  - [x] At the top of `src/FormForge.Api/Features/Datasets/DatasetService.cs`, add alongside `CreateDatasetOutcome` and `UpdateDatasetOutcome`:
+  - [x] At the top of `src/AppForge.Api/Features/Datasets/DatasetService.cs`, add alongside `CreateDatasetOutcome` and `UpdateDatasetOutcome`:
     ```csharp
     internal enum DeleteDatasetOutcome { Success, NotFound }
 
@@ -224,7 +224,7 @@ so that its row and backing PostgreSQL VIEW are removed atomically.
     `LogNameConflict`, `LogAuditWriteFailed`, `LogViewCreateFailed` are **already on the class** — do NOT duplicate them.
 
 - [x] **Task 4 — Add `BuildDropViewDdl` static helper and `DropAsync` to `DatasetViewManager`**
-  - [x] In `src/FormForge.Api/Features/Datasets/DatasetViewManager.cs`, add:
+  - [x] In `src/AppForge.Api/Features/Datasets/DatasetViewManager.cs`, add:
 
     ```csharp
     // Story 8.6 — DROP VIEW IF EXISTS DDL. Uses IF EXISTS for safety (idempotent).
@@ -259,7 +259,7 @@ so that its row and backing PostgreSQL VIEW are removed atomically.
     Note: `BuildDropViewDdl` takes a plain `string` (not `DatasetName`) because it is called with `current.DatasetName`, which came from the DB and is already a validated identifier. This mirrors `BuildRenameViewDdl`'s `oldName` parameter pattern.
 
 - [x] **Task 5 — Replace the DELETE stub in `DatasetEndpoints.cs`**
-  - [x] In `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs`, replace:
+  - [x] In `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs`, replace:
     ```csharp
     group.MapDelete("/{id:guid}", (Guid id) => Results.StatusCode(StatusCodes.Status501NotImplemented))
          .WithSummary("Delete dataset (stub — Story 8.6)")
@@ -300,7 +300,7 @@ so that its row and backing PostgreSQL VIEW are removed atomically.
     And update the opening comment line to add `Story 8.6 (FR-58) — DELETE /{id} removes the row + backing VIEW atomically.`
 
 - [x] **Task 6 — Integration tests: `DatasetDeleteTests.cs`**
-  - [x] Create `src/FormForge.Api.Tests/Features/Datasets/DatasetDeleteTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/Datasets/DatasetDeleteTests.cs`
   - [x] Use the **identical** `PostgresFixture` + `WebApplicationFactory<Program>` pattern as `DatasetUpdateTests.cs` (same `[Collection("DatasetIntegrationTests")]`, same `InitializeAsync` body including TRUNCATE + VIEW cleanup + ReseedAdminRoleAsync + SeedAdminUserAsync)
   - [x] **Test 1 — AC-1: Delete existing dataset → 204, row gone, VIEW gone**
     - Create a dataset via POST (assert 201, parse id and `datasetName`)
@@ -448,22 +448,22 @@ Same rule as Stories 8.4 and 8.5: do **not** add the FluentValidation endpoint f
 ### Project Structure — Modified Files
 
 ```
-src/FormForge.Api/Features/Datasets/DatasetService.cs
+src/AppForge.Api/Features/Datasets/DatasetService.cs
   — add DeleteDatasetOutcome enum, DeleteDatasetResult record, extend IDatasetService
     with DeleteAsync, implement DeleteAsync, add LogViewDropped + LogViewDropFailed
     [LoggerMessage] methods
 
-src/FormForge.Api/Features/Datasets/DatasetViewManager.cs
+src/AppForge.Api/Features/Datasets/DatasetViewManager.cs
   — add BuildDropViewDdl static helper, DropAsync async method,
     LogViewDropped [LoggerMessage] method
 
-src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs
+src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs
   — replace the DELETE /{id:guid} stub with the real handler; update file-header comment
 ```
 
 **New files:**
 ```
-src/FormForge.Api.Tests/Features/Datasets/DatasetDeleteTests.cs   ← NEW (3 tests)
+src/AppForge.Api.Tests/Features/Datasets/DatasetDeleteTests.cs   ← NEW (3 tests)
 ```
 
 **No new EF Core migrations.**
@@ -475,10 +475,10 @@ src/FormForge.Api.Tests/Features/Datasets/DatasetDeleteTests.cs   ← NEW (3 tes
 - [Source: `_bmad-output/planning-artifacts/epics.md` — Epic 8, Story 8.6 ACs (FR-58, AR-59)]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.3 — AR-59: Transactional View Lifecycle (Delete: DELETE row + DROP VIEW IF EXISTS in one NpgsqlTransaction)]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.9 — Dataset API contract: DELETE /api/datasets/{id} → 204]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetService.cs` — CreateAsync / UpdateAsync pattern: connection lifecycle, OperationCanceledException guard, audit try/catch, #pragma CA1031]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetViewManager.cs` — CreateAsync / RenameAsync / ReplaceAsync as models for DropAsync; BuildRenameViewDdl(string, string) as model for BuildDropViewDdl(string)]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — PUT handler as model for DELETE handler; actor extraction + Results.NoContent()]
-- [Source: `src/FormForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs` — InitializeAsync TRUNCATE+VIEW cleanup, ReseedAdminRoleAsync, SeedAdminUserAsync, LoginAsync, CreateAsync, ViewExistsAsync, GetAuditEntriesAsync helper patterns]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetService.cs` — CreateAsync / UpdateAsync pattern: connection lifecycle, OperationCanceledException guard, audit try/catch, #pragma CA1031]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetViewManager.cs` — CreateAsync / RenameAsync / ReplaceAsync as models for DropAsync; BuildRenameViewDdl(string, string) as model for BuildDropViewDdl(string)]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — PUT handler as model for DELETE handler; actor extraction + Results.NoContent()]
+- [Source: `src/AppForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs` — InitializeAsync TRUNCATE+VIEW cleanup, ReseedAdminRoleAsync, SeedAdminUserAsync, LoginAsync, CreateAsync, ViewExistsAsync, GetAuditEntriesAsync helper patterns]
 - [Source: Story 8.5 §7 — pre-existing test failures to ignore (audit DELETE→405, i18n-lint)]
 
 ---
@@ -518,16 +518,16 @@ unrelated audit-DELETE→405 tests (`SchemaAuditLogIntegrationTests`,
 ### File List
 
 **Modified:**
-- `src/FormForge.Api/Features/Datasets/DatasetService.cs` — added `DeleteDatasetOutcome` enum,
+- `src/AppForge.Api/Features/Datasets/DatasetService.cs` — added `DeleteDatasetOutcome` enum,
   `DeleteDatasetResult` record, extended `IDatasetService` with `DeleteAsync`, implemented
   `DeleteAsync`, added `LogViewDropped` + `LogViewDropFailed` `[LoggerMessage]` methods.
-- `src/FormForge.Api/Features/Datasets/DatasetViewManager.cs` — added `BuildDropViewDdl` static
+- `src/AppForge.Api/Features/Datasets/DatasetViewManager.cs` — added `BuildDropViewDdl` static
   helper, `DropAsync` method, `LogViewDropped` `[LoggerMessage]` method; updated header comment.
-- `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — replaced the DELETE `/{id:guid}`
+- `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — replaced the DELETE `/{id:guid}`
   stub with the real handler; updated the file-header comment.
 
 **New:**
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetDeleteTests.cs` — 3 integration tests
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetDeleteTests.cs` — 3 integration tests
   (AC-1 204 + row/VIEW removed, AC-2 404, AC-3 success audit row).
 
 ### Review Findings

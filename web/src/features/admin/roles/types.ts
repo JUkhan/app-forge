@@ -1,4 +1,4 @@
-// Mirrors the backend DTOs at src/FormForge.Api/Features/Roles/Dtos/.
+// Mirrors the backend DTOs at src/AppForge.Api/Features/Roles/Dtos/.
 // Keep in sync when the wire shape changes.
 
 export interface PermissionRecord {

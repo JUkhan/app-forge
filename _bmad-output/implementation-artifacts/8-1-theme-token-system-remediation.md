@@ -6,13 +6,13 @@ Status: done
 
 ## Story
 
-As a **FormForge user (any role) and the platform's design-system maintainer**,
+As a **AppForge user (any role) and the platform's design-system maintainer**,
 I want **every component and region to render through semantic CSS-variable tokens so all three themes look correct and meet WCAG AA**,
 so that **switching to Slate Dark or Solarized produces a fully themed, accessible UI instead of light-theme colors bleeding through, and adding a future theme requires only one new `[data-theme]` block — zero component edits**.
 
 ## Context & Why This Story Exists
 
-Epic 7 shipped the theme *infrastructure* (3 themes, no-flash hydration, server persistence, theme selector) and an accessibility pass (Story 7.4). But a focused brownfield UX audit (`_bmad-output/planning-artifacts/ux-design-specification.md`, the **FormForge Theme Token System** spec) found the infrastructure is sound while **component consumption is broken**:
+Epic 7 shipped the theme *infrastructure* (3 themes, no-flash hydration, server persistence, theme selector) and an accessibility pass (Story 7.4). But a focused brownfield UX audit (`_bmad-output/planning-artifacts/ux-design-specification.md`, the **AppForge Theme Token System** spec) found the infrastructure is sound while **component consumption is broken**:
 
 1. `web/src/index.css:7` redefines Tailwind's `dark:` variant to fire *only* for `slate-dark`. Every `dark:` class is therefore invisible to Solarized and silently irrelevant to Default Light — a 3-theme system fundamentally cannot be expressed with a binary `dark:` axis.
 2. Dozens of files bypass tokens with hardcoded `bg-white` / `bg-slate-*` / `text-slate-*` / `text-white` / `bg-red-*`, which render correctly *only* under Default Light and visibly wrong under both other themes.
@@ -211,7 +211,7 @@ The spec says "~19 files." Actual repo-wide count: **~43 files**. Spec §5–6 t
 Solarized accent was darkened (`0.61`→`0.52`) so white text passes AA. Alternative (if brand-exact cyan is mandatory): keep `0.61` and set `--accent-foreground: oklch(0.25 0.058 232)` (dark text). **Default: take the darkened value already in AC3.** Note which path you took in completion notes.
 
 ### Project Structure Notes
-- All edits are under `web/src/**` plus the two style files (`web/src/index.css`, `web/src/styles/themes.css`). No backend (`src/FormForge.Api/**`) changes — server-side theme persistence is already done (Story 7.3).
+- All edits are under `web/src/**` plus the two style files (`web/src/index.css`, `web/src/styles/themes.css`). No backend (`src/AppForge.Api/**`) changes — server-side theme persistence is already done (Story 7.3).
 - Naming convention for new tokens follows the existing shadcn pattern: `--<role>` / `--<role>-foreground` / `--<role>-hover` / `--<role>-active`, with Tailwind utility = `--color-<role>` (spec §2.2). Stay consistent with the existing flat OKLCh list in `themes.css`.
 - Watch for variance: the spec's region table for the header references `routes/_app.tsx` — confirmed that is the correct flat TanStack Router file (not `_app/route.tsx`).
 

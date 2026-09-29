@@ -60,10 +60,10 @@ So that a new row is inserted into the provisioned table.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Create `MutationAuditLogEntry.cs` entity** (AC: 4)
-  - [x] Create `src/FormForge.Api/Domain/Entities/MutationAuditLogEntry.cs`
+  - [x] Create `src/AppForge.Api/Domain/Entities/MutationAuditLogEntry.cs`
   - Shape mirrors `SchemaAuditLogEntry.cs`:
     ```csharp
-    namespace FormForge.Api.Domain.Entities;
+    namespace AppForge.Api.Domain.Entities;
 
     internal sealed class MutationAuditLogEntry
     {
@@ -79,8 +79,8 @@ So that a new row is inserted into the provisioned table.
     }
     ```
 
-- [x] **Task 2 — Register `MutationAuditLogEntry` in `FormForgeDbContext.cs`** (AC: 4)
-  - [x] Modify `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs`
+- [x] **Task 2 — Register `MutationAuditLogEntry` in `AppForgeDbContext.cs`** (AC: 4)
+  - [x] Modify `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs`
   - Add `DbSet`:
     ```csharp
     public DbSet<MutationAuditLogEntry> MutationAuditLog => Set<MutationAuditLogEntry>();
@@ -113,20 +113,20 @@ So that a new row is inserted into the provisioned table.
     ```
 
 - [x] **Task 3 — EF Migration: `AddMutationAuditLog`** (AC: 4)
-  - [x] Run: `dotnet ef migrations add AddMutationAuditLog --project src/FormForge.Api --startup-project src/FormForge.Api`
+  - [x] Run: `dotnet ef migrations add AddMutationAuditLog --project src/AppForge.Api --startup-project src/AppForge.Api`
   - Verify the generated migration creates:
     - `mutation_audit_log` table with all columns (id UUID PK, designer_id varchar(63) NOT NULL, record_id UUID NOT NULL, operation varchar(20) NOT NULL, actor_id UUID NULL, timestamp TIMESTAMPTZ NOT NULL, new_values jsonb NULL, previous_values jsonb NULL, correlation_id varchar(26) NULL)
     - Three indexes as defined in Task 2
   - `Database.Migrate()` in `Program.cs` auto-runs migrations on startup — no other change needed
 
 - [x] **Task 4 — Create `IDynamicPayloadValidator` + `DynamicPayloadValidator`** (AC: 2, 3)
-  - [x] Create `src/FormForge.Api/Features/DynamicCrud/DynamicPayloadValidator.cs`
+  - [x] Create `src/AppForge.Api/Features/DynamicCrud/DynamicPayloadValidator.cs`
   - Interface + implementation in one file:
     ```csharp
     using System.Text.Json;
-    using FormForge.Api.Features.SchemaRegistry;
+    using AppForge.Api.Features.SchemaRegistry;
 
-    namespace FormForge.Api.Features.DynamicCrud;
+    namespace AppForge.Api.Features.DynamicCrud;
 
     internal interface IDynamicPayloadValidator
     {
@@ -210,7 +210,7 @@ So that a new row is inserted into the provisioned table.
   - `body.TryGetProperty(col.ColumnName, ...)` — uses the fieldKey (PG column name) verbatim, which is what the client sends.
 
 - [x] **Task 5 — Add `BuildInsertQuery` to `DynamicQueryBuilder.cs`** (AC: 1, 8)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
   - Add after `BuildGetChildrenQuery`:
     ```csharp
     // Story 6.3 — parameterized INSERT for POST /api/data/{designerId}.
@@ -273,7 +273,7 @@ So that a new row is inserted into the provisioned table.
   - No RETURNING clause: the response is built from the known-inserted values in the handler to avoid an extra SELECT round-trip.
 
 - [x] **Task 6 — Add `CreateRecordHandler` to `DynamicDataEndpoints.cs`** (AC: 1–8)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
   - Add using: `using System.Text.Json;`
   - Add after the `MapGet("/{id:guid}", GetRecordHandler)` registration (inside `MapDynamicDataEndpoints`):
     ```csharp
@@ -294,7 +294,7 @@ So that a new row is inserted into the provisioned table.
         string designerId,
         JsonElement body,
         HttpContext httpContext,
-        FormForgeDbContext db,
+        AppForgeDbContext db,
         ISchemaRegistry schemaRegistry,
         DbConnectionFactory connectionFactory,
         IDynamicPayloadValidator payloadValidator,
@@ -355,7 +355,7 @@ So that a new row is inserted into the provisioned table.
        ```csharp
        var correlationId = httpContext.GetCorrelationId();
        var newValuesJson = System.Text.Json.JsonSerializer.Serialize(validationResult.CoercedValues);
-       db.MutationAuditLog.Add(new FormForge.Api.Domain.Entities.MutationAuditLogEntry
+       db.MutationAuditLog.Add(new AppForge.Api.Domain.Entities.MutationAuditLogEntry
        {
            DesignerId    = safeId!.Value,
            RecordId      = newRecordId,
@@ -390,10 +390,10 @@ So that a new row is inserted into the provisioned table.
         ```
   - **Add `RecordDeleted` to the `Problems` inner class** (needed by Story 6.4 but add the stub now per the epics AC):
     - Defer — only add `RecordDeleted` when Story 6.4 is implemented. Do NOT add now.
-  - **Note:** `httpContext.GetCorrelationId()` requires `using FormForge.Api.Common.Logging;`. Verify the using directives include this namespace.
+  - **Note:** `httpContext.GetCorrelationId()` requires `using AppForge.Api.Common.Logging;`. Verify the using directives include this namespace.
 
 - [x] **Task 7 — Register `IDynamicPayloadValidator` in `Program.cs`** (AC: 3)
-  - [x] Modify `src/FormForge.Api/Program.cs`
+  - [x] Modify `src/AppForge.Api/Program.cs`
   - After the existing `builder.Services.AddScoped<DdlEmitter>();` line (near DynamicCrud registrations), add:
     ```csharp
     // Story 6.3 — Layer 2 dynamic payload validator (AR-20 / Decision 3.3).
@@ -401,7 +401,7 @@ So that a new row is inserted into the provisioned table.
     ```
 
 - [x] **Task 8 — Unit tests for `BuildInsertQuery`** (AC: 1, 8)
-  - [x] Modify `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
+  - [x] Modify `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
   - Add to the existing test class:
     - `BuildInsertQuery_NoPayload_GeneratesInsertWithSystemColumnsOnly` — empty `coercedPayload` → SQL has `id, created_at, created_by, updated_at, updated_by, is_deleted, cascade_event_id` columns and `false, NULL` literals for `is_deleted` / `cascade_event_id`
     - `BuildInsertQuery_WithOneUserColumn_IncludesColumnAndParameter` — `coercedPayload = { "title" → "hello" }` → SQL has `"title"` in columns; `parameters.Get<string>("f_title")` == `"hello"`
@@ -411,7 +411,7 @@ So that a new row is inserted into the provisioned table.
   - Estimated: +5 unit tests → running total ~451
 
 - [x] **Task 9 — Integration tests** (AC: 1–6)
-  - [x] Create `src/FormForge.Api.Tests/Features/DynamicCrud/CreateRecordIntegrationTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/DynamicCrud/CreateRecordIntegrationTests.cs`
   - Class signature: `[Collection("DynamicCrudTests")] public sealed class CreateRecordIntegrationTests : IClassFixture<PostgresFixture>, IAsyncLifetime`
   - `InitializeAsync` / `DisposeAsync` pattern identical to `GetRecordIntegrationTests` and `DynamicCrudIntegrationTests`
   - **TRUNCATE statement must include `mutation_audit_log`:**
@@ -432,9 +432,9 @@ So that a new row is inserted into the provisioned table.
   - Estimated: +7 integration tests → running total ~458
 
 - [x] **Task 10 — Update TRUNCATE in existing test classes** (AC: 4)
-  - [x] Modify `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs`
+  - [x] Modify `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs`
     - Add `mutation_audit_log` to the TRUNCATE statement in `InitializeAsync`
-  - [x] Modify `src/FormForge.Api.Tests/Features/DynamicCrud/GetRecordIntegrationTests.cs`
+  - [x] Modify `src/AppForge.Api.Tests/Features/DynamicCrud/GetRecordIntegrationTests.cs`
     - Add `mutation_audit_log` to the TRUNCATE statement in `InitializeAsync`
   - Required: `mutation_audit_log` is a static EF-managed table added by the migration in Task 3; after the migration runs, all test classes that TRUNCATE static tables must include it to avoid stale audit rows leaking between test classes in the `[Collection("DynamicCrudTests")]` group
 
@@ -497,12 +497,12 @@ The `/api/data/{designerId}` route group uses `RequireRateLimiting("data-read")`
 Decision 1.6 mandates separated EF + Dapper transactions. The Dapper INSERT runs first (closes the connection). Then `db.SaveChangesAsync()` commits the audit row. If the audit INSERT fails after a successful data INSERT, the record exists without an audit trail — acceptable for v1 (noted as deferred item). Do NOT attempt to share the NpgsqlConnection between EF and Dapper.
 
 **5. `IDynamicPayloadValidator` is `Scoped` (not Singleton)**
-It has no state, but is registered Scoped to remain consistent with other handler dependencies (`FormForgeDbContext` is Scoped). `AddScoped<IDynamicPayloadValidator, DynamicPayloadValidator>()` — correct.
+It has no state, but is registered Scoped to remain consistent with other handler dependencies (`AppForgeDbContext` is Scoped). `AddScoped<IDynamicPayloadValidator, DynamicPayloadValidator>()` — correct.
 
 **6. `Results.ValidationProblem(fieldErrors)` — uses the `IDictionary<string, string[]>` overload**
 `Results.ValidationProblem(validationResult.FieldErrors)` returns HTTP 422 with `ValidationProblemDetails` (errors dict). This is distinct from `Problems.ValidationFailed(string detail)` which returns a simple 422. Use `Results.ValidationProblem` for field-level errors (AC-3); use `Problems.ValidationFailed(string)` for non-field errors (invalid designerId, etc.).
 
-**7. `httpContext.GetCorrelationId()` requires `using FormForge.Api.Common.Logging;`**
+**7. `httpContext.GetCorrelationId()` requires `using AppForge.Api.Common.Logging;`**
 The extension method is defined in `LogContextExtensions.cs`. Add this using to `DynamicDataEndpoints.cs` if not already present.
 
 **8. `JsonElement body` parameter — ASP.NET Core auto-binding**
@@ -520,10 +520,10 @@ After the `AddMutationAuditLog` migration runs in `InitializeAsync`, the new `mu
 
 | New file | Path |
 |---|---|
-| `MutationAuditLogEntry.cs` | `src/FormForge.Api/Domain/Entities/MutationAuditLogEntry.cs` |
-| `DynamicPayloadValidator.cs` | `src/FormForge.Api/Features/DynamicCrud/DynamicPayloadValidator.cs` |
-| `AddMutationAuditLog.cs` (migration) | `src/FormForge.Api/Infrastructure/Persistence/Migrations/` (auto-generated) |
-| `CreateRecordIntegrationTests.cs` | `src/FormForge.Api.Tests/Features/DynamicCrud/CreateRecordIntegrationTests.cs` |
+| `MutationAuditLogEntry.cs` | `src/AppForge.Api/Domain/Entities/MutationAuditLogEntry.cs` |
+| `DynamicPayloadValidator.cs` | `src/AppForge.Api/Features/DynamicCrud/DynamicPayloadValidator.cs` |
+| `AddMutationAuditLog.cs` (migration) | `src/AppForge.Api/Infrastructure/Persistence/Migrations/` (auto-generated) |
+| `CreateRecordIntegrationTests.cs` | `src/AppForge.Api.Tests/Features/DynamicCrud/CreateRecordIntegrationTests.cs` |
 | `createRecordApi.ts` | `web/src/features/data-entry/createRecordApi.ts` |
 | `useCreateRecord.ts` | `web/src/features/data-entry/useCreateRecord.ts` |
 
@@ -531,7 +531,7 @@ After the `AddMutationAuditLog` migration runs in `InitializeAsync`, the new `mu
 
 | Modified file | Change |
 |---|---|
-| `FormForgeDbContext.cs` | Add `MutationAuditLog` DbSet + EF mapping block + indexes |
+| `AppForgeDbContext.cs` | Add `MutationAuditLog` DbSet + EF mapping block + indexes |
 | `DynamicQueryBuilder.cs` | Add `BuildInsertQuery` |
 | `DynamicDataEndpoints.cs` | Add `MapPost("/", CreateRecordHandler)` + handler + using |
 | `Program.cs` | Add `AddScoped<IDynamicPayloadValidator, DynamicPayloadValidator>()` |
@@ -601,13 +601,13 @@ finally { await conn.DisposeAsync(); }
 
 ### References
 
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`] — `ListRecordsHandler` / `GetRecordHandler` — mirror the SafeIdentifier → EF binding → schema registry pattern verbatim; add `CreateRecordHandler` after `GetRecordHandler`
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`] — `BuildGetByIdQuery` shows the column-assembly and parameter-binding pattern to reuse in `BuildInsertQuery`
-- [Source: `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`] — template for `MutationAuditLogEntry` entity shape
-- [Source: `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs`] — `SchemaAuditLogEntry` EF config block (lines 235–266) — mirror the pattern for `MutationAuditLogEntry`
-- [Source: `src/FormForge.Api/Program.cs`] — `"data-write"` policy (lines 294–307); `AddScoped<DdlEmitter>()` registration location (add `IDynamicPayloadValidator` after it); comment "Story 6.1 — register DynamicRecord JSON converter" explains the existing registration location
-- [Source: `src/FormForge.Api/Common/Logging/LogContextExtensions.cs`] — `GetCorrelationId(this HttpContext)` extension used in Step 9 of the handler
-- [Source: `src/FormForge.Api.Tests/Features/DynamicCrud/GetRecordIntegrationTests.cs`] — copy all helper methods; `[Collection("DynamicCrudTests")]` attribute
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`] — `ListRecordsHandler` / `GetRecordHandler` — mirror the SafeIdentifier → EF binding → schema registry pattern verbatim; add `CreateRecordHandler` after `GetRecordHandler`
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`] — `BuildGetByIdQuery` shows the column-assembly and parameter-binding pattern to reuse in `BuildInsertQuery`
+- [Source: `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`] — template for `MutationAuditLogEntry` entity shape
+- [Source: `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs`] — `SchemaAuditLogEntry` EF config block (lines 235–266) — mirror the pattern for `MutationAuditLogEntry`
+- [Source: `src/AppForge.Api/Program.cs`] — `"data-write"` policy (lines 294–307); `AddScoped<DdlEmitter>()` registration location (add `IDynamicPayloadValidator` after it); comment "Story 6.1 — register DynamicRecord JSON converter" explains the existing registration location
+- [Source: `src/AppForge.Api/Common/Logging/LogContextExtensions.cs`] — `GetCorrelationId(this HttpContext)` extension used in Step 9 of the handler
+- [Source: `src/AppForge.Api.Tests/Features/DynamicCrud/GetRecordIntegrationTests.cs`] — copy all helper methods; `[Collection("DynamicCrudTests")]` attribute
 - [Source: `web/src/features/data-entry/recordListApi.ts`] — import `DynamicRecord` type from here in `createRecordApi.ts`
 - [Source: `web/src/features/auth/httpClient.ts`] — `httpClient.post<T>(path, body?)` is available (line 136)
 - [Architecture: AR-20 + Decision 3.3] — Layer 2 dynamic payload validator: unknown fields ignored; known fieldKeys type-checked against PgType
@@ -652,24 +652,24 @@ Claude Opus 4.7 (claude-opus-4-7) — `bmad-dev-story` workflow.
 
 **Added**
 
-- `src/FormForge.Api/Domain/Entities/MutationAuditLogEntry.cs`
-- `src/FormForge.Api/Features/DynamicCrud/DynamicPayloadValidator.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260526054545_AddMutationAuditLog.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260526054545_AddMutationAuditLog.Designer.cs`
-- `src/FormForge.Api.Tests/Features/DynamicCrud/CreateRecordIntegrationTests.cs`
+- `src/AppForge.Api/Domain/Entities/MutationAuditLogEntry.cs`
+- `src/AppForge.Api/Features/DynamicCrud/DynamicPayloadValidator.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260526054545_AddMutationAuditLog.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260526054545_AddMutationAuditLog.Designer.cs`
+- `src/AppForge.Api.Tests/Features/DynamicCrud/CreateRecordIntegrationTests.cs`
 - `web/src/features/data-entry/createRecordApi.ts`
 - `web/src/features/data-entry/useCreateRecord.ts`
 
 **Modified**
 
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` (added `MutationAuditLog` DbSet + EF config + three indexes)
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` (auto-updated by `dotnet ef migrations add`)
-- `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs` (added `BuildInsertQuery`)
-- `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` (added `MapPost("/", CreateRecordHandler)`, handler, and using directives for `System.Text.Json` + `FormForge.Api.Common.Logging`)
-- `src/FormForge.Api/Program.cs` (added `AddScoped<IDynamicPayloadValidator, DynamicPayloadValidator>()`)
-- `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` (added 5 unit tests for `BuildInsertQuery`)
-- `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs` (TRUNCATE + DROP keep-list updated for `mutation_audit_log`)
-- `src/FormForge.Api.Tests/Features/DynamicCrud/GetRecordIntegrationTests.cs` (TRUNCATE + DROP keep-list updated for `mutation_audit_log`)
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` (added `MutationAuditLog` DbSet + EF config + three indexes)
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` (auto-updated by `dotnet ef migrations add`)
+- `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs` (added `BuildInsertQuery`)
+- `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` (added `MapPost("/", CreateRecordHandler)`, handler, and using directives for `System.Text.Json` + `AppForge.Api.Common.Logging`)
+- `src/AppForge.Api/Program.cs` (added `AddScoped<IDynamicPayloadValidator, DynamicPayloadValidator>()`)
+- `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` (added 5 unit tests for `BuildInsertQuery`)
+- `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs` (TRUNCATE + DROP keep-list updated for `mutation_audit_log`)
+- `src/AppForge.Api.Tests/Features/DynamicCrud/GetRecordIntegrationTests.cs` (TRUNCATE + DROP keep-list updated for `mutation_audit_log`)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (`6-3-create-a-new-record` → `review`)
 
 ## Change Log
@@ -696,12 +696,12 @@ Adversarial parallel review (Blind Hunter + Edge Case Hunter + Acceptance Audito
 
 ### Deferred (pre-existing or accepted scope)
 
-- [x] [Review][Defer] `operation` column has no CHECK constraint enforcing `CREATE`/`UPDATE`/`SOFT_DELETE`/`RESTORE` — `FormForgeDbContext.cs` (MutationAuditLogEntry mapping). Mirrors existing `schema_audit_log` pattern. Owner: future hardening — add a CHECK constraint or domain.
+- [x] [Review][Defer] `operation` column has no CHECK constraint enforcing `CREATE`/`UPDATE`/`SOFT_DELETE`/`RESTORE` — `AppForgeDbContext.cs` (MutationAuditLogEntry mapping). Mirrors existing `schema_audit_log` pattern. Owner: future hardening — add a CHECK constraint or domain.
 - [x] [Review][Defer] Down migration drops `mutation_audit_log` outright — `20260526054545_AddMutationAuditLog.cs` `Down`. Audit data is forensic; rollback destroys evidence with no warning. Owner: future migration-policy pass — rename rather than drop, or block destructive downgrades in prod.
 - [x] [Review][Defer] `RootElementParser.ParseFull(null)` silently returns empty columns on missing `ComponentSchemaVersions` row — `DynamicDataEndpoints.cs:340-349` (handler cache-miss path). If the row for `boundVersion` is missing, the schema is cached with zero user columns and subsequent INSERTs silently drop all user fields. Pre-existing pattern from Story 6.1; also recorded against Story 6.2. Owner: future hardening — return 500/404 when `rootElementJson` is null at cache-miss.
 - [x] [Review][Defer] JSONB user columns may fail to INSERT without explicit `NpgsqlDbType.Jsonb` — `DynamicQueryBuilder.cs:301`. `DynamicParameters.Add(name, value)` lets Npgsql infer the DbType from the .NET type; for the JSONB fall-through case (`coerced[col] = el.ToString()`) the value is a `string`, which PG won't implicitly cast to `jsonb`. No currently-defined component maps to JSONB (per `ComponentTypeMapper`), so the path is unreachable in v1. Owner: when the first JSONB-producing component lands, add a per-type DbType branch or a Dapper TypeHandler.
 - [x] [Review][Defer] Non-object request body (array / scalar) may return ASP.NET 400 instead of the project's 422 envelope — `DynamicDataEndpoints.cs:302-310`. `JsonElement` model binding behaviour for non-object roots depends on the configured `JsonOptions`; the validator's own `ValueKind != Object` check at line 31 of `DynamicPayloadValidator.cs` only fires if the binder forwards the value. Owner: confirm with a test or pin a JSON binder policy.
-- [x] [Review][Defer] `mutation_audit_log.actor_id` has no FK to `users.id` — `FormForgeDbContext.cs` (MutationAuditLogEntry mapping). Deleted-user audit rows retain a dangling Guid forever. Mirrors `schema_audit_log.actor_id`. Owner: cross-cutting decision (add FK with `OnDelete(SetNull)` to both tables) when audit-viewer story 6.8 lands.
+- [x] [Review][Defer] `mutation_audit_log.actor_id` has no FK to `users.id` — `AppForgeDbContext.cs` (MutationAuditLogEntry mapping). Deleted-user audit rows retain a dangling Guid forever. Mirrors `schema_audit_log.actor_id`. Owner: cross-cutting decision (add FK with `OnDelete(SetNull)` to both tables) when audit-viewer story 6.8 lands.
 - [x] [Review][Defer] Concurrent POST race: binding may flip between EF lookup and Dapper INSERT — `DynamicDataEndpoints.cs:322-387`. Request A reads version N's columns, request B publishes/binds N+1 which renames a column, A's Dapper INSERT then fails with `column does not exist` returning 500. Owner: architectural — needs a per-designer read lock or version pin on the SchemaRegistry entry.
 - [x] [Review][Defer] Unhandled `PostgresException` from the Dapper INSERT returns 500 with no `code`/`messageKey` envelope — `DynamicDataEndpoints.cs:381-382`. Affects all dynamic CRUD endpoints, not unique to CREATE. Owner: add a global middleware that maps known `PostgresException` SQLSTATE codes to structured ProblemDetails.
 - [x] [Review][Defer] AC-7: no test asserts 429 / `Retry-After: 60` on POST — `CreateRecordIntegrationTests.cs`. Rate-limit policy is registered and `Retry-After: 60` is set globally in `Program.cs:327` via `OnRejected`, so production is correct. A focused 60+ request test is brittle / slow. Owner: add a single shared rate-limit integration test under a fast clock if one is added.

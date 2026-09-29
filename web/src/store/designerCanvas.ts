@@ -270,7 +270,7 @@ export const useDesignerCanvasStore = create<DesignerCanvasState>((set, get) => 
   },
 
   setSchema: (schema) => {
-    // The FormForge DTO already delivers `rootElement` as a parsed object (or
+    // The AppForge DTO already delivers `rootElement` as a parsed object (or
     // null). ESG's variant carried it as a serialised JSON string and parsed
     // here — that conversion is no longer needed. `version` tracks the loaded
     // version; until version-specific loading lands we use `latestVersion`.

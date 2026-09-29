@@ -86,7 +86,7 @@ All backend endpoints and cache-invalidation logic are already complete:
 ### Backend wire shapes (TypeScript interfaces to create in `types.ts`)
 
 ```ts
-// Mirrors src/FormForge.Api/Features/Roles/Dtos/
+// Mirrors src/AppForge.Api/Features/Roles/Dtos/
 
 export interface RoleListItem {
   id: string
@@ -362,9 +362,9 @@ Route paths after adding files:
 - [Source: web/src/routes/_app/admin.tsx — AdminLayout with beforeLoad guard]
 - [Source: web/src/features/admin/roles/useRolesQuery.ts — DO NOT MODIFY; paginated variant is the new hook]
 - [Source: web/src/features/admin/users/userMutations.ts — mutations pattern]
-- [Source: src/FormForge.Api/Features/Roles/RoleEndpoints.cs — error codes and HTTP shape]
-- [Source: src/FormForge.Api/Features/Roles/RoleService.cs — UpdateRoleAsync publishes RolePermissionsChanged after commit]
-- [Source: src/FormForge.Api/Infrastructure/EventBus/IDomainEventBus.cs — RolePermissionsChanged record]
+- [Source: src/AppForge.Api/Features/Roles/RoleEndpoints.cs — error codes and HTTP shape]
+- [Source: src/AppForge.Api/Features/Roles/RoleService.cs — UpdateRoleAsync publishes RolePermissionsChanged after commit]
+- [Source: src/AppForge.Api/Infrastructure/EventBus/IDomainEventBus.cs — RolePermissionsChanged record]
 
 ## Dev Agent Record
 
@@ -424,7 +424,7 @@ _From bmad-code-review on 2026-05-23 (three-reviewer parallel pass: Blind Hunter
 - [x] [Review][Patch] Pagination indicator "Page 5 of 2" on tampered URLs — clamped the displayed page to `Math.min(page, Math.max(1, totalPages))`. [`web/src/routes/_app/admin/roles.tsx`]
 - [x] [Review][Defer] `RoleListItem` interface lives in the untouchable `useRolesQuery.ts` instead of `types.ts` — `useRolesQueryPaginated.ts:4` imports `RoleListItem` from `./useRolesQuery`, inverting the canonical-types dependency direction the spec intended (`types.ts` should be canonical per Dev Notes wire-shape table). Functional behavior is correct; spec also forbids modifying `useRolesQuery.ts`. Defer to a future code-quality pass. [`web/src/features/admin/roles/types.ts`, `useRolesQueryPaginated.ts:4`] — deferred, code-quality nit, doesn't break behavior
 - [x] [Review][Defer] Permission matrix renders raw `resourceId` (likely snake_case or GUID) as row label and aria-label — UX-only; for v2.9 the matrix is empty in practice (no Menu Bindings yet), so this isn't observable until Epic 4 introduces resources. The same epic will likely add the human-readable resource catalog needed for a proper label/aria-label pairing. [`web/src/routes/_app/admin/roles.$roleId.tsx:322`, `:327`] — deferred, Epic 4 dependency
-- [x] [Review][Defer] No optimistic concurrency / ETag on role updates — concurrent admin edits last-write-wins on permissions; backend lacks `If-Match` and frontend has no diff-against-baseline. Pre-existing architectural gap (not introduced by Story 2.9). [`src/FormForge.Api/Features/Roles/RoleEndpoints.cs`] — deferred, pre-existing backend limitation
+- [x] [Review][Defer] No optimistic concurrency / ETag on role updates — concurrent admin edits last-write-wins on permissions; backend lacks `If-Match` and frontend has no diff-against-baseline. Pre-existing architectural gap (not introduced by Story 2.9). [`src/AppForge.Api/Features/Roles/RoleEndpoints.cs`] — deferred, pre-existing backend limitation
 - [x] [Review][Defer] Detail-page error fallthrough treats 403/500 as "Role not found" — `roleQuery.isError || !roleQuery.data` collapses every non-200 into the not-found UI. AdminLayout's beforeLoad guard already prevents non-admins from reaching this route, so 403 is the only realistic non-404 and it's defense-only. [`web/src/routes/_app/admin/roles.$roleId.tsx:31-40`] — deferred, low-risk, layout guard covers the realistic path
 
 ## Change Log

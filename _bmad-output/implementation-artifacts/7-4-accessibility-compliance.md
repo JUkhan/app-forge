@@ -7,13 +7,13 @@ Status: done
 ## Story
 
 As a user with assistive technology,
-I want to navigate and use FormForge with a keyboard and screen reader,
+I want to navigate and use AppForge with a keyboard and screen reader,
 so that the platform is accessible to all users.
 
 ## Acceptance Criteria
 
 **AC-1 — Keyboard-reachable controls in logical tab order**
-**Given** any interactive control on any FormForge page
+**Given** any interactive control on any AppForge page
 **When** I navigate via keyboard
 **Then** the control is keyboard-reachable in a logical tab order
 
@@ -326,7 +326,7 @@ jobs:
       - run: dotnet build --no-restore -c Release
       - run: dotnet test --no-build -c Release
         env:
-          ConnectionStrings__formforge: "Host=localhost;Database=ff_test;Username=postgres;Password=postgres"
+          ConnectionStrings__appforge: "Host=localhost;Database=ff_test;Username=postgres;Password=postgres"
 
   test-frontend:
     runs-on: ubuntu-latest

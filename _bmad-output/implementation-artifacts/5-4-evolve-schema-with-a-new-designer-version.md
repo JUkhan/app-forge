@@ -41,7 +41,7 @@ So that existing records are never broken by schema changes.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Fix `ComponentTypeMapper` SPA-name mismatch** (deferred blocker from Story 5.3)
-  - [x] In `src/FormForge.Api/Features/SchemaRegistry/ComponentTypeMapper.cs`, add bridge mappings for the SPA's space-format component type strings. The SPA stores `"Text Input"` etc. in `RootElement` JSON; the current mapper only recognizes shorthand `"TextInput"`, causing production data to fall through to the JSONB fallback.
+  - [x] In `src/AppForge.Api/Features/SchemaRegistry/ComponentTypeMapper.cs`, add bridge mappings for the SPA's space-format component type strings. The SPA stores `"Text Input"` etc. in `RootElement` JSON; the current mapper only recognizes shorthand `"TextInput"`, causing production data to fall through to the JSONB fallback.
   - [x] Update `NoColumnTypes` to include `"Repeater Field"` (SPA format for `RepeaterField`)
   - [x] Update `MapToPgType` switch to include all SPA-format names:
     ```csharp
@@ -56,7 +56,7 @@ So that existing records are never broken by schema changes.
   - [x] Update `IsImageType` — "Image" has no SPA-format variant; no change needed there
 
 - [x] **Task 2 — Extend `ProvisioningJob` with `FromVersion`** (AC: 4)
-  - [x] In `src/FormForge.Api/Features/Provisioning/ProvisioningJob.cs`, add `int? FromVersion = null` as the last positional parameter with a default value so all existing callers compile unchanged:
+  - [x] In `src/AppForge.Api/Features/Provisioning/ProvisioningJob.cs`, add `int? FromVersion = null` as the last positional parameter with a default value so all existing callers compile unchanged:
     ```csharp
     internal sealed record ProvisioningJob(
         Guid MenuId,
@@ -68,7 +68,7 @@ So that existing records are never broken by schema changes.
   - [x] The default `null` means: first-time CREATE (no previous version) or a Retry (previous version unknown at the retry call site)
 
 - [x] **Task 3 — Update `MenuService.BindDesignerAsync` to pass `FromVersion`** (AC: 4)
-  - [x] In `src/FormForge.Api/Features/Menus/MenuService.cs`, capture `menu.BoundVersion` **before** overwriting it, then pass it as `FromVersion` in the enqueued `ProvisioningJob`:
+  - [x] In `src/AppForge.Api/Features/Menus/MenuService.cs`, capture `menu.BoundVersion` **before** overwriting it, then pass it as `FromVersion` in the enqueued `ProvisioningJob`:
     ```csharp
     var fromVersion = menu.BoundVersion;   // capture BEFORE overwriting — Story 5.4 AC-4
     menu.DesignerId = designerId;
@@ -86,21 +86,21 @@ So that existing records are never broken by schema changes.
   - [x] **`RetryBindingAsync` is NOT changed** — retry enqueues with no `FromVersion` (defaults to null). On a retry of an ALTER, the audit log records `fromVersion = null`. This is a known limitation (documented in Dev Notes)
 
 - [x] **Task 4 — Add `ColumnsDiff` to `SchemaAuditLogEntry`** (AC: 4)
-  - [x] In `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`, add after `ColumnsAdded`:
+  - [x] In `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`, add after `ColumnsAdded`:
     ```csharp
     public string? ColumnsDiff { get; set; }   // JSON snapshot of diff; null for CREATE
     ```
   - [x] `ColumnsDiff` is `null` for CREATE operations and populated for ALTER operations
 
-- [x] **Task 5 — Update `FormForgeDbContext` entity config for `ColumnsDiff`** (AC: 4)
-  - [x] In `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs`, add after the `ColumnsAdded` mapping in the `SchemaAuditLogEntry` entity config block:
+- [x] **Task 5 — Update `AppForgeDbContext` entity config for `ColumnsDiff`** (AC: 4)
+  - [x] In `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs`, add after the `ColumnsAdded` mapping in the `SchemaAuditLogEntry` entity config block:
     ```csharp
     e.Property(a => a.ColumnsDiff).HasColumnName("column_diff");
     ```
   - [x] No `HasColumnType` needed — EF maps `string?` to `TEXT NULL` by default in PostgreSQL
 
 - [x] **Task 6 — Add EF migration `AddColumnDiffToSchemaAuditLog`** (AC: 4)
-  - [x] Run: `dotnet ef migrations add AddColumnDiffToSchemaAuditLog --project src/FormForge.Api --startup-project src/FormForge.Api`
+  - [x] Run: `dotnet ef migrations add AddColumnDiffToSchemaAuditLog --project src/AppForge.Api --startup-project src/AppForge.Api`
   - [x] Verify the generated migration adds `column_diff TEXT NULL` to `schema_audit_log`
   - [x] Add `ArgumentNullException.ThrowIfNull(migrationBuilder)` to both `Up()` and `Down()` per the CA1062 pattern established in `AddMenuBindingColumns` and `CreateSchemaAuditLog`
   - [x] Previous migration: `20260525073718_CreateSchemaAuditLog` — new migration must come after this one
@@ -185,11 +185,11 @@ So that existing records are never broken by schema changes.
 
 - [x] **Task 8 — Add integration and unit tests** (AC: 1–5 + Task 1 regression)
 
-  **8a — New `ComponentTypeMapperTests.cs`** (`src/FormForge.Api.Tests/Features/SchemaRegistry/ComponentTypeMapperTests.cs`):
+  **8a — New `ComponentTypeMapperTests.cs`** (`src/AppForge.Api.Tests/Features/SchemaRegistry/ComponentTypeMapperTests.cs`):
   ```csharp
-  using FormForge.Api.Features.SchemaRegistry;
+  using AppForge.Api.Features.SchemaRegistry;
 
-  namespace FormForge.Api.Tests.Features.SchemaRegistry;
+  namespace AppForge.Api.Tests.Features.SchemaRegistry;
 
   public sealed class ComponentTypeMapperTests
   {
@@ -592,17 +592,17 @@ The SPA-format names come directly from `FieldKeyValidator.InputBearingTypes`:
 
 These files are MODIFIED by Story 5.4 — read them completely first:
 
-1. `src/FormForge.Api/Features/SchemaRegistry/ComponentTypeMapper.cs` — add SPA names
-2. `src/FormForge.Api/Features/Provisioning/ProvisioningJob.cs` — add `FromVersion` parameter
-3. `src/FormForge.Api/Features/Menus/MenuService.cs` — `BindDesignerAsync` around line 434
-4. `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs` — add `ColumnsDiff`
-5. `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — `SchemaAuditLogEntry` entity config
-6. `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs` — refactor `AddMissingColumnsAsync`
-7. `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs` — add tests
+1. `src/AppForge.Api/Features/SchemaRegistry/ComponentTypeMapper.cs` — add SPA names
+2. `src/AppForge.Api/Features/Provisioning/ProvisioningJob.cs` — add `FromVersion` parameter
+3. `src/AppForge.Api/Features/Menus/MenuService.cs` — `BindDesignerAsync` around line 434
+4. `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs` — add `ColumnsDiff`
+5. `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — `SchemaAuditLogEntry` entity config
+6. `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs` — refactor `AddMissingColumnsAsync`
+7. `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs` — add tests
 
 ### Project Structure Notes
 
-- `ComponentTypeMapperTests.cs` goes in `src/FormForge.Api.Tests/Features/SchemaRegistry/` — a folder that already exists (Story 5.3 added `RootElementParserTests.cs` there)
+- `ComponentTypeMapperTests.cs` goes in `src/AppForge.Api.Tests/Features/SchemaRegistry/` — a folder that already exists (Story 5.3 added `RootElementParserTests.cs` there)
 - `AlterResult` and `SystemColumnNames` are **private** to `DdlEmitter` — not exposed in any interface
 - `ColumnsDiff` is a property on the domain entity `SchemaAuditLogEntry` — not a separate type; the JSON string is stored as TEXT in PG
 
@@ -612,10 +612,10 @@ These files are MODIFIED by Story 5.4 — read them completely first:
 - **Decision 1.5** (audit log indexes): `architecture.md`
 - **Decision 1.6** (EF/Dapper transaction boundary): `architecture.md`
 - **FR-25 AC-1** (never drop orphaned columns): `_bmad-output/planning-artifacts/prd.md`
-- **FieldKeyValidator.InputBearingTypes** (SPA component type names): `src/FormForge.Api/Features/Designer/FieldKeyValidator.cs`
+- **FieldKeyValidator.InputBearingTypes** (SPA component type names): `src/AppForge.Api/Features/Designer/FieldKeyValidator.cs`
 - **ComponentTypeMapper shorthand deferred issue**: `_bmad-output/implementation-artifacts/deferred-work.md`
-- **Story 5.3 DdlEmitter** (code being extended): `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`
-- **Story 5.3 ProvisioningIntegrationTests** (test pattern to follow): `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`
+- **Story 5.3 DdlEmitter** (code being extended): `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`
+- **Story 5.3 ProvisioningIntegrationTests** (test pattern to follow): `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`
 - **Previous story file**: `_bmad-output/implementation-artifacts/5-3-provision-new-table-from-designer-schema.md`
 
 ## Dev Agent Record
@@ -627,7 +627,7 @@ claude-opus-4-7[1m]
 ### Debug Log References
 
 - Build #1 failed CA1873: `string.Join(", ", alterResult.OrphanedColumns)` inside the `LogOrphanedColumns` call was evaluated unconditionally. Wrapped the call in an `if (logger.IsEnabled(LogLevel.Information))` block; the analyzer still flagged the inner expression even when combined into a single `&&` guard, so the final form is an outer `if (... && IsEnabled)` with a localised `#pragma warning disable CA1873` around the source-generated LoggerMessage helper. Audit-log JSON payload (built immediately after) always captures the full `orphanedColumns` array regardless of log level — guard is purely a log-line cost optimisation.
-- `dotnet ef migrations add AddColumnDiffToSchemaAuditLog` auto-regenerated both `20260525104940_AddColumnDiffToSchemaAuditLog.Designer.cs` and `FormForgeDbContextModelSnapshot.cs`. The generated `Up()`/`Down()` did not include `ArgumentNullException.ThrowIfNull(migrationBuilder)` so both were added manually to match the CA1062 pattern established by `AddMenuBindingColumns` and `CreateSchemaAuditLog`.
+- `dotnet ef migrations add AddColumnDiffToSchemaAuditLog` auto-regenerated both `20260525104940_AddColumnDiffToSchemaAuditLog.Designer.cs` and `AppForgeDbContextModelSnapshot.cs`. The generated `Up()`/`Down()` did not include `ArgumentNullException.ThrowIfNull(migrationBuilder)` so both were added manually to match the CA1062 pattern established by `AddMenuBindingColumns` and `CreateSchemaAuditLog`.
 - Test build initially failed because the new integration tests called a `PostVersionWithRootAsync` helper that did not yet exist on the test class — added as a sibling to `PostVersionAsync` using the same `JsonSerializer.Serialize → raw StringContent` workaround established by `CreateAndPublishDesignerWithFieldsAsync` (object-typed members collapse to `{}` via `JsonContent.Create`'s polymorphic resolution).
 
 ### Completion Notes List
@@ -648,23 +648,23 @@ claude-opus-4-7[1m]
 ### File List
 
 **Modified files (backend):**
-- `src/FormForge.Api/Features/SchemaRegistry/ComponentTypeMapper.cs`
-- `src/FormForge.Api/Features/Provisioning/ProvisioningJob.cs`
-- `src/FormForge.Api/Features/Menus/MenuService.cs`
-- `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` (auto-regenerated)
-- `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`
+- `src/AppForge.Api/Features/SchemaRegistry/ComponentTypeMapper.cs`
+- `src/AppForge.Api/Features/Provisioning/ProvisioningJob.cs`
+- `src/AppForge.Api/Features/Menus/MenuService.cs`
+- `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` (auto-regenerated)
+- `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`
 
 **New files (backend):**
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260525104940_AddColumnDiffToSchemaAuditLog.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260525104940_AddColumnDiffToSchemaAuditLog.Designer.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260525104940_AddColumnDiffToSchemaAuditLog.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260525104940_AddColumnDiffToSchemaAuditLog.Designer.cs`
 
 **New files (tests):**
-- `src/FormForge.Api.Tests/Features/SchemaRegistry/ComponentTypeMapperTests.cs`
+- `src/AppForge.Api.Tests/Features/SchemaRegistry/ComponentTypeMapperTests.cs`
 
 **Modified files (tests):**
-- `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`
+- `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`
 
 ### Change Log
 
@@ -676,18 +676,18 @@ claude-opus-4-7[1m]
 
 ### Review Findings
 
-- [x] [Review][Patch] Add `"Text Area"` to `FieldKeyValidator.InputBearingTypes` [`src/FormForge.Api/Features/Designer/FieldKeyValidator.cs`] — SPA emits `"Text Area"` (spaced). ComponentTypeMapper correctly maps it → TEXT (Story 5.4 bridge), but FieldKeyValidator.InputBearingTypes only contains `"TextArea"` (no space), so fieldKey is not required at designer save time for Text Area components. A saved Text Area without a fieldKey silently produces no column at provision time. Fix: add `"Text Area"` to the `InputBearingTypes` set.
+- [x] [Review][Patch] Add `"Text Area"` to `FieldKeyValidator.InputBearingTypes` [`src/AppForge.Api/Features/Designer/FieldKeyValidator.cs`] — SPA emits `"Text Area"` (spaced). ComponentTypeMapper correctly maps it → TEXT (Story 5.4 bridge), but FieldKeyValidator.InputBearingTypes only contains `"TextArea"` (no space), so fieldKey is not required at designer save time for Text Area components. A saved Text Area without a fieldKey silently produces no column at provision time. Fix: add `"Text Area"` to the `InputBearingTypes` set.
 
-- [x] [Review][Patch] AC-4 audit test does not assert `existingUserColumns` in column_diff JSON [`src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — `EvolveSchema_AuditLogRecordsAlterWithCorrectFromAndToVersion` checks `addedColumns` and `orphanedColumns` via `TryGetProperty` but never asserts presence of `existingUserColumns`, which is part of the AC-4 columnsDiff spec.
-- [x] [Review][Patch] AC-4 audit test does not assert `actorId` or `correlationId` on the ALTER audit row [`src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — Story 5.3's CREATE audit test asserts both; the Story 5.4 ALTER test SELECT omits `actor_id` and `correlation_id` columns entirely.
-- [x] [Review][Patch] AC-2 `orphanedColumns` asserted by presence only, not by content [`src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — `EvolveSchema_AuditLogRecordsAlterWithCorrectFromAndToVersion` only calls `TryGetProperty("orphanedColumns", out _)`. No test verifies which column names appear in the array. A bug that serialized an empty `orphanedColumns` array would pass.
-- [x] [Review][Patch] SPA-format test discards return value and hardcodes version 2 [`src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — `EvolveSchema_SpaFormatComponentTypes_MapToCorrectPgTypes` calls `await CreateAndPublishDesignerWithFieldsAsync(...)` without capturing the return value, then binds to hardcoded version `2`. Use `var publishedVersion = await CreateAndPublishDesignerWithFieldsAsync(...)` and pass `publishedVersion` to `PutBindingAsync`.
+- [x] [Review][Patch] AC-4 audit test does not assert `existingUserColumns` in column_diff JSON [`src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — `EvolveSchema_AuditLogRecordsAlterWithCorrectFromAndToVersion` checks `addedColumns` and `orphanedColumns` via `TryGetProperty` but never asserts presence of `existingUserColumns`, which is part of the AC-4 columnsDiff spec.
+- [x] [Review][Patch] AC-4 audit test does not assert `actorId` or `correlationId` on the ALTER audit row [`src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — Story 5.3's CREATE audit test asserts both; the Story 5.4 ALTER test SELECT omits `actor_id` and `correlation_id` columns entirely.
+- [x] [Review][Patch] AC-2 `orphanedColumns` asserted by presence only, not by content [`src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — `EvolveSchema_AuditLogRecordsAlterWithCorrectFromAndToVersion` only calls `TryGetProperty("orphanedColumns", out _)`. No test verifies which column names appear in the array. A bug that serialized an empty `orphanedColumns` array would pass.
+- [x] [Review][Patch] SPA-format test discards return value and hardcodes version 2 [`src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — `EvolveSchema_SpaFormatComponentTypes_MapToCorrectPgTypes` calls `await CreateAndPublishDesignerWithFieldsAsync(...)` without capturing the return value, then binds to hardcoded version `2`. Use `var publishedVersion = await CreateAndPublishDesignerWithFieldsAsync(...)` and pass `publishedVersion` to `PutBindingAsync`.
 
-- [x] [Review][Defer] Hardcoded version `3` in all four evolution tests [`src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — deferred, pre-existing. Known fragile pattern from Story 5.3 (`CreateAndPublishDesignerWithFieldsAsync` hardcodes `publishedVersion = 2`; callers hardcode `3` for next version). Tracked in existing deferred item.
-- [x] [Review][Defer] `existingUserColumns` serialization order non-deterministic (built from `HashSet<string>`) [`src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`] — deferred, pre-existing. Cosmetic for a JSON diff blob; no functional impact unless a consumer hashes the field.
-- [x] [Review][Defer] `LIMIT 1` audit query in `EvolveSchema_AuditLogRecordsAlterWithCorrectFromAndToVersion` has no serial isolation guard [`src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — deferred, pre-existing. Pre-existing test-class pattern; within-class xUnit serial execution mitigates the race.
-- [x] [Review][Defer] Retry ALTER writes `from_version = NULL` — indistinguishable from CREATE in audit log [`src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`] — deferred, pre-existing. Explicitly documented known limitation in story Dev Notes; RetryBindingAsync intentionally unchanged.
-- [x] [Review][Defer] `SystemColumnNames` has no compile-time link to `CreateTableAsync` SQL [`src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`] — deferred, pre-existing. A future story adding a system column to the dynamic-table DDL without updating this set will cause all subsequent ALTER diffs to show it as orphaned. Maintenance trap with no current safety net.
-- [x] [Review][Defer] `existingUserColumns` snapshot computed outside the DDL transaction [`src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`] — deferred, pre-existing. A concurrent recovery-scanner + retry race (Story 5.8 scope) can commit columns between the `information_schema` read and the ALTER commit, leaving the audit diff JSON describing a stale pre-race column set.
+- [x] [Review][Defer] Hardcoded version `3` in all four evolution tests [`src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — deferred, pre-existing. Known fragile pattern from Story 5.3 (`CreateAndPublishDesignerWithFieldsAsync` hardcodes `publishedVersion = 2`; callers hardcode `3` for next version). Tracked in existing deferred item.
+- [x] [Review][Defer] `existingUserColumns` serialization order non-deterministic (built from `HashSet<string>`) [`src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`] — deferred, pre-existing. Cosmetic for a JSON diff blob; no functional impact unless a consumer hashes the field.
+- [x] [Review][Defer] `LIMIT 1` audit query in `EvolveSchema_AuditLogRecordsAlterWithCorrectFromAndToVersion` has no serial isolation guard [`src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — deferred, pre-existing. Pre-existing test-class pattern; within-class xUnit serial execution mitigates the race.
+- [x] [Review][Defer] Retry ALTER writes `from_version = NULL` — indistinguishable from CREATE in audit log [`src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`] — deferred, pre-existing. Explicitly documented known limitation in story Dev Notes; RetryBindingAsync intentionally unchanged.
+- [x] [Review][Defer] `SystemColumnNames` has no compile-time link to `CreateTableAsync` SQL [`src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`] — deferred, pre-existing. A future story adding a system column to the dynamic-table DDL without updating this set will cause all subsequent ALTER diffs to show it as orphaned. Maintenance trap with no current safety net.
+- [x] [Review][Defer] `existingUserColumns` snapshot computed outside the DDL transaction [`src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`] — deferred, pre-existing. A concurrent recovery-scanner + retry race (Story 5.8 scope) can commit columns between the `information_schema` read and the ALTER commit, leaving the audit diff JSON describing a stale pre-race column set.
 - [x] [Review][Defer] AC-3 rollback-on-failure integration test absent — deferred, pre-existing. No test injects a mid-ALTER failure and asserts no partial columns remain. The DDL rollback path is inherited unchanged from Story 5.3 which also had no explicit rollback test.
 - [x] [Review][Defer] CREATE path `column_diff IS NULL` not asserted in `ProvisionNewTable_AuditLogRowAppended_OnCreate` — deferred, pre-existing. The Story 5.3 test predates this field; adding the assertion is a Story 5.3 test-backfill, not a Story 5.4 regression.

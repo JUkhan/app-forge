@@ -51,20 +51,20 @@ context: []
 
 ## Code Map
 
-- `src/FormForge.Api/Features/Users/UserService.cs:299-363` — `CreateUserAsync`: pre-check at `:309-316`, `db.Users.Add` at `:326`, `SaveChangesAsync` at `:334`, `23505` catches at `:336-350` filtering `uq_users_email` only. All changes land here. Constructor at `:57-60` — add `ITenantContext`.
-- `src/FormForge.Api/Features/Tenancy/TenantOnboardingService.cs:213-230` — working precedent: platform-admin collision guard, then `db.TenantUserIndex.Add(new TenantUserIndexEntry { Email = ..., TenantId = ... })`. Reuse the shape; do not modify this file.
-- `src/FormForge.Api/Features/Tenancy/ITenantContext.cs:11-22` — `Guid? TenantId`, `string? SchemaName`; scoped (`Program.cs:263`), same lifetime as `UserService` (`Program.cs:176`).
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs:29-30,490-503` — `DbSet TenantUserIndex` / `PlatformAdmins`; `ToTable("tenant_user_index", schema: "public")`, PK `PK_tenant_user_index` on `email`, FK to `tenants` (cascade). Entity: `Domain/Entities/TenantUserIndexEntry.cs:9-14`.
-- `src/FormForge.Api/Features/Auth/AuthService.cs:178-187` (login reader this unblocks) and `Features/Users/UserEndpoints.cs:97-118` (already maps `DuplicateEmail` → 409) — read-only, no change expected.
-- `src/FormForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs` — create-user cases at `:204,:237,:260`; its TRUNCATE list at `:46` excludes `tenants`/`tenant_user_index` and must be extended before asserting index rows.
-- `src/FormForge.Api.Tests/Features/Auth/TenantAwareLoginIntegrationTests.cs:75-118` — reusable `ProvisionTenantAsync` / `SeedTenantUserAsync` helpers for an end-to-end "created user can log in" test.
+- `src/AppForge.Api/Features/Users/UserService.cs:299-363` — `CreateUserAsync`: pre-check at `:309-316`, `db.Users.Add` at `:326`, `SaveChangesAsync` at `:334`, `23505` catches at `:336-350` filtering `uq_users_email` only. All changes land here. Constructor at `:57-60` — add `ITenantContext`.
+- `src/AppForge.Api/Features/Tenancy/TenantOnboardingService.cs:213-230` — working precedent: platform-admin collision guard, then `db.TenantUserIndex.Add(new TenantUserIndexEntry { Email = ..., TenantId = ... })`. Reuse the shape; do not modify this file.
+- `src/AppForge.Api/Features/Tenancy/ITenantContext.cs:11-22` — `Guid? TenantId`, `string? SchemaName`; scoped (`Program.cs:263`), same lifetime as `UserService` (`Program.cs:176`).
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs:29-30,490-503` — `DbSet TenantUserIndex` / `PlatformAdmins`; `ToTable("tenant_user_index", schema: "public")`, PK `PK_tenant_user_index` on `email`, FK to `tenants` (cascade). Entity: `Domain/Entities/TenantUserIndexEntry.cs:9-14`.
+- `src/AppForge.Api/Features/Auth/AuthService.cs:178-187` (login reader this unblocks) and `Features/Users/UserEndpoints.cs:97-118` (already maps `DuplicateEmail` → 409) — read-only, no change expected.
+- `src/AppForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs` — create-user cases at `:204,:237,:260`; its TRUNCATE list at `:46` excludes `tenants`/`tenant_user_index` and must be extended before asserting index rows.
+- `src/AppForge.Api.Tests/Features/Auth/TenantAwareLoginIntegrationTests.cs:75-118` — reusable `ProvisionTenantAsync` / `SeedTenantUserAsync` helpers for an end-to-end "created user can log in" test.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `src/FormForge.Api/Features/Users/UserService.cs` — inject `ITenantContext`; in `CreateUserAsync`, when `TenantId` is non-null, pre-check `db.TenantUserIndex` and `db.PlatformAdmins` for the normalized email (returning `DuplicateEmail`), add the `TenantUserIndexEntry` before `SaveChangesAsync`, and extend both `23505` catch filters to also accept `PK_tenant_user_index` — closes the gap that leaves new users unroutable at login.
-- [x] `src/FormForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs` — extend the TRUNCATE list and cover the matrix: index row written on success, cross-tenant duplicate → 409, platform-admin email → 409, no index row on the duplicate paths.
-- [x] `src/FormForge.Api.Tests/Features/Auth/TenantAwareLoginIntegrationTests.cs` — add an end-to-end test: provision a tenant, create a user through `POST /api/admin/users`, then log in as that user and assert 200 with the tenant's `tenantId` claim.
+- [x] `src/AppForge.Api/Features/Users/UserService.cs` — inject `ITenantContext`; in `CreateUserAsync`, when `TenantId` is non-null, pre-check `db.TenantUserIndex` and `db.PlatformAdmins` for the normalized email (returning `DuplicateEmail`), add the `TenantUserIndexEntry` before `SaveChangesAsync`, and extend both `23505` catch filters to also accept `PK_tenant_user_index` — closes the gap that leaves new users unroutable at login.
+- [x] `src/AppForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs` — extend the TRUNCATE list and cover the matrix: index row written on success, cross-tenant duplicate → 409, platform-admin email → 409, no index row on the duplicate paths.
+- [x] `src/AppForge.Api.Tests/Features/Auth/TenantAwareLoginIntegrationTests.cs` — add an end-to-end test: provision a tenant, create a user through `POST /api/admin/users`, then log in as that user and assert 200 with the tenant's `tenantId` claim.
 
 **Acceptance Criteria:**
 - Given a tenant admin authenticated with a `tenantId` claim, when they create a user through the Users tab, then the user can immediately log in and receive a JWT carrying that same `tenantId`.
@@ -109,7 +109,7 @@ context: []
    returning the same generic `DuplicateEmail`.
 2. **No deterministic coverage of the `PK_tenant_user_index` catch branch.** Added
    `CreateUser_AsTenantAdmin_IndexRowRaceLostAtInsert_Returns409AndRollsBackUserRow`: a
-   per-test factory removes `DbContextOptions<FormForgeDbContext>` and re-registers it with
+   per-test factory removes `DbContextOptions<AppForgeDbContext>` and re-registers it with
    the production `TenantSchemaConnectionInterceptor` plus a test-only
    `SaveChangesInterceptor` that commits the conflicting `public.tenant_user_index` row on a
    separate `NpgsqlConnection` during the race window. Asserts the interceptor fired, 409
@@ -154,7 +154,7 @@ Pass 1 (2026-09-16) — blind-hunter, edge-case-hunter, verification-gap.
 
 **Commands:**
 - `dotnet build` — expected: 0 errors, 0 warnings
-- `dotnet test src/FormForge.Api.Tests --filter "UserAdminIntegrationTests|TenantAwareLoginIntegrationTests|TenantOnboardingServiceTests"` — expected: all pass, with the new tests asserting real `public.tenant_user_index` rows (queried, not mocked)
+- `dotnet test src/AppForge.Api.Tests --filter "UserAdminIntegrationTests|TenantAwareLoginIntegrationTests|TenantOnboardingServiceTests"` — expected: all pass, with the new tests asserting real `public.tenant_user_index` rows (queried, not mocked)
 
 **Results (2026-09-16):**
 - `dotnet build` — Build succeeded, 0 warnings, 0 errors.
@@ -164,7 +164,7 @@ Pass 1 (2026-09-16) — blind-hunter, edge-case-hunter, verification-gap.
   `CreateUser_AsTenantAdmin_WritesTenantUserIndexRow` and
   `UserCreatedThroughAdminApi_CanLogInImmediately_AndJwtCarriesSameTenantId` both fail — the new
   assertions are not vacuous.
-- Full suite (`dotnet test src/FormForge.Api.Tests`) — 1208 passed, 2 failed:
+- Full suite (`dotnet test src/AppForge.Api.Tests`) — 1208 passed, 2 failed:
   `SchemaAuditLogIntegrationTests.GetSchemaAuditLog_AppendOnly_DeleteVerb_Returns405` and
   `MutationAuditLogIntegrationTests.GetMutationAuditLog_AppendOnly_DeleteVerb_Returns405`.
   Both fail identically on the unmodified baseline (`12dd241`, verified by stashing this change)

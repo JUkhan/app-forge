@@ -81,7 +81,7 @@ So that the data is preserved and recoverable.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Add soft-delete query builders to `DynamicQueryBuilder.cs`** (AC: 1, 2, 7, 9)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
   - Add three new static methods after `BuildUpdateQuery`:
 
   **Method A: `BuildSoftDeleteByIdQuery`** — soft-deletes one row by primary key:
@@ -181,18 +181,18 @@ So that the data is preserved and recoverable.
   ```
 
 - [x] **Task 2 — Add `SoftDeleteCascade.cs` (new static class)** (AC: 2, 9)
-  - [x] Create `src/FormForge.Api/Features/DynamicCrud/SoftDeleteCascade.cs`
+  - [x] Create `src/AppForge.Api/Features/DynamicCrud/SoftDeleteCascade.cs`
   - This class encapsulates the recursive cascade walk: schema graph pre-loading (via EF, before the transaction is opened) and execution (Dapper, within caller's NpgsqlTransaction).
 
   ```csharp
   using Dapper;
-  using FormForge.Api.Features.Designer;
-  using FormForge.Api.Features.SchemaRegistry;
-  using FormForge.Api.Infrastructure.Persistence;
+  using AppForge.Api.Features.Designer;
+  using AppForge.Api.Features.SchemaRegistry;
+  using AppForge.Api.Infrastructure.Persistence;
   using Microsoft.EntityFrameworkCore;
   using Npgsql;
 
-  namespace FormForge.Api.Features.DynamicCrud;
+  namespace AppForge.Api.Features.DynamicCrud;
 
   // Story 6.5 — recursive cascade soft-delete walker. Two-phase design:
   //   Phase 1 (BuildSchemaGraphAsync): load all descendant schemas via EF before
@@ -211,7 +211,7 @@ So that the data is preserved and recoverable.
       // no Published schema. Returns immediately when childIds is empty.
       internal static async Task BuildSchemaGraphAsync(
           IReadOnlyList<string> childIds,
-          FormForgeDbContext db,
+          AppForgeDbContext db,
           ISchemaRegistry schemaRegistry,
           Dictionary<string, NodeInfo> graph,
           CancellationToken ct)
@@ -310,7 +310,7 @@ So that the data is preserved and recoverable.
   **IMPORTANT:** The skeleton above is intentionally simplified for the template. See **Dev Notes §3** below for the correct recursive pattern that the dev agent must implement. Do NOT implement `ExecuteAsync` as a flat iteration of all graph entries.
 
 - [x] **Task 3 — Add `DeleteRecordHandler` + route registration to `DynamicDataEndpoints.cs`** (AC: 1–9)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
 
   **3a — Add `Problems.RecordAlreadyDeleted()` to the `private static class Problems` block** (after `RecordDeleted()`):
   ```csharp
@@ -361,7 +361,7 @@ So that the data is preserved and recoverable.
       string designerId,
       Guid id,
       HttpContext httpContext,
-      FormForgeDbContext db,
+      AppForgeDbContext db,
       ISchemaRegistry schemaRegistry,
       DbConnectionFactory connectionFactory,
       CancellationToken ct)
@@ -550,7 +550,7 @@ So that the data is preserved and recoverable.
   ```
 
 - [x] **Task 4 — Unit tests for the three new query builder methods** (AC: 1, 2, 7, 9)
-  - [x] Modify `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
+  - [x] Modify `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
   - Add to the existing class (after the `BuildUpdateQuery` tests):
 
   Tests to add (5 unit tests):
@@ -563,7 +563,7 @@ So that the data is preserved and recoverable.
   Estimated: +5 unit tests → running total ~480
 
 - [x] **Task 5 — Integration tests: `SoftDeleteIntegrationTests.cs`** (AC: 1–9)
-  - [x] Create `src/FormForge.Api.Tests/Features/DynamicCrud/SoftDeleteIntegrationTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/DynamicCrud/SoftDeleteIntegrationTests.cs`
   - Class signature: `[Collection("DynamicCrudTests")] public sealed class SoftDeleteIntegrationTests : IClassFixture<PostgresFixture>, IAsyncLifetime`
   - `InitializeAsync` / `DisposeAsync` **identical** to `UpdateRecordIntegrationTests` (same TRUNCATE statement, same dynamic-table DROP loop, same `ReseedSystemRolesAsync` + `SeedTestUsersAsync`)
   - Copy all helper methods from `UpdateRecordIntegrationTests` verbatim (LoginAsync, PostRecordAsync, PutRecordAsync, SetupProvisionedDesignerWithTitleAsync, CreateRecordAndGetIdAsync, GetUserIdFromToken, etc.)
@@ -822,7 +822,7 @@ Do NOT just `Assert.True(root.TryGetProperty("cascadeEventId", out _))` without 
 
 ### §6 — No `SoftDeleteCascade` namespace injection needed; it is a static class
 
-`SoftDeleteCascade` is a static class (like `DynamicQueryBuilder`), not a DI service. It is called directly from `DeleteRecordHandler` without injection. It does need `FormForgeDbContext` and `ISchemaRegistry` passed in from the handler's DI-injected parameters.
+`SoftDeleteCascade` is a static class (like `DynamicQueryBuilder`), not a DI service. It is called directly from `DeleteRecordHandler` without injection. It does need `AppForgeDbContext` and `ISchemaRegistry` passed in from the handler's DI-injected parameters.
 
 ### §7 — `visited` HashSet in the cascade walk
 
@@ -846,8 +846,8 @@ Per AC-3, only one `mutation_audit_log` row is written (for the parent). Child-l
 
 | New file | Path |
 |---|---|
-| `SoftDeleteCascade.cs` | `src/FormForge.Api/Features/DynamicCrud/SoftDeleteCascade.cs` |
-| `SoftDeleteIntegrationTests.cs` | `src/FormForge.Api.Tests/Features/DynamicCrud/SoftDeleteIntegrationTests.cs` |
+| `SoftDeleteCascade.cs` | `src/AppForge.Api/Features/DynamicCrud/SoftDeleteCascade.cs` |
+| `SoftDeleteIntegrationTests.cs` | `src/AppForge.Api.Tests/Features/DynamicCrud/SoftDeleteIntegrationTests.cs` |
 | `deleteRecordApi.ts` | `web/src/features/data-entry/deleteRecordApi.ts` |
 | `useDeleteRecord.ts` | `web/src/features/data-entry/useDeleteRecord.ts` |
 
@@ -859,7 +859,7 @@ Per AC-3, only one `mutation_audit_log` row is written (for the parent). Child-l
 | `DynamicQueryBuilder.cs` | Add `BuildSoftDeleteByIdQuery`, `BuildSelectChildIdsByFkQuery`, `BuildCascadeChildSoftDeleteQuery` |
 | `DynamicQueryBuilderTests.cs` | Add 5 unit tests for the three new builder methods |
 
-No changes to: `MutationAuditLogEntry.cs` (already supports `"SOFT_DELETE"` per its xmldoc), `FormForgeDbContext.cs`, `Program.cs`, `DynamicRecord.cs`, `DynamicRecordJsonConverter.cs`, `DynamicPayloadValidator.cs`. No new EF migration required.
+No changes to: `MutationAuditLogEntry.cs` (already supports `"SOFT_DELETE"` per its xmldoc), `AppForgeDbContext.cs`, `Program.cs`, `DynamicRecord.cs`, `DynamicRecordJsonConverter.cs`, `DynamicPayloadValidator.cs`. No new EF migration required.
 
 **Import to add in `DynamicDataEndpoints.cs`:** `using Npgsql;` — required for the `NpgsqlConnection` cast and `NpgsqlTransaction`.
 
@@ -879,12 +879,12 @@ No changes to: `MutationAuditLogEntry.cs` (already supports `"SOFT_DELETE"` per 
 
 ### References
 
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`] — `UpdateRecordHandler` (lines 438–620) — mirror SafeIdentifier → EF binding → registry → actorId extraction; single-finally try/finally for connection disposal; `Problems` inner class for new `RecordAlreadyDeleted()`; route registration pattern after `MapPut`
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`] — `BuildUpdateQuery` (lines 307–358) — mirror the WHERE `AND "is_deleted" = false` pattern; `BuildGetByIdQuery` (lines 203–219) — used inside the handler for the pre-DELETE SELECT; `BuildFkColumnName` (lines 363–368) — used by `SoftDeleteCascade.ExecuteAsync` for each child level
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs:GetRecordHandler`] — lines 230–246 — child schema loading via EF before opening Dapper connection; mirror in `SoftDeleteCascade.BuildSchemaGraphAsync`
-- [Source: `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`] — NpgsqlTransaction pattern with `BeginTransactionAsync`, `CommitAsync`, `RollbackAsync(CancellationToken.None)` — mirror for the cascade transaction
-- [Source: `src/FormForge.Api/Features/Provisioning/CycleDetector.cs`] — DFS with `inStack`/`visited` sets — the `visited` HashSet in `SoftDeleteCascade.ExecuteAsync` is a simpler variant of this pattern (no back-edge detection needed since cycles were already prevented at bind time)
-- [Source: `src/FormForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs`] — copy all helpers verbatim; TRUNCATE statement (line 50); `[Collection("DynamicCrudTests")]` attribute; dynamic-table DROP loop; `ReseedSystemRolesAsync` + `SeedTestUsersAsync`; `GetUserIdFromToken` helper
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`] — `UpdateRecordHandler` (lines 438–620) — mirror SafeIdentifier → EF binding → registry → actorId extraction; single-finally try/finally for connection disposal; `Problems` inner class for new `RecordAlreadyDeleted()`; route registration pattern after `MapPut`
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`] — `BuildUpdateQuery` (lines 307–358) — mirror the WHERE `AND "is_deleted" = false` pattern; `BuildGetByIdQuery` (lines 203–219) — used inside the handler for the pre-DELETE SELECT; `BuildFkColumnName` (lines 363–368) — used by `SoftDeleteCascade.ExecuteAsync` for each child level
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs:GetRecordHandler`] — lines 230–246 — child schema loading via EF before opening Dapper connection; mirror in `SoftDeleteCascade.BuildSchemaGraphAsync`
+- [Source: `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`] — NpgsqlTransaction pattern with `BeginTransactionAsync`, `CommitAsync`, `RollbackAsync(CancellationToken.None)` — mirror for the cascade transaction
+- [Source: `src/AppForge.Api/Features/Provisioning/CycleDetector.cs`] — DFS with `inStack`/`visited` sets — the `visited` HashSet in `SoftDeleteCascade.ExecuteAsync` is a simpler variant of this pattern (no back-edge detection needed since cycles were already prevented at bind time)
+- [Source: `src/AppForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs`] — copy all helpers verbatim; TRUNCATE statement (line 50); `[Collection("DynamicCrudTests")]` attribute; dynamic-table DROP loop; `ReseedSystemRolesAsync` + `SeedTestUsersAsync`; `GetUserIdFromToken` helper
 - [Architecture: Decision 1.3] — full transitive cascade; `cascade_event_id` UUID NULL semantics; individual vs cascade distinction; bounded by cycle detection
 - [Architecture: AR-46 Option C] — `DynamicRecordJsonConverter` handles `cascade_event_id` → `cascadeEventId` automatically; `is_deleted` → `isDeleted: true`
 - [Architecture: Decision 1.6] — `commandTimeout: 5` on all Dapper calls; EF + Dapper separated transactions (audit via EF AFTER cascade transaction commits)
@@ -909,15 +909,15 @@ claude-opus-4-7 (Opus 4.7, 1M context)
 ### File List
 
 **New:**
-- `src/FormForge.Api/Features/DynamicCrud/SoftDeleteCascade.cs`
-- `src/FormForge.Api.Tests/Features/DynamicCrud/SoftDeleteIntegrationTests.cs`
+- `src/AppForge.Api/Features/DynamicCrud/SoftDeleteCascade.cs`
+- `src/AppForge.Api.Tests/Features/DynamicCrud/SoftDeleteIntegrationTests.cs`
 - `web/src/features/data-entry/deleteRecordApi.ts`
 - `web/src/features/data-entry/useDeleteRecord.ts`
 
 **Modified:**
-- `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs` — 3 new static methods
-- `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` — `using Npgsql;`, `MapDelete` route, `Problems.RecordAlreadyDeleted()`, `DeleteRecordHandler`
-- `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` — 5 new unit tests
+- `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs` — 3 new static methods
+- `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` — `using Npgsql;`, `MapDelete` route, `Problems.RecordAlreadyDeleted()`, `DeleteRecordHandler`
+- `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` — 5 new unit tests
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — story 6-5 ready-for-dev → review
 
 ---

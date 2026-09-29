@@ -8,7 +8,7 @@
     "catppuccinLatte": "Catppuccin Latte"
   },
   "app": {
-    "home": "Form Forge"
+    "home": "App Forge"
   },
   "auth": {
     "login": {
@@ -112,7 +112,7 @@
     }
   },
   "nav": {
-    "brandName": "Form Forge",
+    "brandName": "App Forge",
     "admin": "Admin",
     "settings": "Settings",
     "openMenu": "Open menu",

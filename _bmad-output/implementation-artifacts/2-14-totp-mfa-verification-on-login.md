@@ -34,9 +34,9 @@ so that a second factor is required to obtain a session.
 ## Tasks / Subtasks
 
 - [x] Task 1: New DTOs and validator for `POST /api/auth/mfa/verify` (AC-1, AC-2, AC-3)
-  - [x] Create `src/FormForge.Api/Features/Auth/Dtos/MfaRequiredResponse.cs`
-  - [x] Create `src/FormForge.Api/Features/Auth/Dtos/MfaVerifyLoginRequest.cs`
-  - [x] Create `src/FormForge.Api/Features/Auth/Validators/MfaVerifyLoginRequestValidator.cs`
+  - [x] Create `src/AppForge.Api/Features/Auth/Dtos/MfaRequiredResponse.cs`
+  - [x] Create `src/AppForge.Api/Features/Auth/Dtos/MfaVerifyLoginRequest.cs`
+  - [x] Create `src/AppForge.Api/Features/Auth/Validators/MfaVerifyLoginRequestValidator.cs`
   - [x] Register validator + `auth-mfa-verify` rate-limit policy in `Program.cs`
 
 - [x] Task 2: Extend `IMfaService` / `MfaService` for login-time MFA (AC-1–AC-6)
@@ -97,27 +97,27 @@ The two-step login exchange is designed as follows (per architecture Decision 2.
 
 ### Task 1: New DTOs and Validator
 
-**`src/FormForge.Api/Features/Auth/Dtos/MfaRequiredResponse.cs`** (new):
+**`src/AppForge.Api/Features/Auth/Dtos/MfaRequiredResponse.cs`** (new):
 ```csharp
-namespace FormForge.Api.Features.Auth.Dtos;
+namespace AppForge.Api.Features.Auth.Dtos;
 
 internal sealed record MfaRequiredResponse(bool MfaRequired, string MfaSessionToken);
 ```
 
-**`src/FormForge.Api/Features/Auth/Dtos/MfaVerifyLoginRequest.cs`** (new):
+**`src/AppForge.Api/Features/Auth/Dtos/MfaVerifyLoginRequest.cs`** (new):
 ```csharp
-namespace FormForge.Api.Features.Auth.Dtos;
+namespace AppForge.Api.Features.Auth.Dtos;
 
 internal sealed record MfaVerifyLoginRequest(string MfaSessionToken, string Code);
 ```
 
-**`src/FormForge.Api/Features/Auth/Validators/MfaVerifyLoginRequestValidator.cs`** (new — folder already exists with `LoginRequestValidator`, `ForgotPasswordRequestValidator`, `ResetPasswordRequestValidator`):
+**`src/AppForge.Api/Features/Auth/Validators/MfaVerifyLoginRequestValidator.cs`** (new — folder already exists with `LoginRequestValidator`, `ForgotPasswordRequestValidator`, `ResetPasswordRequestValidator`):
 ```csharp
 using System.Diagnostics.CodeAnalysis;
 using FluentValidation;
-using FormForge.Api.Features.Auth.Dtos;
+using AppForge.Api.Features.Auth.Dtos;
 
-namespace FormForge.Api.Features.Auth.Validators;
+namespace AppForge.Api.Features.Auth.Validators;
 
 [SuppressMessage("Performance", "CA1812", Justification = "Instantiated via DI")]
 internal sealed class MfaVerifyLoginRequestValidator : AbstractValidator<MfaVerifyLoginRequest>
@@ -297,7 +297,7 @@ internal sealed record AuthServiceResult(
 **Add `IMfaService mfaService` to `AuthService` constructor** (append to existing primary constructor — `AuthService` is `internal sealed partial class` with primary constructor syntax):
 ```csharp
 internal sealed partial class AuthService(
-    FormForgeDbContext db,
+    AppForgeDbContext db,
     IPasswordHasher passwordHasher,
     IJwtTokenService jwtTokenService,
     IOptions<JwtOptions> jwtOptions,
@@ -382,7 +382,7 @@ public async Task<AuthServiceResult> CompleteMfaLoginAsync(Guid userId, Cancella
 }
 ```
 
-**Check `AuthService.cs` `using` directives** — `IMfaService` is in `FormForge.Api.Features.Auth` (same namespace); no new using needed.
+**Check `AuthService.cs` `using` directives** — `IMfaService` is in `AppForge.Api.Features.Auth` (same namespace); no new using needed.
 
 ---
 
@@ -470,9 +470,9 @@ private static async Task<IResult> VerifyMfaLoginHandler(
 ```
 
 **New `using` for `AuthEndpoints.cs`** — check before adding (may already be present):
-- `using FormForge.Api.Features.Auth.Dtos;` — already present (has `LoginRequest`, `LoginResponse`, etc.)
+- `using AppForge.Api.Features.Auth.Dtos;` — already present (has `LoginRequest`, `LoginResponse`, etc.)
 
-`MfaLoginVerifyOutcome` and `IMfaService` are in namespace `FormForge.Api.Features.Auth` (same as `AuthEndpoints`) — no extra using needed.
+`MfaLoginVerifyOutcome` and `IMfaService` are in namespace `AppForge.Api.Features.Auth` (same as `AuthEndpoints`) — no extra using needed.
 
 ---
 
@@ -737,7 +737,7 @@ return (
 **Add to `AuthIntegrationTests.cs`** — new private helper methods for MFA test setup. Add these alongside the existing `LoginAsync`/`LoginFullAsync`/`SeedTestUserAsync` helpers:
 
 ```csharp
-// Requires Otp.NET reference — already added in Story 2.13 to FormForge.Api.Tests.csproj.
+// Requires Otp.NET reference — already added in Story 2.13 to AppForge.Api.Tests.csproj.
 // Add using OtpNet; at the top of the file if not already present.
 
 private async Task<MfaEnrolDto> EnrolMfaAsync(string bearerToken)
@@ -807,7 +807,7 @@ Assert.False(string.IsNullOrEmpty(mfaStart.MfaSessionToken));
 
 **`using` additions for `AuthIntegrationTests.cs`**:
 ```csharp
-using OtpNet; // already added to FormForge.Api.Tests.csproj in Story 2.13
+using OtpNet; // already added to AppForge.Api.Tests.csproj in Story 2.13
 using System.Net.Http.Headers;
 ```
 (Check existing `using` block — `System.Net.Http.Headers` may already be present.)
@@ -862,30 +862,30 @@ using System.Net.Http.Headers;
 
 | File | Purpose |
 |---|---|
-| `src/FormForge.Api/Features/Auth/Dtos/MfaRequiredResponse.cs` | Response DTO for MFA-gated login |
-| `src/FormForge.Api/Features/Auth/Dtos/MfaVerifyLoginRequest.cs` | Request DTO for `POST /api/auth/mfa/verify` |
-| `src/FormForge.Api/Features/Auth/Validators/MfaVerifyLoginRequestValidator.cs` | FluentValidation |
+| `src/AppForge.Api/Features/Auth/Dtos/MfaRequiredResponse.cs` | Response DTO for MFA-gated login |
+| `src/AppForge.Api/Features/Auth/Dtos/MfaVerifyLoginRequest.cs` | Request DTO for `POST /api/auth/mfa/verify` |
+| `src/AppForge.Api/Features/Auth/Validators/MfaVerifyLoginRequestValidator.cs` | FluentValidation |
 
 ### Files to MODIFY
 
 | File | Change |
 |---|---|
-| `src/FormForge.Api/Features/Auth/AuthService.cs` | Add `MfaRequired` outcome, `MfaSessionToken` in result, `IMfaService` injection, `CompleteMfaLoginAsync`, refactor `LoginAsync` |
-| `src/FormForge.Api/Features/Auth/MfaService.cs` | Add `MfaLoginVerifyOutcome`, `MfaLoginVerifyResult`, `CreateMfaSession`, `VerifyMfaLoginAsync` |
-| `src/FormForge.Api/Features/Auth/AuthEndpoints.cs` | Add `POST /mfa/verify` endpoint + handler; update `LoginHandler` switch |
-| `src/FormForge.Api/Program.cs` | Register `auth-mfa-verify` rate policy; register `MfaVerifyLoginRequestValidator` |
+| `src/AppForge.Api/Features/Auth/AuthService.cs` | Add `MfaRequired` outcome, `MfaSessionToken` in result, `IMfaService` injection, `CompleteMfaLoginAsync`, refactor `LoginAsync` |
+| `src/AppForge.Api/Features/Auth/MfaService.cs` | Add `MfaLoginVerifyOutcome`, `MfaLoginVerifyResult`, `CreateMfaSession`, `VerifyMfaLoginAsync` |
+| `src/AppForge.Api/Features/Auth/AuthEndpoints.cs` | Add `POST /mfa/verify` endpoint + handler; update `LoginHandler` switch |
+| `src/AppForge.Api/Program.cs` | Register `auth-mfa-verify` rate policy; register `MfaVerifyLoginRequestValidator` |
 | `web/src/features/auth/httpClient.ts` | Add `/api/auth/mfa/verify` to no-retry exclusion list |
 | `web/src/features/auth/types.ts` | Add `MfaRequiredResponse` and `LoginApiResponse` union |
 | `web/src/features/auth/authMutations.ts` | Modify `useLoginMutation`; add `useMfaLoginVerifyMutation` |
 | `web/src/routes/login.tsx` | MFA challenge screen (conditional render on mfaSessionToken state) |
 | `web/src/lib/i18n/locales/en.json` | `auth.mfaSessionInvalid`, `auth.mfaChallenge.*` keys |
-| `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs` | MFA test helpers + 7 new test methods |
+| `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs` | MFA test helpers + 7 new test methods |
 
 ### Files to Leave Untouched
 
-- `src/FormForge.Api/Features/Users/MeEndpoints.cs` — enrolment endpoints (2.13) unchanged
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs`'s `ForgotPasswordHandler`, `ResetPasswordHandler`, `RefreshHandler`, `LogoutHandler` — untouched
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — no schema changes needed
+- `src/AppForge.Api/Features/Users/MeEndpoints.cs` — enrolment endpoints (2.13) unchanged
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs`'s `ForgotPasswordHandler`, `ResetPasswordHandler`, `RefreshHandler`, `LogoutHandler` — untouched
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — no schema changes needed
 - All migrations — no DB schema change required for 2.14 (`mfa_backup_codes.used_at` already exists from 2.13)
 - `web/src/routes/_app/settings.tsx` — MFA enrolment UI (2.13) unchanged
 - All Designer, Menu, CRUD, Provisioning files — unrelated
@@ -896,11 +896,11 @@ using System.Net.Http.Headers;
 
 - [Source: `_bmad-output/planning-artifacts/epics.md` — Story 2.14 full AC (lines listing `mfaRequired`, `mfaSessionToken`, 5-failure eviction)]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` — Decision 2.12 TOTP MFA (two-step login exchange, IMemoryCache session, backup code stamping)]
-- [Source: `src/FormForge.Api/Features/Auth/AuthService.cs` — existing `LoginAsync` pattern to extend; `IssueLoginTokensAsync` private helper to extract]
-- [Source: `src/FormForge.Api/Features/Auth/AuthEndpoints.cs` — `LoginHandler`/`SetRefreshCookieAndReturn` pattern; endpoint registration style]
-- [Source: `src/FormForge.Api/Features/Auth/MfaService.cs` — existing `PendingEnrolment` cache pattern and `_protector` usage to mirror for `MfaLoginSession`]
-- [Source: `src/FormForge.Api/Features/Auth/Validators/` — folder exists with `LoginRequestValidator`, validator namespace/pattern to follow]
-- [Source: `src/FormForge.Api/Program.cs` — rate limiter block at ~line 299; DI registrations at ~line 151]
+- [Source: `src/AppForge.Api/Features/Auth/AuthService.cs` — existing `LoginAsync` pattern to extend; `IssueLoginTokensAsync` private helper to extract]
+- [Source: `src/AppForge.Api/Features/Auth/AuthEndpoints.cs` — `LoginHandler`/`SetRefreshCookieAndReturn` pattern; endpoint registration style]
+- [Source: `src/AppForge.Api/Features/Auth/MfaService.cs` — existing `PendingEnrolment` cache pattern and `_protector` usage to mirror for `MfaLoginSession`]
+- [Source: `src/AppForge.Api/Features/Auth/Validators/` — folder exists with `LoginRequestValidator`, validator namespace/pattern to follow]
+- [Source: `src/AppForge.Api/Program.cs` — rate limiter block at ~line 299; DI registrations at ~line 151]
 - [Source: `web/src/features/auth/httpClient.ts` — no-retry guard at `path !== '/api/auth/login'`; extend with `/api/auth/mfa/verify`]
 - [Source: `web/src/features/auth/authMutations.ts` — `useLoginMutation` full implementation to modify]
 - [Source: `web/src/routes/login.tsx` — existing login form structure to extend with MFA challenge conditional]
@@ -945,8 +945,8 @@ claude-opus-4-8 (implementation)
   error retry, session-expired reset) with new `auth.mfaChallenge.*` + `auth.mfaSessionInvalid`
   i18n keys. `auth.mfaCodeInvalid` reused from Story 2.13.
 - **Validation (confirmed via process exit codes + targeted output inspection):**
-  - `dotnet build` FormForge.Api — succeeded, 0 warnings / 0 errors.
-  - `dotnet build` FormForge.Api.Tests — succeeded, 0 warnings / 0 errors.
+  - `dotnet build` AppForge.Api — succeeded, 0 warnings / 0 errors.
+  - `dotnet build` AppForge.Api.Tests — succeeded, 0 warnings / 0 errors.
   - `dotnet test` full suite (Docker/Testcontainers PostgreSQL) — **753 passed / 2 failed /
     755 total**. All 7 new `AuthIntegrationTests` MFA tests passed. The 2 failures are the
     pre-existing, documented audit DELETE→405 tests
@@ -972,22 +972,22 @@ claude-opus-4-8 (implementation)
 ### File List
 
 **Created**
-- `src/FormForge.Api/Features/Auth/Dtos/MfaRequiredResponse.cs`
-- `src/FormForge.Api/Features/Auth/Dtos/MfaVerifyLoginRequest.cs`
-- `src/FormForge.Api/Features/Auth/Validators/MfaVerifyLoginRequestValidator.cs`
+- `src/AppForge.Api/Features/Auth/Dtos/MfaRequiredResponse.cs`
+- `src/AppForge.Api/Features/Auth/Dtos/MfaVerifyLoginRequest.cs`
+- `src/AppForge.Api/Features/Auth/Validators/MfaVerifyLoginRequestValidator.cs`
 
 **Modified**
-- `src/FormForge.Api/Features/Auth/MfaService.cs`
-- `src/FormForge.Api/Features/Auth/AuthService.cs`
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs`
-- `src/FormForge.Api/Program.cs`
-- `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`
+- `src/AppForge.Api/Features/Auth/MfaService.cs`
+- `src/AppForge.Api/Features/Auth/AuthService.cs`
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs`
+- `src/AppForge.Api/Program.cs`
+- `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`
 - `web/src/features/auth/httpClient.ts`
 - `web/src/features/auth/types.ts`
 - `web/src/features/auth/authMutations.ts`
 - `web/src/routes/login.tsx`
 - `web/src/lib/i18n/locales/en.json`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260531233219_AddDataProtectionKeys.cs` (pre-existing build-break fix — see Debug Log)
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260531233219_AddDataProtectionKeys.cs` (pre-existing build-break fix — see Debug Log)
 
 ### Change Log
 
@@ -1004,15 +1004,15 @@ _Adversarial code review 2026-06-01 (Blind Hunter + Edge Case Hunter + Acceptanc
 
 ### Decision Needed
 
-- [x] [Review][Decision] **MFA session consume + TOTP code reuse are not atomic / not deduped** — `VerifyMfaLoginAsync` only `cache.Remove`s the session *after* a successful verify, and the read→verify→remove sequence is non-atomic. Two concurrent verify requests carrying the same `mfaSessionToken` + same valid TOTP can both pass and both issue a JWT pair. Separately, a captured valid TOTP can be replayed against a *different* freshly-minted session within the ±1-step (~90s) window because no last-used TOTP counter is persisted per user (RFC 6238 §5.2). Hardening the cross-session replay needs a design call (persist last-used step on the user row vs. accept the risk). `[src/FormForge.Api/Features/Auth/MfaService.cs — VerifyMfaLoginAsync]`
-- [x] [Review][Decision] **Per-session 5-failure cap is bypassable; no per-user brute-force lockout** — The `MaxLoginFailAttempts = 5` eviction is per-session-token only. An attacker who already holds the password can call `/api/auth/login` repeatedly to mint fresh sessions (each `FailCount = 0`), so the real online-guess budget against a 6-digit TOTP is bounded only by the `auth-mfa-verify` 10/min/IP limiter, not by the 5-failure guard. AC-5 (per-session eviction) IS met; per-user lockout was never specified — adding it is a product decision. `[src/FormForge.Api/Features/Auth/MfaService.cs]`
+- [x] [Review][Decision] **MFA session consume + TOTP code reuse are not atomic / not deduped** — `VerifyMfaLoginAsync` only `cache.Remove`s the session *after* a successful verify, and the read→verify→remove sequence is non-atomic. Two concurrent verify requests carrying the same `mfaSessionToken` + same valid TOTP can both pass and both issue a JWT pair. Separately, a captured valid TOTP can be replayed against a *different* freshly-minted session within the ±1-step (~90s) window because no last-used TOTP counter is persisted per user (RFC 6238 §5.2). Hardening the cross-session replay needs a design call (persist last-used step on the user row vs. accept the risk). `[src/AppForge.Api/Features/Auth/MfaService.cs — VerifyMfaLoginAsync]`
+- [x] [Review][Decision] **Per-session 5-failure cap is bypassable; no per-user brute-force lockout** — The `MaxLoginFailAttempts = 5` eviction is per-session-token only. An attacker who already holds the password can call `/api/auth/login` repeatedly to mint fresh sessions (each `FailCount = 0`), so the real online-guess budget against a 6-digit TOTP is bounded only by the `auth-mfa-verify` 10/min/IP limiter, not by the 5-failure guard. AC-5 (per-session eviction) IS met; per-user lockout was never specified — adding it is a product decision. `[src/AppForge.Api/Features/Auth/MfaService.cs]`
 
 ### Patch
 
-- [x] [Review][Patch] **Backup-code single-use is a non-atomic check-then-act (concurrent double-spend)** `[src/FormForge.Api/Features/Auth/MfaService.cs — VerifyMfaLoginAsync, backup-code branch]` — Match is `FirstOrDefault(c => c.UsedAt is null && Verify(...))` then `matchingCode.UsedAt = now; SaveChangesAsync()` with no atomic guard. Two concurrent requests with the same valid backup code both see `UsedAt == null` and both succeed → one single-use code authenticates two sessions. The codebase already has the correct pattern in `AuthService.ResetPasswordAsync` (`ExecuteUpdateAsync` with `WHERE UsedAt == null` + rowcount check). Mirror it: after the in-memory bcrypt match, stamp via `ExecuteUpdateAsync(... WHERE Id == matchingCode.Id && UsedAt == null ...)` and treat rowcount 0 as already-used. The sequential single-use test passes; it does not cover the concurrent window.
-- [x] [Review][Patch] **"5-minute absolute TTL" is actually a sliding TTL; `IssuedAt` is dead** `[src/FormForge.Api/Features/Auth/MfaService.cs]` — Each wrong guess re-`Set`s the session with a fresh `TimeSpan.FromMinutes(5)`, and `MfaLoginSession.IssuedAt` is recorded but never read, so a client failing once every <5 min keeps the post-password/pre-JWT session alive far past the documented hard cap. Either enforce the absolute cap (check `UtcNow - IssuedAt >= 5min` at entry, or compute the remaining TTL from `IssuedAt` on re-Set) or drop the misleading comment + dead field.
-- [x] [Review][Patch] **Deleted-user race returns HTTP 500 instead of 401 and isn't logged** `[src/FormForge.Api/Features/Auth/AuthEndpoints.cs — VerifyMfaLoginHandler; AuthService.cs — CompleteMfaLoginAsync]` — If the user is deleted between session creation and verify, `CompleteMfaLoginAsync` returns `InvalidCredentials`, which the handler's non-Success arm maps to a generic 500 with no log line — an expected race surfaced as a server fault, polluting error dashboards. Map this to 401 (e.g. `MFA_SESSION_INVALID`) and log. (Note: the backup code is already stamped `used_at` before this point, so on this race the code is burned for a now-deleted user — acceptable given the user is gone, but resolved by the same handling.)
-- [x] [Review][Patch] **`mfa-verify` validator accepts up to 128 chars → bcrypt amplification on the backup path** `[src/FormForge.Api/Features/Auth/Validators/MfaVerifyLoginRequestValidator.cs]` — Any non-6-digit input routes to the backup branch and is bcrypt-verified against every unused backup code (~8–10 × ~250ms). The validator's `MaximumLength(128)` + `^[a-zA-Z0-9]+$` does not narrow `Code` to the two legitimate shapes (exactly 6 digits OR exactly 8 alphanumerics). Tighten the rule to those shapes to cap the work-per-request. (Deviates from the spec's prescribed `MaximumLength(128)`, but reduces a mild DoS-amplification vector with no AC impact.)
+- [x] [Review][Patch] **Backup-code single-use is a non-atomic check-then-act (concurrent double-spend)** `[src/AppForge.Api/Features/Auth/MfaService.cs — VerifyMfaLoginAsync, backup-code branch]` — Match is `FirstOrDefault(c => c.UsedAt is null && Verify(...))` then `matchingCode.UsedAt = now; SaveChangesAsync()` with no atomic guard. Two concurrent requests with the same valid backup code both see `UsedAt == null` and both succeed → one single-use code authenticates two sessions. The codebase already has the correct pattern in `AuthService.ResetPasswordAsync` (`ExecuteUpdateAsync` with `WHERE UsedAt == null` + rowcount check). Mirror it: after the in-memory bcrypt match, stamp via `ExecuteUpdateAsync(... WHERE Id == matchingCode.Id && UsedAt == null ...)` and treat rowcount 0 as already-used. The sequential single-use test passes; it does not cover the concurrent window.
+- [x] [Review][Patch] **"5-minute absolute TTL" is actually a sliding TTL; `IssuedAt` is dead** `[src/AppForge.Api/Features/Auth/MfaService.cs]` — Each wrong guess re-`Set`s the session with a fresh `TimeSpan.FromMinutes(5)`, and `MfaLoginSession.IssuedAt` is recorded but never read, so a client failing once every <5 min keeps the post-password/pre-JWT session alive far past the documented hard cap. Either enforce the absolute cap (check `UtcNow - IssuedAt >= 5min` at entry, or compute the remaining TTL from `IssuedAt` on re-Set) or drop the misleading comment + dead field.
+- [x] [Review][Patch] **Deleted-user race returns HTTP 500 instead of 401 and isn't logged** `[src/AppForge.Api/Features/Auth/AuthEndpoints.cs — VerifyMfaLoginHandler; AuthService.cs — CompleteMfaLoginAsync]` — If the user is deleted between session creation and verify, `CompleteMfaLoginAsync` returns `InvalidCredentials`, which the handler's non-Success arm maps to a generic 500 with no log line — an expected race surfaced as a server fault, polluting error dashboards. Map this to 401 (e.g. `MFA_SESSION_INVALID`) and log. (Note: the backup code is already stamped `used_at` before this point, so on this race the code is burned for a now-deleted user — acceptable given the user is gone, but resolved by the same handling.)
+- [x] [Review][Patch] **`mfa-verify` validator accepts up to 128 chars → bcrypt amplification on the backup path** `[src/AppForge.Api/Features/Auth/Validators/MfaVerifyLoginRequestValidator.cs]` — Any non-6-digit input routes to the backup branch and is bcrypt-verified against every unused backup code (~8–10 × ~250ms). The validator's `MaximumLength(128)` + `^[a-zA-Z0-9]+$` does not narrow `Code` to the two legitimate shapes (exactly 6 digits OR exactly 8 alphanumerics). Tighten the rule to those shapes to cap the work-per-request. (Deviates from the spec's prescribed `MaximumLength(128)`, but reduces a mild DoS-amplification vector with no AC impact.)
 
 ### Dismissed (5, recorded for traceability)
 
@@ -1039,16 +1039,16 @@ _Adversarial code review pass 2 (Blind Hunter + Edge Case Hunter + Acceptance Au
 
 #### Patch
 
-- [x] [Review][Patch] **Validator regex `\d{6}` accepts Unicode decimal digits — input misrouted to backup-code bcrypt path** `[src/FormForge.Api/Features/Auth/Validators/MfaVerifyLoginRequestValidator.cs]` — .NET `\d` matches all Unicode decimal digit categories (Arabic-Indic, fullwidth, etc.), not just ASCII 0–9. A 6-character string of Unicode digits (e.g. `٦٧٨٩٠١`) passes the validator's `^(\d{6}|[a-zA-Z0-9]{8})$` rule, but `code.All(char.IsAsciiDigit)` in `VerifyMfaLoginCoreAsync` returns false, routing the input to the backup-code branch where bcrypt verify fails harmlessly. No credential bypass, but the validator contract is violated. Fix: change the TOTP alternative to `[0-9]{6}` (ASCII digits only): `^([0-9]{6}|[a-zA-Z0-9]{8})$`.
+- [x] [Review][Patch] **Validator regex `\d{6}` accepts Unicode decimal digits — input misrouted to backup-code bcrypt path** `[src/AppForge.Api/Features/Auth/Validators/MfaVerifyLoginRequestValidator.cs]` — .NET `\d` matches all Unicode decimal digit categories (Arabic-Indic, fullwidth, etc.), not just ASCII 0–9. A 6-character string of Unicode digits (e.g. `٦٧٨٩٠١`) passes the validator's `^(\d{6}|[a-zA-Z0-9]{8})$` rule, but `code.All(char.IsAsciiDigit)` in `VerifyMfaLoginCoreAsync` returns false, routing the input to the backup-code branch where bcrypt verify fails harmlessly. No credential bypass, but the validator contract is violated. Fix: change the TOTP alternative to `[0-9]{6}` (ASCII digits only): `^([0-9]{6}|[a-zA-Z0-9]{8})$`.
 - [x] [Review][Patch] **MFA_SESSION_INVALID error message is silently lost when returning to password screen** `[web/src/routes/login.tsx — handleMfaVerify]` — When `MFA_SESSION_INVALID` fires, `setMfaSessionToken(null)` and `setMfaError(t('auth.mfaChallenge.sessionExpired'))` are batched in the same React update. Setting `mfaSessionToken` to null unmounts the MFA challenge screen (the `if (mfaSessionToken)` block), so `mfaError` is set but has no element to render it — the user is silently returned to the password form with no explanation. Fix: add a separate `loginScreenError` state (or reuse `mfaError` as a general login-page error) that persists after the challenge screen tears down and is displayed on the password form.
 - [x] [Review][Patch] **MFA challenge has no `<form>` wrapper — Enter key does not submit the code** `[web/src/routes/login.tsx — MFA challenge JSX]` — The challenge screen renders a plain `<div>` with an `onClick` handler on the Button. Pressing Enter in the autofocused `<Input id="mfa-code">` fires no submit handler, breaking both keyboard-only users and the standard UX expectation for a code-entry form. Fix: wrap the challenge content in `<form onSubmit={(e) => { e.preventDefault(); void handleMfaVerify() }}>` and change the Button `type` to `"submit"`.
-- [x] [Review][Patch] **`SessionGates` memory leak: entries for naturally-expired sessions are never removed** `[src/FormForge.Api/Features/Auth/MfaService.cs — CreateMfaSession / SessionGates]` — `SessionGates.TryRemove` is only called inside `VerifyMfaLoginAsync`'s `finally` block. If a session expires via `IMemoryCache` TTL (user closes browser before completing MFA), no eviction callback fires on `SessionGates`, so the `SemaphoreSlim` entry accumulates unbounded. Fix: register a `PostEvictionCallback` when creating the cache entry so the gate is cleaned up on natural expiry: use `cache.CreateEntry(SessionKey(token))` with `entry.RegisterPostEvictionCallback((key, _, _, _) => { SessionGates.TryRemove(((string)key)[MfaSessionPrefix.Length..], out _); })`.
+- [x] [Review][Patch] **`SessionGates` memory leak: entries for naturally-expired sessions are never removed** `[src/AppForge.Api/Features/Auth/MfaService.cs — CreateMfaSession / SessionGates]` — `SessionGates.TryRemove` is only called inside `VerifyMfaLoginAsync`'s `finally` block. If a session expires via `IMemoryCache` TTL (user closes browser before completing MFA), no eviction callback fires on `SessionGates`, so the `SemaphoreSlim` entry accumulates unbounded. Fix: register a `PostEvictionCallback` when creating the cache entry so the gate is cleaned up on natural expiry: use `cache.CreateEntry(SessionKey(token))` with `entry.RegisterPostEvictionCallback((key, _, _, _) => { SessionGates.TryRemove(((string)key)[MfaSessionPrefix.Length..], out _); })`.
 
 #### Defer
 
-- [x] [Review][Defer] **Cross-session TOTP replay within ±90 s window** `[src/FormForge.Api/Features/Auth/MfaService.cs]` — deferred, pre-existing. Accepted residual risk per Decision-1 in prior review pass; fixing requires a per-user last-used-step column and a DB migration. The per-token `SemaphoreSlim` gate prevents same-session double-issue; cross-session replay requires both knowledge of the password and interception of a live TOTP code.
-- [x] [Review][Defer] **Per-user brute-force lockout bypass via fresh session minting** `[src/FormForge.Api/Features/Auth/MfaService.cs]` — deferred, pre-existing. Accepted per Decision-2 in prior review pass; per-user lockout was never specified and adds an account-lockout DoS surface. Rate-limited to 10/min/IP.
-- [x] [Review][Defer] **MFA session token delivered in JSON response body — accessible to XSS** `[src/FormForge.Api/Features/Auth/AuthEndpoints.cs, web/src/features/auth/authMutations.ts]` — deferred, architectural decision. Spec-defined response shape `{ mfaRequired: true, mfaSessionToken }` is a JSON body. Token is short-lived (5 min) and single-use. Hardening requires a server-set HttpOnly cookie for the session token, a non-trivial protocol change.
-- [x] [Review][Defer] **Timing oracle: empty or exhausted backup codes take ~0 ms (no bcrypt work)** `[src/FormForge.Api/Features/Auth/MfaService.cs — VerifyMfaLoginCoreAsync, backup-code branch]` — deferred. When `user.BackupCodes` is empty or all codes have `UsedAt != null`, `FirstOrDefault` returns null and no bcrypt calls are made, producing a measurably faster response. Observing this timing difference leaks that no unused backup codes remain. Exploitation requires sub-millisecond timing precision. Mitigate in a future hardening pass with a constant-time dummy bcrypt call when no candidates are found.
-- [x] [Review][Defer] **`mfaResult.UserId!.Value` null-suppression is fragile to future outcome variants** `[src/FormForge.Api/Features/Auth/AuthEndpoints.cs — VerifyMfaLoginHandler]` — deferred. Safe today: all non-Success outcomes are guarded by early returns before the dereference. If a future `MfaLoginVerifyOutcome` variant has a null `UserId` and no early-return guard, this becomes a `NullReferenceException`. Consider changing `UserId` to a non-nullable `Guid` on the `Success` variant via a discriminated-union pattern.
+- [x] [Review][Defer] **Cross-session TOTP replay within ±90 s window** `[src/AppForge.Api/Features/Auth/MfaService.cs]` — deferred, pre-existing. Accepted residual risk per Decision-1 in prior review pass; fixing requires a per-user last-used-step column and a DB migration. The per-token `SemaphoreSlim` gate prevents same-session double-issue; cross-session replay requires both knowledge of the password and interception of a live TOTP code.
+- [x] [Review][Defer] **Per-user brute-force lockout bypass via fresh session minting** `[src/AppForge.Api/Features/Auth/MfaService.cs]` — deferred, pre-existing. Accepted per Decision-2 in prior review pass; per-user lockout was never specified and adds an account-lockout DoS surface. Rate-limited to 10/min/IP.
+- [x] [Review][Defer] **MFA session token delivered in JSON response body — accessible to XSS** `[src/AppForge.Api/Features/Auth/AuthEndpoints.cs, web/src/features/auth/authMutations.ts]` — deferred, architectural decision. Spec-defined response shape `{ mfaRequired: true, mfaSessionToken }` is a JSON body. Token is short-lived (5 min) and single-use. Hardening requires a server-set HttpOnly cookie for the session token, a non-trivial protocol change.
+- [x] [Review][Defer] **Timing oracle: empty or exhausted backup codes take ~0 ms (no bcrypt work)** `[src/AppForge.Api/Features/Auth/MfaService.cs — VerifyMfaLoginCoreAsync, backup-code branch]` — deferred. When `user.BackupCodes` is empty or all codes have `UsedAt != null`, `FirstOrDefault` returns null and no bcrypt calls are made, producing a measurably faster response. Observing this timing difference leaks that no unused backup codes remain. Exploitation requires sub-millisecond timing precision. Mitigate in a future hardening pass with a constant-time dummy bcrypt call when no candidates are found.
+- [x] [Review][Defer] **`mfaResult.UserId!.Value` null-suppression is fragile to future outcome variants** `[src/AppForge.Api/Features/Auth/AuthEndpoints.cs — VerifyMfaLoginHandler]` — deferred. Safe today: all non-Success outcomes are guarded by early returns before the dereference. If a future `MfaLoginVerifyOutcome` variant has a null `UserId` and no early-return guard, this becomes a `NullReferenceException`. Consider changing `UserId` to a non-nullable `Guid` on the `Success` variant via a discriminated-union pattern.
 - [x] [Review][Defer] **Backup-code toggle button lacks `aria-pressed` / accessible state** `[web/src/routes/login.tsx — MFA challenge JSX]` — deferred. The `<button type="button">` toggles between "Use a backup code instead" and "Use authenticator code instead" but carries no `aria-pressed` or `aria-describedby` state to communicate the active mode to screen readers. Accessibility polish; address in a dedicated a11y pass.

@@ -48,19 +48,19 @@ So that I can define a Dataset using hand-authored SQL, with the server rejectin
     <PackageVersion Include="PgQuery.NET" Version="2.1.2" />
     ```
     Verify the latest stable `PgQuery.NET` version on NuGet.org at implementation time (search "PgQuery.NET" — pick the build wrapping `libpg_query` with protobuf AST output). The package ships native binaries for linux-x64, linux-arm64, win-x64, and osx — no special RuntimeIdentifier flags needed.
-  - [x] In `src/FormForge.Api/FormForge.Api.csproj`, add to the existing PackageReference ItemGroup (alphabetical order):
+  - [x] In `src/AppForge.Api/AppForge.Api.csproj`, add to the existing PackageReference ItemGroup (alphabetical order):
     ```xml
     <PackageReference Include="PgQuery.NET" />
     ```
   - [x] Run `dotnet restore` and confirm the package resolves without errors.
-  - [x] **The tests project does NOT need `PgQuery.NET`** — it references `FormForge.Api.csproj` via `<ProjectReference>`, which transitively includes the runtime. `InternalsVisibleTo` already allows the tests to call `SqlSelectEnforcer.Validate` directly.
+  - [x] **The tests project does NOT need `PgQuery.NET`** — it references `AppForge.Api.csproj` via `<ProjectReference>`, which transitively includes the runtime. `InternalsVisibleTo` already allows the tests to call `SqlSelectEnforcer.Validate` directly.
 
 - [x] **Task 2 — Create `SqlSelectEnforcer.cs`** (AC-2 / AC-4 / AC-5)
-  - [x] Create `src/FormForge.Api/Features/Datasets/SqlSelectEnforcer.cs`:
+  - [x] Create `src/AppForge.Api/Features/Datasets/SqlSelectEnforcer.cs`:
     ```csharp
     using PgQuery;
 
-    namespace FormForge.Api.Features.Datasets;
+    namespace AppForge.Api.Features.Datasets;
 
     // Story 8.8 (FR-60 / AR-61) — checkpoint (a): SELECT-only enforcement for
     // Custom Query create/update, before any VIEW DDL executes. Checkpoints (b)
@@ -115,10 +115,10 @@ So that I can define a Dataset using hand-authored SQL, with the server rejectin
     README or IntelliSense after restore. The `catch (Exception)` is intentional — the exception type
     for parse failure varies by version (`ParseException` or `PgQueryException`); catching `Exception`
     is safe because this is a known boundary with no side effects.
-  - [x] Run `dotnet build src/FormForge.Api` — 0 errors, 0 warnings.
+  - [x] Run `dotnet build src/AppForge.Api` — 0 errors, 0 warnings.
 
 - [x] **Task 3 — Wire enforcer into `DatasetService.CreateAsync`** (AC-2 / AC-4 / AC-5)
-  - [x] Open `src/FormForge.Api/Features/Datasets/DatasetService.cs`.
+  - [x] Open `src/AppForge.Api/Features/Datasets/DatasetService.cs`.
   - [x] In `CreateAsync`, add the enforcer call **after** `effectiveQuery` and `viewDdl` are computed,
         **before** `var conn = await connectionFactory.CreateOpenConnectionAsync(ct)`.
         This ensures no DB resources are consumed on invalid input (AC-5):
@@ -165,14 +165,14 @@ So that I can define a Dataset using hand-authored SQL, with the server rejectin
         mapping already carries `result.ErrorDetail` through to HTTP 422.
 
 - [x] **Task 5 — Unit tests: `SqlSelectEnforcerTests.cs`** (AC-2)
-  - [x] Create `src/FormForge.Api.Tests/Features/Datasets/SqlSelectEnforcerTests.cs`.
+  - [x] Create `src/AppForge.Api.Tests/Features/Datasets/SqlSelectEnforcerTests.cs`.
   - [x] These are **pure unit tests** (no Testcontainers, no WebApplicationFactory, no `[Collection]`).
         They call `SqlSelectEnforcer.Validate(sql)` directly — fast and isolated.
   - [x] No `[Collection("DatasetIntegrationTests")]` attribute — this is NOT an integration test.
     ```csharp
-    using FormForge.Api.Features.Datasets;
+    using AppForge.Api.Features.Datasets;
 
-    namespace FormForge.Api.Tests.Features.Datasets;
+    namespace AppForge.Api.Tests.Features.Datasets;
 
     public sealed class SqlSelectEnforcerTests
     {
@@ -342,7 +342,7 @@ So that I can define a Dataset using hand-authored SQL, with the server rejectin
         client-side validation from Story 8.3 and is unrelated to SQL content validation.
 
 - [x] **Task 7 — Build and test verification**
-  - [x] `dotnet build src/FormForge.Api` → 0 errors, 0 warnings
+  - [x] `dotnet build src/AppForge.Api` → 0 errors, 0 warnings
   - [x] `dotnet test --filter SqlSelectEnforcerTests` → all pass (fast unit tests, no containers)
   - [x] `dotnet test` (full suite) → 869+ passed, 2 pre-existing failures (audit DELETE→405 only)
   - [x] Web: `cd web && pnpm tsc --noEmit` → 0 errors (or equivalent type-check script in package.json)
@@ -431,22 +431,22 @@ Story 8.10 will use `t('datasets.sqlTextarea.emptyHint')` for the disabled-submi
 
 ### Central Package Management (`Directory.Packages.props`)
 
-This project uses `ManagePackageVersionsCentrally = true`. All package versions are in `Directory.Packages.props` — the `.csproj` has NO `Version` attributes. Adding a new package requires two edits: version in `Directory.Packages.props` AND reference in `FormForge.Api.csproj`.
+This project uses `ManagePackageVersionsCentrally = true`. All package versions are in `Directory.Packages.props` — the `.csproj` has NO `Version` attributes. Adding a new package requires two edits: version in `Directory.Packages.props` AND reference in `AppForge.Api.csproj`.
 
 ### Project Structure — Files Modified / Created
 
 ```
 NEW:
-  src/FormForge.Api/Features/Datasets/SqlSelectEnforcer.cs
-  src/FormForge.Api.Tests/Features/Datasets/SqlSelectEnforcerTests.cs
+  src/AppForge.Api/Features/Datasets/SqlSelectEnforcer.cs
+  src/AppForge.Api.Tests/Features/Datasets/SqlSelectEnforcerTests.cs
   web/src/features/datasets/SqlQueryTextarea.tsx
 
 MODIFIED:
   Directory.Packages.props
     — add <PackageVersion Include="PgQuery.NET" Version="x.y.z" />
-  src/FormForge.Api/FormForge.Api.csproj
+  src/AppForge.Api/AppForge.Api.csproj
     — add <PackageReference Include="PgQuery.NET" />
-  src/FormForge.Api/Features/Datasets/DatasetService.cs
+  src/AppForge.Api/Features/Datasets/DatasetService.cs
     — CreateAsync: add SqlSelectEnforcer.Validate call before connection open
     — UpdateAsync: add SqlSelectEnforcer.Validate call inside outer try, before primaryDdl Step E
   web/src/lib/i18n/locales/en.json
@@ -457,11 +457,11 @@ MODIFIED:
 
 - [Source: `_bmad-output/planning-artifacts/epics.md` — Epic 8, Story 8.8 ACs (FR-60 AC-1/4, FR-62 H-8 AC-3, AR-61)]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` — Decision 6.5: SqlSelectEnforcer, PgQuery.NET algorithm, three checkpoints]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetService.cs` — CreateAsync lines ~100-115 (enforcer insertion point), UpdateAsync Step D/E boundary (enforcer insertion point)]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — InvalidQuery → HTTP 422 mapping (no changes needed)]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetService.cs` — CreateAsync lines ~100-115 (enforcer insertion point), UpdateAsync Step D/E boundary (enforcer insertion point)]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — InvalidQuery → HTTP 422 mapping (no changes needed)]
 - [Source: `Directory.Packages.props` — CPM format (PackageVersion, ManagePackageVersionsCentrally = true)]
-- [Source: `src/FormForge.Api/FormForge.Api.csproj` — PackageReference format (no Version attribute in CPM)]
-- [Source: `src/FormForge.Api.Tests/FormForge.Api.Tests.csproj` — tests project structure; InternalsVisibleTo already configured in API project]
+- [Source: `src/AppForge.Api/AppForge.Api.csproj` — PackageReference format (no Version attribute in CPM)]
+- [Source: `src/AppForge.Api.Tests/AppForge.Api.Tests.csproj` — tests project structure; InternalsVisibleTo already configured in API project]
 - [Source: `web/src/features/datasets/validation.ts` — existing datasets feature folder (dataset_name validation, unrelated to this story)]
 - [Source: `web/src/components/ui/textarea.tsx` — existing shadcn/ui Textarea to wrap in SqlQueryTextarea]
 - [Source: `web/src/lib/i18n/locales/en.json` — existing `"datasets"` section (~lines 490-502); add `"sqlTextarea"` as new sibling key]
@@ -477,7 +477,7 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context) — BMad Dev Story workflow.
 
 ### Debug Log References
 
-- `dotnet build src/FormForge.Api` → 0 errors, 0 warnings (after package add + enforcer + Create/Update wiring).
+- `dotnet build src/AppForge.Api` → 0 errors, 0 warnings (after package add + enforcer + Create/Update wiring).
 - `dotnet test --filter SqlSelectEnforcerTests` → 24 passed (pure unit, no containers).
 - First full suite run surfaced 2 regressions (`PostDataset_DdlFailure_WritesFailedAuditRow`, `PutDataset_DdlFailure_WritesFailedAuditRow`) — see Completion Notes #3.
 - After regression fixes: affected classes (`DatasetViewLifecycleTests` + `DatasetUpdateTests`) → 20 passed.
@@ -494,17 +494,17 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context) — BMad Dev Story workflow.
 ### File List
 
 NEW:
-- `src/FormForge.Api/Features/Datasets/SqlSelectEnforcer.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/SqlSelectEnforcerTests.cs`
+- `src/AppForge.Api/Features/Datasets/SqlSelectEnforcer.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/SqlSelectEnforcerTests.cs`
 - `web/src/features/datasets/SqlQueryTextarea.tsx`
 
 MODIFIED:
 - `Directory.Packages.props` — add `<PackageVersion Include="pgsqlparser" Version="1.0.0" />` (substitute for the non-existent PgQuery.NET)
-- `src/FormForge.Api/FormForge.Api.csproj` — add `<PackageReference Include="pgsqlparser" />`
-- `src/FormForge.Api/Features/Datasets/DatasetService.cs` — `CreateAsync` + `UpdateAsync` enforcer calls (checkpoint a)
+- `src/AppForge.Api/AppForge.Api.csproj` — add `<PackageReference Include="pgsqlparser" />`
+- `src/AppForge.Api/Features/Datasets/DatasetService.cs` — `CreateAsync` + `UpdateAsync` enforcer calls (checkpoint a)
 - `web/src/lib/i18n/locales/en.json` — add `datasets.sqlTextarea.{label, placeholder, emptyHint}`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetViewLifecycleTests.cs` — fix `PostDataset_DdlFailure...` query; add `PostDataset_CustomQueryNonSelect_RejectedByEnforcer...`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs` — fix `PutDataset_DdlFailure...` query; add `PutDataset_CustomQueryNonSelect_RejectedByEnforcer...`
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetViewLifecycleTests.cs` — fix `PostDataset_DdlFailure...` query; add `PostDataset_CustomQueryNonSelect_RejectedByEnforcer...`
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs` — fix `PutDataset_DdlFailure...` query; add `PutDataset_CustomQueryNonSelect_RejectedByEnforcer...`
 
 ## Change Log
 

@@ -12,9 +12,9 @@ context: []
 
 ## Intent
 
-**Problem:** Dataset Manager Preview fails with `42P01 relation "public.message" does not exist` (Query Builder) and `relation "message" does not exist` (custom query). The builder SQL hardcodes `"public"."<table>"`, and the preview connection's search_path is only `{schema}_datasets, public`, so tenant tables in the tenant's own schema are never found. The `formforge_preview` role also has no USAGE on tenant schemas, which would hide them even if on the search_path.
+**Problem:** Dataset Manager Preview fails with `42P01 relation "public.message" does not exist` (Query Builder) and `relation "message" does not exist` (custom query). The builder SQL hardcodes `"public"."<table>"`, and the preview connection's search_path is only `{schema}_datasets, public`, so tenant tables in the tenant's own schema are never found. The `appforge_preview` role also has no USAGE on tenant schemas, which would hide them even if on the search_path.
 
-**Approach:** Emit unqualified quoted table names from the SQL generator, put the tenant schema on the preview search_path, and grant `formforge_preview` USAGE on the tenant and tenant-datasets schemas at onboarding.
+**Approach:** Emit unqualified quoted table names from the SQL generator, put the tenant schema on the preview search_path, and grant `appforge_preview` USAGE on the tenant and tenant-datasets schemas at onboarding.
 
 </frozen-after-approval>
 

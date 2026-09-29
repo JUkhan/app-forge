@@ -40,7 +40,7 @@ so that monitoring can alert on dependency failures.
 
 **Given** the MinIO health check
 **When** it queries MinIO
-**Then** it performs an HTTP HEAD request to the MinIO S3 endpoint at path `/formforge` (the bucket name)
+**Then** it performs an HTTP HEAD request to the MinIO S3 endpoint at path `/appforge` (the bucket name)
 **And** the request has a 5-second timeout
 **And** HTTP responses 200 and 403 are treated as `Healthy` (MinIO is reachable and bucket exists; 403 means auth required, which confirms MinIO is up)
 **And** HTTP response 404 is treated as `Unhealthy` (MinIO is reachable but bucket is missing — provisioning required)
@@ -59,7 +59,7 @@ so that monitoring can alert on dependency failures.
 **When** I GET `/health/live` or `/health/ready` or `/health`
 **Then** the endpoints respond (not 404)
 
-> This closes the deferred-work item: "Health endpoints only mapped in Development" (`ServiceDefaults/Extensions.cs:134-144`). The Aspire template gates these behind `IsDevelopment()` for security — FormForge intentionally exposes them in all environments behind its network boundary; platform-admin auth on `/health` is added in Story 2.6 as an additional guard.
+> This closes the deferred-work item: "Health endpoints only mapped in Development" (`ServiceDefaults/Extensions.cs:134-144`). The Aspire template gates these behind `IsDevelopment()` for security — AppForge intentionally exposes them in all environments behind its network boundary; platform-admin auth on `/health` is added in Story 2.6 as an additional guard.
 
 ---
 
@@ -68,25 +68,25 @@ so that monitoring can alert on dependency failures.
 - [x] **Task 1 — Add `AspNetCore.HealthChecks.NpgSql` package** (AC: 2, 3)
   - [x] Check NuGet for the latest stable `AspNetCore.HealthChecks.NpgSql` version compatible with `Npgsql 10.x`. Look for `10.0.x` (aligned with .NET 10); fall back to the latest `9.0.x` if no `10.x` release exists yet (package targets `netstandard2.1`, compatible with `net10.0`). Source: https://www.nuget.org/packages/AspNetCore.HealthChecks.NpgSql
   - [x] In `Directory.Packages.props`, add `<PackageVersion Include="AspNetCore.HealthChecks.NpgSql" Version="X.Y.Z" />` under the `<!-- API -->` comment block.
-  - [x] In `src/FormForge.Api/FormForge.Api.csproj`, add `<PackageReference Include="AspNetCore.HealthChecks.NpgSql" />` (no inline `Version=` — CPM enforced).
+  - [x] In `src/AppForge.Api/AppForge.Api.csproj`, add `<PackageReference Include="AspNetCore.HealthChecks.NpgSql" />` (no inline `Version=` — CPM enforced).
   - [x] Run `dotnet restore` — confirm clean (no NU1605 / NU1010). If a version conflict with `Npgsql` is detected, add `<PackageVersion Include="Npgsql" Version="10.x.y" />` to override the transitive pull.
 
 - [x] **Task 2 — Create `MinioHealthCheck.cs`** (AC: 4)
-  - [x] Create `src/FormForge.Api/Infrastructure/HealthChecks/MinioHealthCheck.cs`:
+  - [x] Create `src/AppForge.Api/Infrastructure/HealthChecks/MinioHealthCheck.cs`:
     - `internal sealed class MinioHealthCheck(IHttpClientFactory httpClientFactory, IConfiguration configuration) : IHealthCheck`
     - Primary config key: `configuration["services__minio__s3__0"]` (Aspire service discovery key set by `WithReference(minio.GetEndpoint("s3"))` in AppHost).
     - Fallback config key: `configuration["MinIO__Endpoint"]` (for Compose / non-Aspire environments, set in `docker-compose.yml`).
     - Fallback default: `"http://localhost:9000"` (local dev without Aspire).
-    - Build the HEAD request URL as `{minioEndpoint}/formforge` (the bucket name per AR-44 / FR-24).
+    - Build the HEAD request URL as `{minioEndpoint}/appforge` (the bucket name per AR-44 / FR-24).
     - Use `httpClientFactory.CreateClient("minio-health")` — a named client registered in Task 3.
     - Set `Timeout = TimeSpan.FromSeconds(5)` on the request via `CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)` with a 5s timeout, OR configure the named HttpClient's `Timeout = TimeSpan.FromSeconds(5)`.
     - Return `HealthCheckResult.Healthy()` on HTTP 200 or 403 (bucket exists, MinIO is up).
-    - Return `HealthCheckResult.Unhealthy("MinIO bucket 'formforge' not found (404). Bucket provisioning may be required.")` on HTTP 404.
+    - Return `HealthCheckResult.Unhealthy("MinIO bucket 'appforge' not found (404). Bucket provisioning may be required.")` on HTTP 404.
     - Catch `HttpRequestException` and `TaskCanceledException` and return `HealthCheckResult.Unhealthy("MinIO is unreachable.", exception)`.
     - Class is `internal sealed` to satisfy CA1515 + CA1852.
 
 - [x] **Task 3 — Create `HealthCheckJsonWriter.cs`** (AC: 1, 2, 3)
-  - [x] Create `src/FormForge.Api/Infrastructure/HealthChecks/HealthCheckJsonWriter.cs`:
+  - [x] Create `src/AppForge.Api/Infrastructure/HealthChecks/HealthCheckJsonWriter.cs`:
     - `internal static class HealthCheckJsonWriter`
     - `public static Task WriteResponse(HttpContext context, HealthReport report)` method.
     - Set `context.Response.ContentType = "application/json"`.
@@ -96,7 +96,7 @@ so that monitoring can alert on dependency failures.
     - `WriteMinimalResponse` variant used by `/health/live` only: omit `checks`, return `{ "status": "healthy" }` unconditionally (the endpoint predicate already ensures only the "self" liveness check runs, which always passes).
 
 - [x] **Task 4 — Create `LoggingHealthCheckPublisher.cs`** (AC: 5)
-  - [x] Create `src/FormForge.Api/Infrastructure/HealthChecks/LoggingHealthCheckPublisher.cs`:
+  - [x] Create `src/AppForge.Api/Infrastructure/HealthChecks/LoggingHealthCheckPublisher.cs`:
     - `internal sealed class LoggingHealthCheckPublisher(ILogger<LoggingHealthCheckPublisher> logger) : IHealthCheckPublisher`
     - `PublishAsync(HealthReport report, CancellationToken cancellationToken)`:
       - Log level: `Information` when `report.Status == HealthStatus.Healthy`; `Warning` otherwise.
@@ -117,8 +117,8 @@ so that monitoring can alert on dependency failures.
     builder.Services.AddHealthChecks()
         .AddNpgSql(
             connectionStringFactory: sp =>
-                builder.Configuration.GetConnectionString("formforge")
-                ?? throw new InvalidOperationException("Missing ConnectionStrings:formforge"),
+                builder.Configuration.GetConnectionString("appforge")
+                ?? throw new InvalidOperationException("Missing ConnectionStrings:appforge"),
             name: "postgres",
             failureStatus: HealthStatus.Unhealthy,
             tags: ["ready"])
@@ -149,7 +149,7 @@ so that monitoring can alert on dependency failures.
     ```
   - [x] Add required `using` statements:
     ```csharp
-    using FormForge.Api.Infrastructure.HealthChecks;
+    using AppForge.Api.Infrastructure.HealthChecks;
     using Microsoft.Extensions.Diagnostics.HealthChecks;
     ```
 
@@ -171,7 +171,7 @@ so that monitoring can alert on dependency failures.
   - [x] The three endpoints `/health/live`, `/health/ready`, and `/health` must **not** require authentication (AR-25 defers `/health` auth to Story 2.6; `/health/live` and `/health/ready` are always anonymous per AR-25).
 
 - [x] **Task 7 — Refactor `ServiceDefaults.MapDefaultEndpoints` to expose endpoints in all environments** (AC: 6)
-  - [x] In `src/FormForge.ServiceDefaults/Extensions.cs`:
+  - [x] In `src/AppForge.ServiceDefaults/Extensions.cs`:
     - Replace `AlivenessEndpointPath = "/alive"` constant with `LivenessEndpointPath = "/health/live"` and `ReadinessEndpointPath = "/health/ready"`.
     - Replace the `MapDefaultEndpoints` body:
       ```csharp
@@ -180,7 +180,7 @@ so that monitoring can alert on dependency failures.
           ArgumentNullException.ThrowIfNull(app);
 
           // /health/live and /health/ready are exposed in all environments (not just Development).
-          // AR-25: both endpoints are anonymous; /health (detailed) is mapped in FormForge.Api/Program.cs
+          // AR-25: both endpoints are anonymous; /health (detailed) is mapped in AppForge.Api/Program.cs
           // and receives platform-admin auth in Story 2.6.
 
           // Liveness: only the "self" tag check (always Healthy if process is up).
@@ -201,7 +201,7 @@ so that monitoring can alert on dependency failures.
           });
 
           // Readiness: only "ready" tagged checks (postgres + minio).
-          // Response writer configured per-app — FormForge.Api overrides for JSON shape.
+          // Response writer configured per-app — AppForge.Api overrides for JSON shape.
           app.MapHealthChecks(ReadinessEndpointPath, new HealthCheckOptions
           {
               Predicate = r => r.Tags.Contains("ready"),
@@ -225,7 +225,7 @@ so that monitoring can alert on dependency failures.
   - [x] Add missing `using Microsoft.AspNetCore.Http;` to `ServiceDefaults/Extensions.cs` if not already present (needed for `StatusCodes`).
 
 - [x] **Task 8 — Update `AppHost.cs` to use `/health/live`** (AC: 6)
-  - [x] In `src/FormForge.AppHost/AppHost.cs` line 23, change:
+  - [x] In `src/AppForge.AppHost/AppHost.cs` line 23, change:
     ```csharp
     .WithHttpHealthCheck("/alive")
     ```
@@ -236,20 +236,20 @@ so that monitoring can alert on dependency failures.
   - [x] This aligns the Aspire orchestrator's wait-for-ready probe with the canonical liveness endpoint.
 
 - [x] **Task 9 — Add unit and integration tests** (AC: 1, 2, 3, 4, 5)
-  - [x] Create `src/FormForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckEndpointsTests.cs`:
-    - Reuse the `FormForgeApiFactory` (WebApplicationFactory subclass) already created in Story 1.5 (`CorrelationIdMiddlewareTests.cs`) that sets a fake connection string so `Database.Migrate()` swallows quickly.
+  - [x] Create `src/AppForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckEndpointsTests.cs`:
+    - Reuse the `AppForgeApiFactory` (WebApplicationFactory subclass) already created in Story 1.5 (`CorrelationIdMiddlewareTests.cs`) that sets a fake connection string so `Database.Migrate()` swallows quickly.
     - **Test 1: `LiveEndpoint_AlwaysReturns200`** — `GET /health/live` → HTTP 200; body is `{"status":"healthy"}`.
     - **Test 2: `ReadyEndpoint_Returns503_WhenDependenciesUnavailable`** — in the test WebApplicationFactory, postgres and minio are not running → `GET /health/ready` → HTTP 503; body contains `"status":"unhealthy"` or `"status":"degraded"`.
     - **Test 3: `ReadyEndpoint_ResponseBodyIsValidJson`** — `GET /health/ready` returns Content-Type `application/json`; body is valid JSON parseable with `JsonDocument.Parse`.
     - **Test 4: `HealthEndpoint_Returns503_WhenDependenciesUnavailable`** — `GET /health` → HTTP 503; body contains `"status"` and `"checks"` keys; `"checks"` contains `"postgres"` and `"minio"` entries.
     - **Test 5: `HealthEndpoint_ResponseContainsCorrelationId_WhenResponseHeaderSet`** — `GET /health` returns `X-Correlation-ID` response header (correlation middleware runs on this path too).
-  - [x] Create `src/FormForge.Api.Tests/Infrastructure/HealthChecks/MinioHealthCheckTests.cs`:
+  - [x] Create `src/AppForge.Api.Tests/Infrastructure/HealthChecks/MinioHealthCheckTests.cs`:
     - **Test 1: `CheckAsync_Returns_Healthy_On_200Response`** — mock `IHttpClientFactory` to return 200 → `HealthCheckResult.Status == HealthStatus.Healthy`.
     - **Test 2: `CheckAsync_Returns_Healthy_On_403Response`** — mock to return 403 → `HealthStatus.Healthy` (MinIO is up, auth required).
     - **Test 3: `CheckAsync_Returns_Unhealthy_On_404Response`** — 404 → `HealthStatus.Unhealthy`, description contains "bucket" or "not found".
     - **Test 4: `CheckAsync_Returns_Unhealthy_On_ConnectionRefused`** — `IHttpClientFactory` client throws `HttpRequestException` → `HealthStatus.Unhealthy`.
     - **Test 5: `CheckAsync_Uses_MinioEndpointFromConfiguration`** — verify the HEAD request URL is built from `services__minio__s3__0` config key when present.
-  - [x] Create `src/FormForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckJsonWriterTests.cs`:
+  - [x] Create `src/AppForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckJsonWriterTests.cs`:
     - **Test 1: `WriteResponse_Healthy_Returns_LowercaseHealthyStatus`** — HealthReport with all Healthy checks → JSON status = `"healthy"`.
     - **Test 2: `WriteResponse_Unhealthy_Returns_LowercaseUnhealthyStatus`** — at least one Unhealthy check → JSON status = `"unhealthy"`.
     - **Test 3: `WriteResponse_Checks_ContainsExpectedKeys`** — two checks "postgres" and "minio" → JSON `checks` object has both keys.
@@ -261,11 +261,11 @@ so that monitoring can alert on dependency failures.
   - [x] `dotnet format --verify-no-changes` — clean.
   - [x] `dotnet test` — all new tests pass; no regressions. (49 tests pass, 0 failures.)
   - [x] `cd web && npm run build` — clean (no frontend changes; regression check only).
-  - [ ] Run API in Development (`dotnet run --project src/FormForge.Api`):
+  - [ ] Run API in Development (`dotnet run --project src/AppForge.Api`):
     - `curl -i http://localhost:{port}/health/live` → HTTP 200, body `{"status":"healthy"}`.
     - `curl -i http://localhost:{port}/health/ready` → HTTP 200 if postgres is running; 503 if not.
     - `curl -i http://localhost:{port}/health` → 200/503 with full `{ "status", "checks": { "postgres", "minio" } }` body.
-  - [ ] Run AppHost (`dotnet run --project src/FormForge.AppHost`) — confirm Aspire waits for `/health/live` (not `/alive`) before starting the frontend service; no 404 on the health probe.
+  - [ ] Run AppHost (`dotnet run --project src/AppForge.AppHost`) — confirm Aspire waits for `/health/live` (not `/alive`) before starting the frontend service; no 404 on the health probe.
   - [ ] Wait 30+ seconds — confirm the logging health check publisher emits a structured log line in the Aspire Dashboard.
 
 ---
@@ -277,7 +277,7 @@ so that monitoring can alert on dependency failures.
 **In scope:**
 1. **Three health check endpoints** — `/health/live` (liveness, always 200), `/health/ready` (readiness, 503 on dependency failure), `/health` (detailed, all checks, auth deferred).
 2. **PostgreSQL health check** — `AspNetCore.HealthChecks.NpgSql` verifying the connection string is reachable.
-3. **MinIO health check** — custom `MinioHealthCheck` using a HEAD request to the `formforge` bucket with 5s timeout.
+3. **MinIO health check** — custom `MinioHealthCheck` using a HEAD request to the `appforge` bucket with 5s timeout.
 4. **30-second logging publisher** — `LoggingHealthCheckPublisher` emits health status every 30 seconds via structured `ILogger` call.
 5. **Fix all-environment exposure** — removes the `IsDevelopment()` gate from `ServiceDefaults.MapDefaultEndpoints`; closes two deferred-work items.
 6. **AppHost update** — changes Aspire's wait probe from `/alive` to `/health/live`.
@@ -298,16 +298,16 @@ This story implements **FR-47** (Health Checks) in full and fulfills:
 
 ### Current code state (what you are modifying)
 
-**`src/FormForge.ServiceDefaults/Extensions.cs`** (159 lines, full content in Dev Notes of Story 1.5):
+**`src/AppForge.ServiceDefaults/Extensions.cs`** (159 lines, full content in Dev Notes of Story 1.5):
 - `AddDefaultHealthChecks` (lines 119–126): registers a "self" liveness check with tag `["live"]`. **Leave this intact** — it is the base that `/health/live` relies on.
 - `MapDefaultEndpoints` (lines 128–147): **replaces** the `IsDevelopment()` gated body (this is the fix).
 - `ConfigureOpenTelemetry` (lines 47–79): tracing filter at lines 67–69 uses `HealthEndpointPath = "/health"` and `AlivenessEndpointPath = "/alive"`. After this story, only the `/health` prefix filter remains (covers all three new paths). Remove the `AlivenessEndpointPath` constant and its reference in the filter since `/alive` is retired.
 
-**`src/FormForge.Api/Program.cs`** (105 lines, current full content in file structure section):
+**`src/AppForge.Api/Program.cs`** (105 lines, current full content in file structure section):
 - `builder.AddServiceDefaults()` (line 11) already calls `AddDefaultHealthChecks()` which seeds the "self" check. The story adds postgres and minio checks afterward by calling `builder.Services.AddHealthChecks()` again — this chains into the same `IHealthChecksBuilder` instance.
 - `app.MapDefaultEndpoints()` (line 90) maps `/health/live` and `/health/ready` (after ServiceDefaults refactor). Story 1.6 adds `app.MapHealthChecks("/health", ...)` on the next line.
 
-**`src/FormForge.AppHost/AppHost.cs`** (31 lines):
+**`src/AppForge.AppHost/AppHost.cs`** (31 lines):
 - Line 23: `.WithHttpHealthCheck("/alive")` → change to `.WithHttpHealthCheck("/health/live")`.
 - This is the only change in AppHost. The URL change means Aspire will now probe `/health/live` to know the API is ready before starting the frontend. Since `/health/live` is always 200 (no dependency checks), it behaves identically to `/alive`.
 
@@ -337,7 +337,7 @@ The `MinioHealthCheck` constructor reads these in priority order: `services__min
   "status": "healthy",
   "checks": {
     "postgres": { "status": "healthy", "description": null },
-    "minio": { "status": "healthy", "description": "MinIO bucket 'formforge' reachable" }
+    "minio": { "status": "healthy", "description": "MinIO bucket 'appforge' reachable" }
   }
 }
 ```
@@ -366,7 +366,7 @@ Inherited context relevant to this story:
 - **`AnalysisMode=AllEnabledByDefault`** — every CA rule is on; CA1515, CA1852, CA2254 will fire.
 - **CPM enforced** — new package (`AspNetCore.HealthChecks.NpgSql`) version goes in `Directory.Packages.props`; no inline `Version=` on `<PackageReference>`.
 - **`InvariantGlobalization=true`** — use `StringComparison.Ordinal` for any path/header comparisons; `ToLowerInvariant()` instead of `ToLower()`.
-- **`WebApplicationFactory<Program>` pattern** — `FormForgeApiFactory` already exists in `CorrelationIdMiddlewareTests.cs`. Reuse it. It sets an unreachable postgres connection string; `Database.Migrate()` fails inside the existing `try/catch` and startup continues. **Do not add a test-only branch in `Program.cs`.**
+- **`WebApplicationFactory<Program>` pattern** — `AppForgeApiFactory` already exists in `CorrelationIdMiddlewareTests.cs`. Reuse it. It sets an unreachable postgres connection string; `Database.Migrate()` fails inside the existing `try/catch` and startup continues. **Do not add a test-only branch in `Program.cs`.**
 - **CA1812 suppression pattern** — if the compiler can't see the health check implementations instantiated (they're registered via DI), add `[SuppressMessage("Performance", "CA1812", ...)]` with justification comment.
 - **`#pragma warning disable CA1031`** pattern exists in `Program.cs` line 71–73 for migration catch. The `MinioHealthCheck` should catch only `HttpRequestException` and `OperationCanceledException` (not general `Exception`) to stay within the spirit of CA1031.
 - **`public partial class Program;`** exists at bottom of `Program.cs` — do not duplicate it.
@@ -394,26 +394,26 @@ After this story lands: `Story 1.6 — Health check endpoints: /health/live, /he
 
 **Touch:**
 - `Directory.Packages.props` — add `AspNetCore.HealthChecks.NpgSql` PackageVersion
-- `src/FormForge.Api/FormForge.Api.csproj` — add `AspNetCore.HealthChecks.NpgSql` PackageReference
-- `src/FormForge.ServiceDefaults/Extensions.cs` — refactor `MapDefaultEndpoints`, update constants + tracing filter
-- `src/FormForge.AppHost/AppHost.cs` — update `.WithHttpHealthCheck("/alive")` to `/health/live`
-- `src/FormForge.Api/Program.cs` — register health checks, publisher, named HttpClient; map `/health` endpoint
+- `src/AppForge.Api/AppForge.Api.csproj` — add `AspNetCore.HealthChecks.NpgSql` PackageReference
+- `src/AppForge.ServiceDefaults/Extensions.cs` — refactor `MapDefaultEndpoints`, update constants + tracing filter
+- `src/AppForge.AppHost/AppHost.cs` — update `.WithHttpHealthCheck("/alive")` to `/health/live`
+- `src/AppForge.Api/Program.cs` — register health checks, publisher, named HttpClient; map `/health` endpoint
 - `docker-compose.yml` — add `MinIO__Endpoint=http://minio:9000` to api service environment
 - `_bmad-output/implementation-artifacts/deferred-work.md` — mark two items closed
 
 **New:**
-- `src/FormForge.Api/Infrastructure/HealthChecks/MinioHealthCheck.cs`
-- `src/FormForge.Api/Infrastructure/HealthChecks/HealthCheckJsonWriter.cs`
-- `src/FormForge.Api/Infrastructure/HealthChecks/LoggingHealthCheckPublisher.cs`
-- `src/FormForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckEndpointsTests.cs`
-- `src/FormForge.Api.Tests/Infrastructure/HealthChecks/MinioHealthCheckTests.cs`
-- `src/FormForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckJsonWriterTests.cs`
+- `src/AppForge.Api/Infrastructure/HealthChecks/MinioHealthCheck.cs`
+- `src/AppForge.Api/Infrastructure/HealthChecks/HealthCheckJsonWriter.cs`
+- `src/AppForge.Api/Infrastructure/HealthChecks/LoggingHealthCheckPublisher.cs`
+- `src/AppForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckEndpointsTests.cs`
+- `src/AppForge.Api.Tests/Infrastructure/HealthChecks/MinioHealthCheckTests.cs`
+- `src/AppForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckJsonWriterTests.cs`
 
 **Do NOT touch:**
-- `src/FormForge.ServiceDefaults/Extensions.cs:119-126` (`AddDefaultHealthChecks`) — the "self" liveness check registration stays intact
-- `src/FormForge.Api/appsettings.json` — no config changes needed; endpoint URLs come from env vars (Aspire injection or Compose)
+- `src/AppForge.ServiceDefaults/Extensions.cs:119-126` (`AddDefaultHealthChecks`) — the "self" liveness check registration stays intact
+- `src/AppForge.Api/appsettings.json` — no config changes needed; endpoint URLs come from env vars (Aspire injection or Compose)
 - `web/` — no frontend changes
-- `src/FormForge.Api/Common/` — no changes to existing middleware or logging helpers
+- `src/AppForge.Api/Common/` — no changes to existing middleware or logging helpers
 - Any EF Core migration files
 
 ### Anti-patterns to avoid
@@ -437,19 +437,19 @@ tinnitus/
 ├── Directory.Packages.props       ← ADD AspNetCore.HealthChecks.NpgSql version
 ├── docker-compose.yml             ← ADD MinIO__Endpoint env var to api service
 ├── src/
-│   ├── FormForge.AppHost/
+│   ├── AppForge.AppHost/
 │   │   └── AppHost.cs             ← UPDATE .WithHttpHealthCheck("/alive") → "/health/live"
-│   ├── FormForge.ServiceDefaults/
+│   ├── AppForge.ServiceDefaults/
 │   │   └── Extensions.cs          ← REFACTOR MapDefaultEndpoints; update constants + filter
-│   ├── FormForge.Api/
-│   │   ├── FormForge.Api.csproj   ← ADD AspNetCore.HealthChecks.NpgSql PackageReference
+│   ├── AppForge.Api/
+│   │   ├── AppForge.Api.csproj   ← ADD AspNetCore.HealthChecks.NpgSql PackageReference
 │   │   ├── Program.cs             ← ADD health check registrations, publisher, /health mapping
 │   │   └── Infrastructure/
 │   │       └── HealthChecks/      ← NEW directory
 │   │           ├── MinioHealthCheck.cs
 │   │           ├── HealthCheckJsonWriter.cs
 │   │           └── LoggingHealthCheckPublisher.cs
-│   └── FormForge.Api.Tests/
+│   └── AppForge.Api.Tests/
 │       └── Infrastructure/
 │           └── HealthChecks/      ← NEW directory
 │               ├── HealthCheckEndpointsTests.cs
@@ -463,7 +463,7 @@ tinnitus/
 ### Testing standards summary
 
 - **Framework:** xUnit (already pinned via CPM).
-- **Integration tests (`HealthCheckEndpointsTests`):** `WebApplicationFactory<Program>` via `FormForgeApiFactory` (existing in `CorrelationIdMiddlewareTests.cs`). PostgreSQL and MinIO are not running — health checks fail → readiness/detailed endpoints return 503. This is correct test behavior.
+- **Integration tests (`HealthCheckEndpointsTests`):** `WebApplicationFactory<Program>` via `AppForgeApiFactory` (existing in `CorrelationIdMiddlewareTests.cs`). PostgreSQL and MinIO are not running — health checks fail → readiness/detailed endpoints return 503. This is correct test behavior.
 - **Unit tests (`MinioHealthCheckTests`):** Construct `MinioHealthCheck` directly, using a mock `HttpMessageHandler` (the standard xUnit approach: subclass `HttpMessageHandler`, override `SendAsync`, inject via `new HttpClient(handler)`). No `WebApplicationFactory` needed.
 - **Unit tests (`HealthCheckJsonWriterTests`):** Construct a minimal `HealthReport` from a `Dictionary<string, HealthReportEntry>`. Use `new DefaultHttpContext()` to test the writer without a real host.
 - **No Testcontainers** for health check tests — test environments without running PG/MinIO are the valid test scenario for the 503 path.
@@ -500,7 +500,7 @@ claude-sonnet-4-6
 - No debug log. Clean run: all builds succeeded on first attempt after fixing `partial` modifier on `LoggingHealthCheckPublisher`, adding `using Microsoft.AspNetCore.Diagnostics.HealthChecks;` in `Program.cs`, and pre-computing logger arguments to satisfy CA1873.
 - CA2234 in tests fixed by using `HttpRequestMessage` instead of passing strings to `GetAsync`.
 - CA2000 in tests fixed by `using` declarations on all `HttpClient` and `HttpMessageHandler` instances.
-- `HealthCheckJsonWriter` kept in `FormForge.Api`; `ServiceDefaults` uses an equivalent private inline method (`WriteHealthReportAsJson`) to avoid circular dependency — JSON shape is identical.
+- `HealthCheckJsonWriter` kept in `AppForge.Api`; `ServiceDefaults` uses an equivalent private inline method (`WriteHealthReportAsJson`) to avoid circular dependency — JSON shape is identical.
 
 ### Completion Notes List
 
@@ -520,28 +520,28 @@ claude-sonnet-4-6
 
 **Modified:**
 - `Directory.Packages.props`
-- `src/FormForge.Api/FormForge.Api.csproj`
-- `src/FormForge.ServiceDefaults/Extensions.cs`
-- `src/FormForge.AppHost/AppHost.cs`
-- `src/FormForge.Api/Program.cs`
+- `src/AppForge.Api/AppForge.Api.csproj`
+- `src/AppForge.ServiceDefaults/Extensions.cs`
+- `src/AppForge.AppHost/AppHost.cs`
+- `src/AppForge.Api/Program.cs`
 - `docker-compose.yml`
 - `_bmad-output/implementation-artifacts/deferred-work.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
 **New:**
-- `src/FormForge.Api/Infrastructure/HealthChecks/MinioHealthCheck.cs`
-- `src/FormForge.Api/Infrastructure/HealthChecks/HealthCheckJsonWriter.cs`
-- `src/FormForge.Api/Infrastructure/HealthChecks/LoggingHealthCheckPublisher.cs`
-- `src/FormForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckEndpointsTests.cs`
-- `src/FormForge.Api.Tests/Infrastructure/HealthChecks/MinioHealthCheckTests.cs`
-- `src/FormForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckJsonWriterTests.cs`
+- `src/AppForge.Api/Infrastructure/HealthChecks/MinioHealthCheck.cs`
+- `src/AppForge.Api/Infrastructure/HealthChecks/HealthCheckJsonWriter.cs`
+- `src/AppForge.Api/Infrastructure/HealthChecks/LoggingHealthCheckPublisher.cs`
+- `src/AppForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckEndpointsTests.cs`
+- `src/AppForge.Api.Tests/Infrastructure/HealthChecks/MinioHealthCheckTests.cs`
+- `src/AppForge.Api.Tests/Infrastructure/HealthChecks/HealthCheckJsonWriterTests.cs`
 
 ### Review Findings
 
-- [x] [Review][Patch] `/health/ready` response missing `error` field — `WriteHealthReportAsJson` in `Extensions.cs` never emits `"error"` when `e.Value.Exception != null`, unlike `HealthCheckJsonWriter.WriteResponse` used by `/health`. Operators see 503 with no exception message. [`src/FormForge.ServiceDefaults/Extensions.cs` `WriteHealthReportAsJson`] ✅ Fixed
-- [x] [Review][Patch] `MinioHealthCheck` trailing slash in endpoint URL — `$"{endpoint}/formforge"` produces `//formforge` when config value ends with `/`. [`src/FormForge.Api/Infrastructure/HealthChecks/MinioHealthCheck.cs:13`] ✅ Fixed
-- [x] [Review][Defer] Timeout cancellation path not tested — no unit test exercises `cts.CancelAfter(5s)` firing in `MinioHealthCheck`; only `HttpRequestException` mock covers catch branches. [`src/FormForge.Api.Tests/Infrastructure/HealthChecks/MinioHealthCheckTests.cs`] — deferred, pre-existing
+- [x] [Review][Patch] `/health/ready` response missing `error` field — `WriteHealthReportAsJson` in `Extensions.cs` never emits `"error"` when `e.Value.Exception != null`, unlike `HealthCheckJsonWriter.WriteResponse` used by `/health`. Operators see 503 with no exception message. [`src/AppForge.ServiceDefaults/Extensions.cs` `WriteHealthReportAsJson`] ✅ Fixed
+- [x] [Review][Patch] `MinioHealthCheck` trailing slash in endpoint URL — `$"{endpoint}/appforge"` produces `//appforge` when config value ends with `/`. [`src/AppForge.Api/Infrastructure/HealthChecks/MinioHealthCheck.cs:13`] ✅ Fixed
+- [x] [Review][Defer] Timeout cancellation path not tested — no unit test exercises `cts.CancelAfter(5s)` firing in `MinioHealthCheck`; only `HttpRequestException` mock covers catch branches. [`src/AppForge.Api.Tests/Infrastructure/HealthChecks/MinioHealthCheckTests.cs`] — deferred, pre-existing
 - [x] [Review][Defer] docker-compose api healthcheck still probes `GET /` — `docker-compose.yml:63` uses `wget -qO- http://localhost:8080/`; deferred item marked closed but probe wasn't updated to `/health/live`. [`docker-compose.yml:63`] — deferred, pre-existing
-- [x] [Review][Defer] OTel trace filter is case-sensitive — `StartsWithSegments("/health", StringComparison.Ordinal)` won't filter `/Health/*` paths; low practical risk on standard deployments. [`src/FormForge.ServiceDefaults/Extensions.cs:70`] — deferred, pre-existing
-- [x] [Review][Defer] `LoggingHealthCheckPublisher.PublishAsync` ignores `CancellationToken` — acceptable for synchronous publisher; latent hazard if async I/O is added later. [`src/FormForge.Api/Infrastructure/HealthChecks/LoggingHealthCheckPublisher.cs:8`] — deferred, pre-existing
-- [x] [Review][Defer] `/health` emits raw exception messages to anonymous callers — `HealthCheckJsonWriter` includes `Exception.Message` in JSON response; mitigated when Story 2.6 adds platform-admin auth per AR-25. [`src/FormForge.Api/Infrastructure/HealthChecks/HealthCheckJsonWriter.cs:26-28`] — deferred, pre-existing
+- [x] [Review][Defer] OTel trace filter is case-sensitive — `StartsWithSegments("/health", StringComparison.Ordinal)` won't filter `/Health/*` paths; low practical risk on standard deployments. [`src/AppForge.ServiceDefaults/Extensions.cs:70`] — deferred, pre-existing
+- [x] [Review][Defer] `LoggingHealthCheckPublisher.PublishAsync` ignores `CancellationToken` — acceptable for synchronous publisher; latent hazard if async I/O is added later. [`src/AppForge.Api/Infrastructure/HealthChecks/LoggingHealthCheckPublisher.cs:8`] — deferred, pre-existing
+- [x] [Review][Defer] `/health` emits raw exception messages to anonymous callers — `HealthCheckJsonWriter` includes `Exception.Message` in JSON response; mitigated when Story 2.6 adds platform-admin auth per AR-25. [`src/AppForge.Api/Infrastructure/HealthChecks/HealthCheckJsonWriter.cs:26-28`] — deferred, pre-existing

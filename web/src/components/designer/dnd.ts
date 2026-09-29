@@ -4,7 +4,7 @@
 // bugs that synthetic DnD libraries (dnd-kit) can't track without manual
 // rect-refresh plumbing.
 
-export const DRAG_MIME = 'application/x-formforge-designer'
+export const DRAG_MIME = 'application/x-appforge-designer'
 
 // Containers that accept drops as children. Mirrored from the designerCanvas
 // store (which is the source of truth for the schema invariant) so renderers

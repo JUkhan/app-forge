@@ -49,31 +49,31 @@ baseline_commit: '0468e560f0aed4ab279838dfeabacfc2ffcef8c7'
 
 ## Code Map
 
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs:28,438` — `DbSet<Tenant>` + `Tenant` mapping pattern to mirror for the new `TenantUserIndexEntry` entity/mapping.
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260908035446_AddTenants.cs` — most recent migration; follow its shape (incl. `ArgumentNullException.ThrowIfNull` in `Up`/`Down`, per Story 12.1's review fix) for the new `tenant_user_index` migration.
-- `src/FormForge.Api/Features/Tenancy/TenantProvisioningService.cs` — schema-scoped `FormForgeDbContext` pattern (`NpgsqlConnectionStringBuilder { SearchPath = schemaName }`) to reuse for the tenant-matched login credential check.
-- `src/FormForge.Api/Features/Tenancy/TenantOnboardingService.cs` — add the `tenant_user_index` insert here, alongside the first-user seed, in the same `public`-schema `FormForgeDbContext` call.
-- `src/FormForge.Api/Features/SchemaRegistry/SchemaRegistry.cs:11-19` — `IMemoryCache` singleton-wrapper pattern to mirror for the tenant lookup cache.
-- `src/FormForge.Api/Features/Auth/JwtTokenService.cs:10-13,19,40-50` — `CreateAccessToken` needs a `Guid? tenantId` parameter and a conditional `tenantId` claim.
-- `src/FormForge.Api/Features/Auth/AuthService.cs:117-156` (`LoginAsync`), `:214-319` (`RefreshAsync`), `:160-195` (`IssueLoginTokensAsync`) — the credential-check/token-issuance flow to extend.
-- `src/FormForge.Api/Program.cs:609-610` (`CorrelationIdMiddleware`), `:653-654` (`UseAuthentication`/`UseAuthorization`), `:223-235` (Tenancy DI block to extend) — insert `TenantContextMiddleware` between 653 and 654 (JWT is validated by then; still before any `RequireAuth`/`RequirePermission` filter runs at the authorization stage).
-- `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs:16-30` — `RequireAuth`/`RequirePlatformAdmin`, confirms these run at the `UseAuthorization` stage, after the planned middleware insertion point.
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs:28,438` — `DbSet<Tenant>` + `Tenant` mapping pattern to mirror for the new `TenantUserIndexEntry` entity/mapping.
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260908035446_AddTenants.cs` — most recent migration; follow its shape (incl. `ArgumentNullException.ThrowIfNull` in `Up`/`Down`, per Story 12.1's review fix) for the new `tenant_user_index` migration.
+- `src/AppForge.Api/Features/Tenancy/TenantProvisioningService.cs` — schema-scoped `AppForgeDbContext` pattern (`NpgsqlConnectionStringBuilder { SearchPath = schemaName }`) to reuse for the tenant-matched login credential check.
+- `src/AppForge.Api/Features/Tenancy/TenantOnboardingService.cs` — add the `tenant_user_index` insert here, alongside the first-user seed, in the same `public`-schema `AppForgeDbContext` call.
+- `src/AppForge.Api/Features/SchemaRegistry/SchemaRegistry.cs:11-19` — `IMemoryCache` singleton-wrapper pattern to mirror for the tenant lookup cache.
+- `src/AppForge.Api/Features/Auth/JwtTokenService.cs:10-13,19,40-50` — `CreateAccessToken` needs a `Guid? tenantId` parameter and a conditional `tenantId` claim.
+- `src/AppForge.Api/Features/Auth/AuthService.cs:117-156` (`LoginAsync`), `:214-319` (`RefreshAsync`), `:160-195` (`IssueLoginTokensAsync`) — the credential-check/token-issuance flow to extend.
+- `src/AppForge.Api/Program.cs:609-610` (`CorrelationIdMiddleware`), `:653-654` (`UseAuthentication`/`UseAuthorization`), `:223-235` (Tenancy DI block to extend) — insert `TenantContextMiddleware` between 653 and 654 (JWT is validated by then; still before any `RequireAuth`/`RequirePermission` filter runs at the authorization stage).
+- `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs:16-30` — `RequireAuth`/`RequirePlatformAdmin`, confirms these run at the `UseAuthorization` stage, after the planned middleware insertion point.
 - `_bmad-output/planning-artifacts/architecture.md:1090-1102` (§7.3) — `ITenantContext` design decision this story implements.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `src/FormForge.Api/Infrastructure/Persistence/Migrations/{ts}_AddTenantUserIndex.cs` -- new `tenant_user_index (email PK, tenant_id FK->tenants)` table in `public` -- backs email→tenant login resolution
-- [x] `src/FormForge.Api/Domain/Entities/TenantUserIndexEntry.cs` + `FormForgeDbContext` mapping/DbSet -- EF entity for the new table
-- [x] `src/FormForge.Api/Features/Tenancy/ITenantContext.cs` + `TenantContext.cs` -- per-request resolved `TenantId`/`SchemaName` accessor
-- [x] `src/FormForge.Api/Features/Tenancy/TenantLookupCache.cs` -- `IMemoryCache`-backed cache of `tenantId` → `(SchemaName, Status)`, mirroring `SchemaRegistry`
-- [x] `src/FormForge.Api/Features/Tenancy/TenantContextMiddleware.cs` -- resolves `tenantId` claim (skip if absent), 401s on missing/non-Active tenant, stores result for `ITenantContext`
-- [x] `src/FormForge.Api/Features/Auth/JwtTokenService.cs` -- add optional `tenantId` claim to `CreateAccessToken`
-- [x] `src/FormForge.Api/Features/Auth/AuthService.cs` -- `LoginAsync` checks `tenant_user_index` first, runs the schema-scoped credential check on a match, else falls back to today's `public.users` check unchanged; thread `tenantId` into `IssueLoginTokensAsync`
-- [x] `src/FormForge.Api/Features/Tenancy/TenantOnboardingService.cs` -- insert the `tenant_user_index` row for the seeded first user
-- [x] `src/FormForge.Api/Program.cs` -- register new services; insert `TenantContextMiddleware` between `UseAuthentication`/`UseAuthorization`
-- [x] `src/FormForge.Api.Tests/Features/Tenancy/TenantContextMiddlewareTests.cs` -- covers the I/O matrix (valid, invalid/inactive → 401, no-claim passthrough)
-- [x] `src/FormForge.Api.Tests/Features/Auth/TenantAwareLoginIntegrationTests.cs` (equivalent new file) -- new tests for the tenant-matched login path and the legacy-fallback path; existing tests unmodified
+- [x] `src/AppForge.Api/Infrastructure/Persistence/Migrations/{ts}_AddTenantUserIndex.cs` -- new `tenant_user_index (email PK, tenant_id FK->tenants)` table in `public` -- backs email→tenant login resolution
+- [x] `src/AppForge.Api/Domain/Entities/TenantUserIndexEntry.cs` + `AppForgeDbContext` mapping/DbSet -- EF entity for the new table
+- [x] `src/AppForge.Api/Features/Tenancy/ITenantContext.cs` + `TenantContext.cs` -- per-request resolved `TenantId`/`SchemaName` accessor
+- [x] `src/AppForge.Api/Features/Tenancy/TenantLookupCache.cs` -- `IMemoryCache`-backed cache of `tenantId` → `(SchemaName, Status)`, mirroring `SchemaRegistry`
+- [x] `src/AppForge.Api/Features/Tenancy/TenantContextMiddleware.cs` -- resolves `tenantId` claim (skip if absent), 401s on missing/non-Active tenant, stores result for `ITenantContext`
+- [x] `src/AppForge.Api/Features/Auth/JwtTokenService.cs` -- add optional `tenantId` claim to `CreateAccessToken`
+- [x] `src/AppForge.Api/Features/Auth/AuthService.cs` -- `LoginAsync` checks `tenant_user_index` first, runs the schema-scoped credential check on a match, else falls back to today's `public.users` check unchanged; thread `tenantId` into `IssueLoginTokensAsync`
+- [x] `src/AppForge.Api/Features/Tenancy/TenantOnboardingService.cs` -- insert the `tenant_user_index` row for the seeded first user
+- [x] `src/AppForge.Api/Program.cs` -- register new services; insert `TenantContextMiddleware` between `UseAuthentication`/`UseAuthorization`
+- [x] `src/AppForge.Api.Tests/Features/Tenancy/TenantContextMiddlewareTests.cs` -- covers the I/O matrix (valid, invalid/inactive → 401, no-claim passthrough)
+- [x] `src/AppForge.Api.Tests/Features/Auth/TenantAwareLoginIntegrationTests.cs` (equivalent new file) -- new tests for the tenant-matched login path and the legacy-fallback path; existing tests unmodified
 
 **Acceptance Criteria:**
 - Given an authenticated request with a valid `tenantId` claim, when the pipeline runs, then `ITenantContext.SchemaName` reflects that tenant, resolved before any `RequireAuth`/`RequirePermission` filter executes.
@@ -100,7 +100,7 @@ which covers login-behavior tests specifically, not these):
   correctly fails with `DbUpdateException` on the unique-constraint violation. Renamed to
   `OnboardTenantAsync_DuplicateAdminEmailAcrossTenants_SecondOnboardingFails` and rewrote the
   assertion to match; each onboarding call now runs in its own DI scope (its own
-  `FormForgeDbContext`) to mirror how two independent production onboarding requests behave.
+  `AppForgeDbContext`) to mirror how two independent production onboarding requests behave.
 
 **Verification audit (step-03, post-implementation):** the spec's own Verification filter (`TenantContextMiddlewareTests|AuthServiceTests|AuthIntegrationTests`) does not match the new `TenantAwareLoginIntegrationTests` class name, so its 5 tests (covering the login-match, legacy-fallback, and refresh-gap matrix rows) never ran under that command even though they exist and pass. Corrected the filter to include `TenantAwareLoginIntegrationTests`; re-ran — 47/47 pass. `dotnet build` (full solution): 0 errors, 0 warnings, confirmed independently.
 
@@ -135,8 +135,8 @@ in code comments at their respective sites.
 - **low, patch** — No test exercises `LoginAgainstTenantSchemaAsync`'s `SafeIdentifier.TryCreate` failure branch (a `tenant_user_index` row pointing at a tenant with a corrupted `SchemaName`) — confirmed absent from `TenantAwareLoginIntegrationTests.cs`, which only covers happy-path/wrong-password/inactive/legacy-fallback. Defensive, currently-unreachable-in-production code path, but the constant-time dummy-hash behavior it's meant to preserve is unverified. (blind-hunter)
 - **low, patch** — No dedicated test covers `JwtTokenService.CreateAccessToken`'s new `tenantId` parameter in isolation (only indirect coverage via a full HTTP round trip). Confirmed by reading the test suite — no `JwtTokenServiceTests` file exists. (blind-hunter)
 - **low, patch** — The twelve DynamicCrud/Provisioning/Audit test fixtures add `'tenants'`/`'tenant_user_index'` to the DROP-loop's protect-list but not to the preceding `TRUNCATE TABLE ...` statement in the same `InitializeAsync`, unlike every other table that appears in both. Currently inert (no test in these files writes tenant data) but inconsistent with the pattern the rest of the statement follows. Confirmed by reading all twelve diffs. (blind-hunter)
-- **defer** — `LoginAgainstTenantSchemaAsync` opens a brand-new `NpgsqlConnection` + `FormForgeDbContext` on every tenant-matched login (Story 12.2's ad hoc-connection pattern, built for rare provisioning calls, now extended to a much hotter path). Distinct connection strings (via `SearchPath`) mean Npgsql pools per tenant schema, risking pool multiplication at scale. No demonstrated failure today; the real fix (a shared per-schema pooled DbContext factory) belongs to Story 12.6's per-request dynamic-schema EF wiring, which this story explicitly excludes. (blind-hunter)
-- **false** — Claimed `TenantUserIndexEntry.Email` normalization ("stored lowercase-normalized") is unenforced at the DB layer (no CHECK/citext) and could silently break on a future non-normalizing insert path. Disproven: `users.email` (`FormForgeDbContext.cs:40`) has the exact same shape — `IsRequired().HasMaxLength(320)`, no CHECK, no citext — normalization is an app-layer convention (`.Trim().ToLowerInvariant()`) everywhere in this codebase, not a gap this story introduces. (blind-hunter)
+- **defer** — `LoginAgainstTenantSchemaAsync` opens a brand-new `NpgsqlConnection` + `AppForgeDbContext` on every tenant-matched login (Story 12.2's ad hoc-connection pattern, built for rare provisioning calls, now extended to a much hotter path). Distinct connection strings (via `SearchPath`) mean Npgsql pools per tenant schema, risking pool multiplication at scale. No demonstrated failure today; the real fix (a shared per-schema pooled DbContext factory) belongs to Story 12.6's per-request dynamic-schema EF wiring, which this story explicitly excludes. (blind-hunter)
+- **false** — Claimed `TenantUserIndexEntry.Email` normalization ("stored lowercase-normalized") is unenforced at the DB layer (no CHECK/citext) and could silently break on a future non-normalizing insert path. Disproven: `users.email` (`AppForgeDbContext.cs:40`) has the exact same shape — `IsRequired().HasMaxLength(320)`, no CHECK, no citext — normalization is an app-layer convention (`.Trim().ToLowerInvariant()`) everywhere in this codebase, not a gap this story introduces. (blind-hunter)
 - **false** — Claimed `TenantContextMiddleware.cs:90`'s `tenantContext.Set(tenantId, entry.SchemaName)` can throw `ArgumentException` (turning an intended 401 into an unhandled 500) if an `Active` tenant has an empty/whitespace `SchemaName`. Disproven as unreachable: the only code path that can ever set `Tenant.Status = "Active"` (`TenantOnboardingService.OnboardTenantAsync`) runs strictly after `TenantProvisioningService.ProvisionSchemaAsync` already validated `SchemaName` via `SafeIdentifier` and successfully issued `CREATE SCHEMA` against it (which itself cannot succeed with an empty name) — no current caller can produce an `Active` tenant with an empty `SchemaName`. (edge-case-hunter)
 - **false** — Claimed the empty `## Review Triage Log` section (at diff-capture time) reflects a missed step. Disproven: this section is populated by step-04 (this exact review step) and is correctly empty per the spec template until the first review pass — not a defect in the diff. (blind-hunter)
 - **rejected — fix is to edit this build's spec** — Claimed the frozen Boundaries line "Do not modify any of the ~40 existing test files that seed users into `public.users` and log in" is contradicted by the diff modifying twelve such files (plus renaming/rewriting one `TenantOnboardingServiceTests` assertion). Verified real and necessary, not a defect: without extending those twelve fixtures' table-protect-lists, their `TRUNCATE`-and-drop-unlisted-tables cleanup would DROP `tenant_user_index` between tests, and the next `POST /api/auth/login` in that class would 500 (`relation "tenant_user_index" does not exist`) — a genuine regression this story would otherwise introduce into unrelated epics' tests. The mechanical protect-list edits are correct and necessary; the frozen boundary text is simply narrower than what turned out to be required. No code change needed; flagged to the human directly rather than looped back, since the only remaining "fix" is reconciling frozen spec wording. (blind-hunter + edge-case-hunter, duplicate claims, merged)
@@ -152,4 +152,4 @@ in code comments at their respective sites.
 
 **Commands:**
 - `dotnet build` -- expected: 0 errors, 0 warnings
-- `dotnet test src/FormForge.Api.Tests --filter "TenantContextMiddlewareTests|AuthIntegrationTests|TenantAwareLoginIntegrationTests|JwtTokenServiceTests"` -- expected: all pass
+- `dotnet test src/AppForge.Api.Tests --filter "TenantContextMiddlewareTests|AuthIntegrationTests|TenantAwareLoginIntegrationTests|JwtTokenServiceTests"` -- expected: all pass

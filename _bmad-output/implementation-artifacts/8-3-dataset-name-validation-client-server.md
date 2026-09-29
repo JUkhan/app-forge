@@ -50,7 +50,7 @@ so that invalid or unsafe identifiers are rejected before any DDL runs.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Create `DatasetName.cs` value type** (AC-1, AC-2, AC-3, AC-6)
-  - [x] Create `src/FormForge.Api/Domain/ValueTypes/DatasetName.cs`
+  - [x] Create `src/AppForge.Api/Domain/ValueTypes/DatasetName.cs`
   - [x] Define `DatasetNameError` enum: `InvalidPattern`, `ReservedKeyword`, `Denylist`
   - [x] Declare the sealed class with private constructor:
     ```csharp
@@ -115,22 +115,22 @@ so that invalid or unsafe identifiers are rejected before any DDL runs.
         public override string ToString() => Value;
     }
     ```
-  - [x] The `PgReservedKeywords.IsReserved()` call is imported from `FormForge.Api.Features.Designer` — add the `using` statement.
+  - [x] The `PgReservedKeywords.IsReserved()` call is imported from `AppForge.Api.Features.Designer` — add the `using` statement.
   - [x] **IMPORTANT:** Length check `raw.Length > 63` must happen BEFORE the regex to avoid regex-matching a 10000-char input. Check length first, then regex.
 
 - [x] **Task 2 — Create DTOs for create and update requests** (AC-1)
-  - [x] Create `src/FormForge.Api/Features/Datasets/Dtos/CreateDatasetRequest.cs`:
+  - [x] Create `src/AppForge.Api/Features/Datasets/Dtos/CreateDatasetRequest.cs`:
     ```csharp
-    namespace FormForge.Api.Features.Datasets.Dtos;
+    namespace AppForge.Api.Features.Datasets.Dtos;
 
     internal sealed record CreateDatasetRequest(
         string DatasetName,
         bool IsCustomQuery,
         string? Query);
     ```
-  - [x] Create `src/FormForge.Api/Features/Datasets/Dtos/UpdateDatasetRequest.cs`:
+  - [x] Create `src/AppForge.Api/Features/Datasets/Dtos/UpdateDatasetRequest.cs`:
     ```csharp
-    namespace FormForge.Api.Features.Datasets.Dtos;
+    namespace AppForge.Api.Features.Datasets.Dtos;
 
     // dataset_name and query are nullable — omitting them means "keep existing value".
     // version is always required for optimistic concurrency (Story 8.5).
@@ -144,12 +144,12 @@ so that invalid or unsafe identifiers are rejected before any DDL runs.
   - [x] These DTOs will be fleshed out further in Stories 8.4 and 8.5. Fields here cover what validation needs.
 
 - [x] **Task 3 — Create `DatasetNameValidator.cs` FluentValidation validator** (AC-1, AC-2, AC-3)
-  - [x] Create `src/FormForge.Api/Features/Datasets/Validators/DatasetNameValidator.cs`:
+  - [x] Create `src/AppForge.Api/Features/Datasets/Validators/DatasetNameValidator.cs`:
     ```csharp
     using FluentValidation;
-    using FormForge.Api.Domain.ValueTypes;
+    using AppForge.Api.Domain.ValueTypes;
 
-    namespace FormForge.Api.Features.Datasets.Validators;
+    namespace AppForge.Api.Features.Datasets.Validators;
 
     // Standalone validator for the dataset_name field.
     // Used as a child validator via SetValidator() in CreateUpdateDatasetValidator.
@@ -168,12 +168,12 @@ so that invalid or unsafe identifiers are rejected before any DDL runs.
         }
     }
     ```
-  - [x] Create `src/FormForge.Api/Features/Datasets/Validators/CreateUpdateDatasetValidator.cs`:
+  - [x] Create `src/AppForge.Api/Features/Datasets/Validators/CreateUpdateDatasetValidator.cs`:
     ```csharp
     using FluentValidation;
-    using FormForge.Api.Features.Datasets.Dtos;
+    using AppForge.Api.Features.Datasets.Dtos;
 
-    namespace FormForge.Api.Features.Datasets.Validators;
+    namespace AppForge.Api.Features.Datasets.Validators;
 
     // Story 8.3: validates dataset_name on create.
     // Stories 8.4–8.8 will extend this with query/builder_state rules.
@@ -205,7 +205,7 @@ so that invalid or unsafe identifiers are rejected before any DDL runs.
     ```
 
 - [x] **Task 4 — Update stub endpoints to validate dataset_name and return INVALID_DATASET_NAME** (AC-1, AC-2, AC-3)
-  - [x] Update `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs`
+  - [x] Update `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs`
   - [x] The POST stub now accepts `CreateDatasetRequest`, calls `DatasetName.TryCreate()` inline, and returns `Results.Problem()` with `code: "INVALID_DATASET_NAME"` on failure. On success (valid name), it still returns 501 (handler not yet implemented in Story 8.4):
     ```csharp
     group.MapPost("/", ([FromBody] CreateDatasetRequest request) =>
@@ -258,7 +258,7 @@ so that invalid or unsafe identifiers are rejected before any DDL runs.
   - [x] **Do NOT add `.AddValidationFilter<CreateDatasetRequest>()` to the stub endpoints.** The stub uses an inline `DatasetName.TryCreate()` check (not the FluentValidation filter) to return the specific `INVALID_DATASET_NAME` code. FluentValidation's `ValidationProblemDetails` format doesn't emit a root `code` field. The inline pattern matches the `IDENTIFIER_INVALID` handling in `DesignerEndpoints.cs` (lines 104–112).
 
 - [x] **Task 5 — Unit tests for `DatasetName` validation** (AC-1, AC-2, AC-3)
-  - [x] Create `src/FormForge.Api.Tests/Features/Datasets/DatasetNameValidatorTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/Datasets/DatasetNameValidatorTests.cs`
   - [x] Test `DatasetName.TryCreate()` for each validation layer:
     - **AC-1 valid inputs** → `true`: `"my_dataset"`, `"_private"`, `"report_2024"`, `"a"` (single char), `"a" + new string('b', 62)` (63 chars exactly)
     - **AC-1 invalid pattern** → `false`, `InvalidPattern`: `""`, `" "`, `"MyDataset"` (uppercase), `"123abc"` (starts with digit), `"my-dataset"` (hyphen), `"a" + new string('b', 63)` (64 chars — exceeds limit), `"a b"` (space), `"pg_foo"` (pg_ prefix — caught by `PgReservedKeywords.IsReserved`)
@@ -269,7 +269,7 @@ so that invalid or unsafe identifiers are rejected before any DDL runs.
   - [x] No integration tests in this test file (unit-only); integration tests for the endpoint are in Task 6
 
 - [x] **Task 6 — Integration tests for the stub endpoints** (AC-1, AC-2, AC-3)
-  - [x] Create `src/FormForge.Api.Tests/Features/Datasets/DatasetNameValidationTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/Datasets/DatasetNameValidationTests.cs`
   - [x] Reuse `PostgresFixture` and `WebApplicationFactory<Program>` pattern from `DatasetMigrationTests.cs` / `DatasetPermissionTests.cs`
   - [x] Tests (all use platform-admin token):
     - **AC-1 invalid pattern** — `POST /api/datasets { "datasetName": "InvalidName", ... }` → 422, body contains `code: "INVALID_DATASET_NAME"`
@@ -363,11 +363,11 @@ so that invalid or unsafe identifiers are rejected before any DDL runs.
 
 ### §1 — `DatasetName.cs` mirrors `SafeIdentifier.cs` but lives in a different location
 
-`SafeIdentifier.cs` lives at `src/FormForge.Api/Features/Designer/SafeIdentifier.cs` (Feature folder). Per AR-57 and the architecture's Domain map, `DatasetName.cs` goes to `src/FormForge.Api/Domain/ValueTypes/DatasetName.cs` (the Domain layer). The `Domain/ValueTypes/` directory does not exist yet — create it.
+`SafeIdentifier.cs` lives at `src/AppForge.Api/Features/Designer/SafeIdentifier.cs` (Feature folder). Per AR-57 and the architecture's Domain map, `DatasetName.cs` goes to `src/AppForge.Api/Domain/ValueTypes/DatasetName.cs` (the Domain layer). The `Domain/ValueTypes/` directory does not exist yet — create it.
 
-Both types use the same sealed+private-ctor pattern, and both use `PgReservedKeywords.IsReserved()` from `FormForge.Api.Features.Designer`. You must add:
+Both types use the same sealed+private-ctor pattern, and both use `PgReservedKeywords.IsReserved()` from `AppForge.Api.Features.Designer`. You must add:
 ```csharp
-using FormForge.Api.Features.Designer;
+using AppForge.Api.Features.Designer;
 ```
 in `DatasetName.cs`.
 
@@ -439,12 +439,12 @@ public sealed class DatasetNameValidationTests : IClassFixture<PostgresFixture>,
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                builder.UseSetting("ConnectionStrings:formforge", _postgres.ConnectionString);
+                builder.UseSetting("ConnectionStrings:appforge", _postgres.ConnectionString);
                 builder.UseSetting("Jwt:SigningKey", "test-signing-key-minimum-32-characters!!");
                 builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:5173");
             });
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
         await db.Database.MigrateAsync();
     }
 
@@ -496,22 +496,22 @@ Expected after this story: same baseline (804 backend + 1 new unit file + N inte
 
 **New files created:**
 ```
-src/FormForge.Api/Domain/ValueTypes/              ← NEW directory
-src/FormForge.Api/Domain/ValueTypes/DatasetName.cs ← NEW
-src/FormForge.Api/Features/Datasets/Dtos/CreateDatasetRequest.cs  ← NEW
-src/FormForge.Api/Features/Datasets/Dtos/UpdateDatasetRequest.cs  ← NEW
-src/FormForge.Api/Features/Datasets/Validators/   ← NEW directory
-src/FormForge.Api/Features/Datasets/Validators/DatasetNameValidator.cs  ← NEW
-src/FormForge.Api/Features/Datasets/Validators/CreateUpdateDatasetValidator.cs  ← NEW
-src/FormForge.Api.Tests/Features/Datasets/DatasetNameValidatorTests.cs  ← NEW
-src/FormForge.Api.Tests/Features/Datasets/DatasetNameValidationTests.cs ← NEW (integration)
+src/AppForge.Api/Domain/ValueTypes/              ← NEW directory
+src/AppForge.Api/Domain/ValueTypes/DatasetName.cs ← NEW
+src/AppForge.Api/Features/Datasets/Dtos/CreateDatasetRequest.cs  ← NEW
+src/AppForge.Api/Features/Datasets/Dtos/UpdateDatasetRequest.cs  ← NEW
+src/AppForge.Api/Features/Datasets/Validators/   ← NEW directory
+src/AppForge.Api/Features/Datasets/Validators/DatasetNameValidator.cs  ← NEW
+src/AppForge.Api/Features/Datasets/Validators/CreateUpdateDatasetValidator.cs  ← NEW
+src/AppForge.Api.Tests/Features/Datasets/DatasetNameValidatorTests.cs  ← NEW
+src/AppForge.Api.Tests/Features/Datasets/DatasetNameValidationTests.cs ← NEW (integration)
 web/src/features/datasets/                        ← NEW directory
 web/src/features/datasets/validation.ts           ← NEW
 ```
 
 **Modified files:**
 ```
-src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs  (stub handlers accept DTOs + inline validation)
+src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs  (stub handlers accept DTOs + inline validation)
 web/src/lib/i18n/locales/en.json                         (new "datasets" top-level key)
 ```
 
@@ -524,15 +524,15 @@ web/src/lib/i18n/locales/en.json                         (new "datasets" top-lev
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.1 — AR-57: Dataset Schema + DatasetName.cs + identifier denylist]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.5 — AR-61: SELECT-only enforcement (context for SqlSelectEnforcer, not this story)]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.9 — AR-65: Dataset API contract + 7 error codes including INVALID_DATASET_NAME (422)]
-- [Source: `src/FormForge.Api/Features/Designer/SafeIdentifier.cs` — sealed+private-ctor pattern to mirror]
-- [Source: `src/FormForge.Api/Features/Designer/PgReservedKeywords.cs` — shared keyword check (reused via `PgReservedKeywords.IsReserved()`)]
-- [Source: `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs:104–112` — IDENTIFIER_INVALID Results.Problem pattern to follow]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — current stub state; /preview ordering fix needed]
-- [Source: `src/FormForge.Api/Domain/Entities/CustomDataset.cs` — entity structure; DatasetName used in Value column]
-- [Source: `src/FormForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs` — why FluentValidation ValidationProblemDetails can't emit root `code` field]
-- [Source: `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs` — RequireDatasetManagement() pattern]
-- [Source: `src/FormForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs` — PostgresFixture + WAF pattern, admin login helper, 403-body assertion technique]
-- [Source: `src/FormForge.Api.Tests/Features/Datasets/DatasetMigrationTests.cs` — test project initialization pattern]
+- [Source: `src/AppForge.Api/Features/Designer/SafeIdentifier.cs` — sealed+private-ctor pattern to mirror]
+- [Source: `src/AppForge.Api/Features/Designer/PgReservedKeywords.cs` — shared keyword check (reused via `PgReservedKeywords.IsReserved()`)]
+- [Source: `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs:104–112` — IDENTIFIER_INVALID Results.Problem pattern to follow]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — current stub state; /preview ordering fix needed]
+- [Source: `src/AppForge.Api/Domain/Entities/CustomDataset.cs` — entity structure; DatasetName used in Value column]
+- [Source: `src/AppForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs` — why FluentValidation ValidationProblemDetails can't emit root `code` field]
+- [Source: `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs` — RequireDatasetManagement() pattern]
+- [Source: `src/AppForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs` — PostgresFixture + WAF pattern, admin login helper, 403-body assertion technique]
+- [Source: `src/AppForge.Api.Tests/Features/Datasets/DatasetMigrationTests.cs` — test project initialization pattern]
 - [Source: Story 8.2 Dev Agent Record §Deviation — code/action assertions at JSON root (not under "extensions")]
 - [Source: Story 8.2 Dev Agent Record §Review Findings — /preview before / ordering fix (deferred to this story)]
 
@@ -540,9 +540,9 @@ web/src/lib/i18n/locales/en.json                         (new "datasets" top-lev
 
 ### Review Findings
 
-- [x] [Review][Patch] DatasetNameValidator calls `DatasetName.TryCreate` twice per validation — use `.Custom()` to call once and capture error in a single pass [`src/FormForge.Api/Features/Datasets/Validators/DatasetNameValidator.cs`]
-- [x] [Review][Defer] FluentValidation filter risk for Stories 8.4/8.5 — if `AddValidationFilter<CreateDatasetRequest>()` is attached in Story 8.4, the response will be a 400 `ValidationProblemDetails` (not 422 `INVALID_DATASET_NAME`); Stories 8.4/8.5 must keep inline validation for `dataset_name` rather than using the FV filter [`src/FormForge.Api/Features/Datasets/Validators/DatasetNameValidator.cs`, `Program.cs`] — deferred, actionable in Story 8.4
-- [x] [Review][Defer] `UpdateDatasetRequest.Version` has no minimum-value check — negative/zero version reaches the handler without a 422; guard belongs in Story 8.5's real update handler [`src/FormForge.Api/Features/Datasets/Dtos/UpdateDatasetRequest.cs`] — deferred, pre-existing gap for Story 8.5
+- [x] [Review][Patch] DatasetNameValidator calls `DatasetName.TryCreate` twice per validation — use `.Custom()` to call once and capture error in a single pass [`src/AppForge.Api/Features/Datasets/Validators/DatasetNameValidator.cs`]
+- [x] [Review][Defer] FluentValidation filter risk for Stories 8.4/8.5 — if `AddValidationFilter<CreateDatasetRequest>()` is attached in Story 8.4, the response will be a 400 `ValidationProblemDetails` (not 422 `INVALID_DATASET_NAME`); Stories 8.4/8.5 must keep inline validation for `dataset_name` rather than using the FV filter [`src/AppForge.Api/Features/Datasets/Validators/DatasetNameValidator.cs`, `Program.cs`] — deferred, actionable in Story 8.4
+- [x] [Review][Defer] `UpdateDatasetRequest.Version` has no minimum-value check — negative/zero version reaches the handler without a 422; guard belongs in Story 8.5's real update handler [`src/AppForge.Api/Features/Datasets/Dtos/UpdateDatasetRequest.cs`] — deferred, pre-existing gap for Story 8.5
 - [x] [Review][Defer] `pg_`-prefix rejection produces a different client error message ("Names starting with 'pg_' are reserved by PostgreSQL.") than the server's generic `messageKey: "datasets.invalidDatasetName"` — cosmetic UX inconsistency; align in Story 8.10 when form UI wires i18n [`web/src/features/datasets/validation.ts`] — deferred, pre-existing for Story 8.10
 
 ## Dev Agent Record
@@ -576,20 +576,20 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context)
 ### File List
 
 **New files:**
-- `src/FormForge.Api/Domain/ValueTypes/DatasetName.cs`
-- `src/FormForge.Api/Features/Datasets/Dtos/CreateDatasetRequest.cs`
-- `src/FormForge.Api/Features/Datasets/Dtos/UpdateDatasetRequest.cs`
-- `src/FormForge.Api/Features/Datasets/Validators/DatasetNameValidator.cs`
-- `src/FormForge.Api/Features/Datasets/Validators/CreateUpdateDatasetValidator.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetNameValidatorTests.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetNameValidationTests.cs`
+- `src/AppForge.Api/Domain/ValueTypes/DatasetName.cs`
+- `src/AppForge.Api/Features/Datasets/Dtos/CreateDatasetRequest.cs`
+- `src/AppForge.Api/Features/Datasets/Dtos/UpdateDatasetRequest.cs`
+- `src/AppForge.Api/Features/Datasets/Validators/DatasetNameValidator.cs`
+- `src/AppForge.Api/Features/Datasets/Validators/CreateUpdateDatasetValidator.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetNameValidatorTests.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetNameValidationTests.cs`
 - `web/src/features/datasets/validation.ts`
 - `web/src/features/datasets/__tests__/validation.test.ts`
 
 **Modified files:**
-- `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` (DTO parsing + inline validation; `/preview` reordered before `/`)
-- `src/FormForge.Api/Program.cs` (explicit DI registration of the two dataset validators + usings)
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs` (updated `PostDatasets_Admin_Returns501NotForbidden` to post a valid name)
+- `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` (DTO parsing + inline validation; `/preview` reordered before `/`)
+- `src/AppForge.Api/Program.cs` (explicit DI registration of the two dataset validators + usings)
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs` (updated `PostDatasets_Admin_Returns501NotForbidden` to post a valid name)
 - `web/src/lib/i18n/locales/en.json` (new `datasets` top-level key)
 
 ### Change Log

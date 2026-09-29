@@ -49,10 +49,10 @@ context:
 
 - `Domain/Entities/Tenant.cs` (+ its EF config and a public-schema migration) -- add `dev_user_email`, `dev_user_password_encrypted` columns.
 
-- `src/FormForge.Api/Features/Tenancy/TenantOnboardingService.cs` -- `OnboardTenantAsync` step 2 (~131-152) seeds admin user/role; add dev role+user here; `tenant_user_index` write ~223-227; `platform_admins` email collision check ~213-221.
-- `src/FormForge.Api/Features/Tenancy/TenantEndpoints.cs` -- derives admin email (~156), temp password (~73), welcome email (~170-192).
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260523021147_CreateRolesRolePermissionsAndUserRoles.cs` -- seeds `platform-admin`(`...01`), `viewer`(`...02`); new role seed goes in a new EF migration (deterministic GUID, e.g. `...03`). Check `20260908153134_PinPlatformTablesToPublicSchema.cs` does not pin `roles`.
-- `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs` -- `RequirePlatformAdmin`, `RequirePermission`; `Program.cs:358-366,738-743` policies and `/api/admin` mount; `Features/Admin/AdminEndpoints.cs:18-28` route groups to split per role.
+- `src/AppForge.Api/Features/Tenancy/TenantOnboardingService.cs` -- `OnboardTenantAsync` step 2 (~131-152) seeds admin user/role; add dev role+user here; `tenant_user_index` write ~223-227; `platform_admins` email collision check ~213-221.
+- `src/AppForge.Api/Features/Tenancy/TenantEndpoints.cs` -- derives admin email (~156), temp password (~73), welcome email (~170-192).
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260523021147_CreateRolesRolePermissionsAndUserRoles.cs` -- seeds `platform-admin`(`...01`), `viewer`(`...02`); new role seed goes in a new EF migration (deterministic GUID, e.g. `...03`). Check `20260908153134_PinPlatformTablesToPublicSchema.cs` does not pin `roles`.
+- `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs` -- `RequirePlatformAdmin`, `RequirePermission`; `Program.cs:358-366,738-743` policies and `/api/admin` mount; `Features/Admin/AdminEndpoints.cs:18-28` route groups to split per role.
 - `Features/Roles/RoleService.cs:34-82` (`GetRolesAsync`), `Features/Users/UserService.cs` (list ~205-253, get ~288-308, assign ~77-200 incl. last-admin guard ~113-142), `ActiveUsersEndpoints.cs:26-38`, `Features/Menus/MenuService.cs:309` -- filter hidden role/users here.
 - `Features/Auth/AuthService.cs` (login via `tenant_user_index` ~233, token issue ~310, refresh ~466); `JwtTokenService.cs:24-37` role claims.
 - `web/src/routes/_app.tsx:76,132-143` gear gating; `web/src/routes/_app/admin.tsx:12-30,40-50,101-166` guard, breadcrumbs, hard-coded tabs; `features/auth/usePermission.ts`, `usePermissionsQuery.ts`.

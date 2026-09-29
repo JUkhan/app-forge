@@ -47,23 +47,23 @@ so that I do not re-select it each session and do not see the wrong theme paint 
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Add `theme_preference` column to `users` (migration)** (AC-1)
-  - [x] Add `public string? ThemePreference { get; set; }` to `src/FormForge.Api/Domain/Entities/User.cs` (nullable; null = "use client default")
-  - [x] In `FormForgeDbContext.OnModelCreating`'s `User` block, add: `e.Property(u => u.ThemePreference).HasColumnName("theme_preference").HasMaxLength(20);` and a CHECK constraint: `e.ToTable(t => t.HasCheckConstraint("ck_users_theme_preference", "theme_preference IS NULL OR theme_preference IN ('default-light', 'slate-dark', 'solarized')"));`
-  - [x] Generate migration: `dotnet ef migrations add AddUserThemePreference --project src/FormForge.Api --output-dir Infrastructure/Persistence/Migrations`
+  - [x] Add `public string? ThemePreference { get; set; }` to `src/AppForge.Api/Domain/Entities/User.cs` (nullable; null = "use client default")
+  - [x] In `AppForgeDbContext.OnModelCreating`'s `User` block, add: `e.Property(u => u.ThemePreference).HasColumnName("theme_preference").HasMaxLength(20);` and a CHECK constraint: `e.ToTable(t => t.HasCheckConstraint("ck_users_theme_preference", "theme_preference IS NULL OR theme_preference IN ('default-light', 'slate-dark', 'solarized')"));`
+  - [x] Generate migration: `dotnet ef migrations add AddUserThemePreference --project src/AppForge.Api --output-dir Infrastructure/Persistence/Migrations`
   - [x] Verify the generated `Up` adds `theme_preference text NULL` + `CHECK` constraint; `Down` drops the constraint then the column
   - [x] See Dev Notes §1 for migration shape
 
 - [x] **Task 2 — Add `MeEndpoints.cs` with `PUT /me/preferences`** (AC-1)
-  - [x] Create `src/FormForge.Api/Features/Users/Dtos/UpdateMyPreferencesRequest.cs`: `internal sealed record UpdateMyPreferencesRequest(string? ThemePreference);`
-  - [x] Create `src/FormForge.Api/Features/Users/Validators/UpdateMyPreferencesRequestValidator.cs` enforcing `ThemePreference is null OR ThemePreference in {default-light, slate-dark, solarized}` — see Dev Notes §2
-  - [x] Create `src/FormForge.Api/Features/Users/MeEndpoints.cs` with `MapMePreferencesEndpoints(this RouteGroupBuilder group)` — registers `PUT /me/preferences` with `AddValidationFilter<UpdateMyPreferencesRequest>()`
+  - [x] Create `src/AppForge.Api/Features/Users/Dtos/UpdateMyPreferencesRequest.cs`: `internal sealed record UpdateMyPreferencesRequest(string? ThemePreference);`
+  - [x] Create `src/AppForge.Api/Features/Users/Validators/UpdateMyPreferencesRequestValidator.cs` enforcing `ThemePreference is null OR ThemePreference in {default-light, slate-dark, solarized}` — see Dev Notes §2
+  - [x] Create `src/AppForge.Api/Features/Users/MeEndpoints.cs` with `MapMePreferencesEndpoints(this RouteGroupBuilder group)` — registers `PUT /me/preferences` with `AddValidationFilter<UpdateMyPreferencesRequest>()`
   - [x] Handler reads `userId` from `httpContext.User.FindFirst("userId")?.Value` (same pattern as `UserEndpoints.DeactivateUserHandler`); `Results.Unauthorized()` if missing/invalid
   - [x] Use `db.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(s => s.SetProperty(u => u.ThemePreference, request.ThemePreference).SetProperty(u => u.UpdatedAt, DateTimeOffset.UtcNow), ct)`
   - [x] Return `Results.NoContent()` on success; `Results.NotFound()` if `rowsAffected == 0` (should not happen for an authenticated user but defensive)
   - [x] In `Program.cs`: extend the existing `/api/users` group to call `.MapMePreferencesEndpoints()` after `.MapUserSelfEndpoints()` — see Dev Notes §3
 
 - [x] **Task 3 — Extend `LoginResponse` to include `user` profile** (AC-1)
-  - [x] Replace `src/FormForge.Api/Features/Auth/Dtos/LoginResponse.cs` with: see Dev Notes §4
+  - [x] Replace `src/AppForge.Api/Features/Auth/Dtos/LoginResponse.cs` with: see Dev Notes §4
   - [x] Add `AuthenticatedUser` record co-located in `LoginResponse.cs` (not a separate file; keeps auth DTOs together)
   - [x] Modify `AuthService.LoginAsync` to construct `AuthenticatedUser` from the loaded `user` + already-fetched `roleNames` array, and pass it to the `LoginResponse` constructor
   - [x] Modify `AuthService.RefreshAsync` to do the same in the rotation success path (the `token.User` is already loaded via `.Include(r => r.User)`)
@@ -90,7 +90,7 @@ so that I do not re-select it each session and do not see the wrong theme paint 
   - [x] Do NOT call the PUT when `setTheme` is invoked from the login/refresh response handler (that would loop: server → client → server). Login/refresh sync path calls `applyTheme` directly (lower-level function), bypassing `setTheme` and skipping the server PUT. See Dev Notes §7 for the chosen pattern.
 
 - [x] **Task 7 — Add `CspNonceMiddleware`** (AC-4)
-  - [x] Create `src/FormForge.Api/Common/Security/CspNonceMiddleware.cs` — per-request 16-byte random base64 nonce, stored in `HttpContext.Items["CspNonce"]`
+  - [x] Create `src/AppForge.Api/Common/Security/CspNonceMiddleware.cs` — per-request 16-byte random base64 nonce, stored in `HttpContext.Items["CspNonce"]`
   - [x] Use `RandomNumberGenerator.GetBytes(16)` and `Convert.ToBase64String` (NOT `Guid.NewGuid()`; nonces must be cryptographically random per CSP spec)
   - [x] Add a static helper `CspNonceMiddleware.GetNonce(HttpContext ctx) => (string)ctx.Items["CspNonce"]!`
   - [x] See Dev Notes §8 for full implementation
@@ -104,23 +104,23 @@ so that I do not re-select it each session and do not see the wrong theme paint 
   - [x] Verify the existing `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` headers are preserved
 
 - [x] **Task 9 — Add `IndexHtmlRewriter` to serve `index.html` with the nonce baked in** (AC-4)
-  - [x] Create `src/FormForge.Api/Common/Spa/IndexHtmlRewriter.cs` — see Dev Notes §10 for full implementation
+  - [x] Create `src/AppForge.Api/Common/Spa/IndexHtmlRewriter.cs` — see Dev Notes §10 for full implementation
   - [x] The rewriter reads `wwwroot/index.html` ONCE at first request into a static `string?` (double-check lock); per-request it does a `string.Replace("__CSP_NONCE__", nonce)` on the cached content
   - [x] If `wwwroot/index.html` does not exist (dev with Vite serving directly), the handler returns 404 — startup does not fail
   - [x] Returns `text/html; charset=utf-8` with `Cache-Control: no-store` with the rewritten body
   - [x] `UseStaticFiles` runs before `MapFallback` so `/assets/*.js` etc. serve unmodified
 
 - [x] **Task 10 — Wire production SPA fallback** (AC-4)
-  - [x] In `Program.cs`, REPLACED `app.MapGet("/", () => "FormForge API is running.")` with `app.MapFallback(IndexHtmlRewriter.HandleAsync)` — handles `/` and any unmatched non-API path
+  - [x] In `Program.cs`, REPLACED `app.MapGet("/", () => "AppForge API is running.")` with `app.MapFallback(IndexHtmlRewriter.HandleAsync)` — handles `/` and any unmatched non-API path
   - [x] `app.UseStaticFiles()` remains before the fallback so static assets serve unmodified
   - [x] `app.MapOpenApi()` and `/health/*` registered before fallback so they win route resolution
-  - [x] **Deferred:** copying Vite `dist/` into `src/FormForge.Api/wwwroot/` at build time. `IndexHtmlRewriter` short-circuits if the file is missing, so dev (Vite-served SPA) works unchanged.
+  - [x] **Deferred:** copying Vite `dist/` into `src/AppForge.Api/wwwroot/` at build time. `IndexHtmlRewriter` short-circuits if the file is missing, so dev (Vite-served SPA) works unchanged.
 
 - [x] **Task 11 — Backend tests** (AC-1, AC-4)
-  - [x] In `src/FormForge.Api.Tests/Features/Users/`: added `MeIntegrationTests.cs` covering the four PUT cases (204 valid theme, 401 unauthenticated, 422 invalid theme, 204+null clears preference)
-  - [x] In `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`: added `Login_Returns_UserProfile_WithThemePreference` and `Refresh_Returns_UserProfile_WithThemePreference`
-  - [x] In `src/FormForge.Api.Tests/Common/Security/`: added `CspNonceMiddlewareTests.cs` — 4 tests covering nonce generation, distinctness, GetNonce accessor, and missing-nonce exception
-  - [x] In `src/FormForge.Api.Tests/Common/Spa/`: added `IndexHtmlRewriterTests.cs` — 3 integration tests: body+header nonce shared, 404 when file missing, Cache-Control: no-store
+  - [x] In `src/AppForge.Api.Tests/Features/Users/`: added `MeIntegrationTests.cs` covering the four PUT cases (204 valid theme, 401 unauthenticated, 422 invalid theme, 204+null clears preference)
+  - [x] In `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`: added `Login_Returns_UserProfile_WithThemePreference` and `Refresh_Returns_UserProfile_WithThemePreference`
+  - [x] In `src/AppForge.Api.Tests/Common/Security/`: added `CspNonceMiddlewareTests.cs` — 4 tests covering nonce generation, distinctness, GetNonce accessor, and missing-nonce exception
+  - [x] In `src/AppForge.Api.Tests/Common/Spa/`: added `IndexHtmlRewriterTests.cs` — 3 integration tests: body+header nonce shared, 404 when file missing, Cache-Control: no-store
 
 - [x] **Task 12 — Frontend tests** (AC-2, AC-3)
   - [x] In `web/src/lib/theme/__tests__/`: updated `ThemeProvider.test.tsx` with 2 new tests verifying `setTheme` calls `updateThemePreference` and the failure case logs to console without throwing
@@ -164,9 +164,9 @@ EF Core 10 emits the CHECK as part of the column-level fluent mapping (`HasCheck
 
 ```csharp
 using FluentValidation;
-using FormForge.Api.Features.Users.Dtos;
+using AppForge.Api.Features.Users.Dtos;
 
-namespace FormForge.Api.Features.Users.Validators;
+namespace AppForge.Api.Features.Users.Validators;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
     Justification = "Registered via DI as IValidator<UpdateMyPreferencesRequest>.")]
@@ -201,12 +201,12 @@ builder.Services.AddScoped<IValidator<UpdateMyPreferencesRequest>, UpdateMyPrefe
 `MeEndpoints.cs`:
 
 ```csharp
-using FormForge.Api.Common.Endpoints;
-using FormForge.Api.Features.Users.Dtos;
-using FormForge.Api.Infrastructure.Persistence;
+using AppForge.Api.Common.Endpoints;
+using AppForge.Api.Features.Users.Dtos;
+using AppForge.Api.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FormForge.Api.Features.Users;
+namespace AppForge.Api.Features.Users;
 
 internal static class MeEndpoints
 {
@@ -226,7 +226,7 @@ internal static class MeEndpoints
 
     private static async Task<IResult> UpdateMyPreferencesHandler(
         UpdateMyPreferencesRequest request,
-        FormForgeDbContext db,
+        AppForgeDbContext db,
         HttpContext httpContext,
         CancellationToken ct)
     {
@@ -271,7 +271,7 @@ Both extension methods return the same `RouteGroupBuilder` so they chain cleanly
 `LoginResponse.cs`:
 
 ```csharp
-namespace FormForge.Api.Features.Auth.Dtos;
+namespace AppForge.Api.Features.Auth.Dtos;
 
 internal sealed record AuthenticatedUser(
     Guid UserId,
@@ -438,7 +438,7 @@ If we want the selector dropdown to reflect the synced server value without a pa
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 
-namespace FormForge.Api.Common.Security;
+namespace AppForge.Api.Common.Security;
 
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes",
     Justification = "Instantiated at runtime by app.UseMiddleware<CspNonceMiddleware>().")]
@@ -525,9 +525,9 @@ The HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy lines stay in
 
 ```csharp
 using System.Text;
-using FormForge.Api.Common.Security;
+using AppForge.Api.Common.Security;
 
-namespace FormForge.Api.Common.Spa;
+namespace AppForge.Api.Common.Spa;
 
 internal static class IndexHtmlRewriter
 {
@@ -615,7 +615,7 @@ app.MapFallback(IndexHtmlRewriter.HandleAsync);
 app.Run();
 ```
 
-DELETE the existing `app.MapGet("/", () => "FormForge API is running.")` — the fallback handles `/` correctly (serves index.html in prod; 404 in dev where Vite owns root).
+DELETE the existing `app.MapGet("/", () => "AppForge API is running.")` — the fallback handles `/` correctly (serves index.html in prod; 404 in dev where Vite owns root).
 
 `MapFallback` only matches if NO other route did. So `/api/...` paths that match nothing in the API routes (e.g. `/api/typo`) will fall through to the SPA — which is technically wrong (they should 404 as API paths). Defensive fix:
 
@@ -647,7 +647,7 @@ public async Task PutMyPreferences_ValidTheme_Returns204AndPersists()
 
     // Verify persisted
     using var scope = _factory!.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+    var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
     var user = await db.Users.FirstAsync(u => u.Email == "viewer@example.com");
     Assert.Equal("slate-dark", user.ThemePreference);
 }
@@ -689,7 +689,7 @@ public async Task Login_Returns_UserProfile_WithThemePreference()
     // Seed the test user with a theme preference first
     using (var scope = _factory!.Services.CreateScope())
     {
-        var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
         var u = await db.Users.FirstAsync(u => u.Email == "test@example.com");
         u.ThemePreference = "solarized";
         await db.SaveChangesAsync();
@@ -803,23 +803,23 @@ Frontend tests follow the patterns established in Story 7.2's `ThemeProvider.tes
 
 | Action | Path | Purpose |
 |--------|------|---------|
-| CREATE | `src/FormForge.Api/Common/Security/CspNonceMiddleware.cs` | Per-request 16-byte base64 nonce on `HttpContext.Items` |
-| CREATE | `src/FormForge.Api/Common/Spa/IndexHtmlRewriter.cs` | SPA fallback handler; replaces `__CSP_NONCE__` in cached index.html |
-| CREATE | `src/FormForge.Api/Features/Users/MeEndpoints.cs` | `PUT /me/preferences` |
-| CREATE | `src/FormForge.Api/Features/Users/Dtos/UpdateMyPreferencesRequest.cs` | Request DTO |
-| CREATE | `src/FormForge.Api/Features/Users/Validators/UpdateMyPreferencesRequestValidator.cs` | Theme-name allow-list validator |
-| CREATE | `src/FormForge.Api/Features/Auth/Dtos/AuthenticatedUser.cs` | User-profile sub-record on `LoginResponse` (or co-locate in `LoginResponse.cs`) |
-| CREATE | `src/FormForge.Api/Infrastructure/Persistence/Migrations/{timestamp}_AddUserThemePreference.cs` | EF migration adds nullable column + CHECK constraint |
-| CREATE | `src/FormForge.Api.Tests/Features/Users/MeIntegrationTests.cs` | PUT preferences integration tests |
-| CREATE | `src/FormForge.Api.Tests/Common/Security/CspNonceMiddlewareTests.cs` | Unit tests for nonce middleware |
-| CREATE | `src/FormForge.Api.Tests/Common/Spa/IndexHtmlRewriterTests.cs` | Integration test against rewriter |
+| CREATE | `src/AppForge.Api/Common/Security/CspNonceMiddleware.cs` | Per-request 16-byte base64 nonce on `HttpContext.Items` |
+| CREATE | `src/AppForge.Api/Common/Spa/IndexHtmlRewriter.cs` | SPA fallback handler; replaces `__CSP_NONCE__` in cached index.html |
+| CREATE | `src/AppForge.Api/Features/Users/MeEndpoints.cs` | `PUT /me/preferences` |
+| CREATE | `src/AppForge.Api/Features/Users/Dtos/UpdateMyPreferencesRequest.cs` | Request DTO |
+| CREATE | `src/AppForge.Api/Features/Users/Validators/UpdateMyPreferencesRequestValidator.cs` | Theme-name allow-list validator |
+| CREATE | `src/AppForge.Api/Features/Auth/Dtos/AuthenticatedUser.cs` | User-profile sub-record on `LoginResponse` (or co-locate in `LoginResponse.cs`) |
+| CREATE | `src/AppForge.Api/Infrastructure/Persistence/Migrations/{timestamp}_AddUserThemePreference.cs` | EF migration adds nullable column + CHECK constraint |
+| CREATE | `src/AppForge.Api.Tests/Features/Users/MeIntegrationTests.cs` | PUT preferences integration tests |
+| CREATE | `src/AppForge.Api.Tests/Common/Security/CspNonceMiddlewareTests.cs` | Unit tests for nonce middleware |
+| CREATE | `src/AppForge.Api.Tests/Common/Spa/IndexHtmlRewriterTests.cs` | Integration test against rewriter |
 | CREATE | `web/src/lib/theme/preferencesApi.ts` | Frontend PUT wrapper |
-| MODIFY | `src/FormForge.Api/Domain/Entities/User.cs` | Add `ThemePreference` property |
-| MODIFY | `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` | Map `theme_preference` column + CHECK constraint |
-| MODIFY | `src/FormForge.Api/Features/Auth/Dtos/LoginResponse.cs` | Add `User` field |
-| MODIFY | `src/FormForge.Api/Features/Auth/AuthService.cs` | Construct `AuthenticatedUser` in Login + Refresh response paths |
-| MODIFY | `src/FormForge.Api/Program.cs` | Register CspNonceMiddleware + per-request CSP + MapFallback to IndexHtmlRewriter; remove placeholder MapGet("/") |
-| MODIFY | `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs` | Add Login_Returns_UserProfile and Refresh_Returns_UserProfile tests |
+| MODIFY | `src/AppForge.Api/Domain/Entities/User.cs` | Add `ThemePreference` property |
+| MODIFY | `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` | Map `theme_preference` column + CHECK constraint |
+| MODIFY | `src/AppForge.Api/Features/Auth/Dtos/LoginResponse.cs` | Add `User` field |
+| MODIFY | `src/AppForge.Api/Features/Auth/AuthService.cs` | Construct `AuthenticatedUser` in Login + Refresh response paths |
+| MODIFY | `src/AppForge.Api/Program.cs` | Register CspNonceMiddleware + per-request CSP + MapFallback to IndexHtmlRewriter; remove placeholder MapGet("/") |
+| MODIFY | `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs` | Add Login_Returns_UserProfile and Refresh_Returns_UserProfile tests |
 | MODIFY | `web/index.html` | Insert inline `<head>` theme bootstrap script with `__CSP_NONCE__` placeholder |
 | MODIFY | `web/src/lib/theme/ThemeProvider.tsx` | Fire `updateThemePreference` on user-initiated `setTheme` |
 | MODIFY | `web/src/features/auth/authMutations.ts` | Extend `LoginResponse` shape; sync `themePreference` to localStorage on login success |
@@ -858,7 +858,7 @@ Recent commits relevant to this story:
 This story has 12 tasks split across backend (1–3, 7–11) and frontend (4–6, 12). Recommended order:
 
 1. **Backend first (T1 → T3):** Migration + DTO + endpoint + AuthService changes are pure server work, easy to integration-test in isolation. Verify with curl: login with the bootstrap admin, PUT a theme, login again, observe the theme in the response.
-2. **Frontend wire-up (T4 → T6):** Wire login/refresh sync + PUT-on-setTheme. Validate end-to-end in Aspire dev (`dotnet run --project src/FormForge.AppHost`): set a theme, log out, log in, observe theme restored.
+2. **Frontend wire-up (T4 → T6):** Wire login/refresh sync + PUT-on-setTheme. Validate end-to-end in Aspire dev (`dotnet run --project src/AppForge.AppHost`): set a theme, log out, log in, observe theme restored.
 3. **CSP plumbing (T7 → T10):** The middleware + rewriter are independent of the persistence work. Test in isolation using the integration test in §12. Be ready for the `NetEscapades` 1.0 API to require a small adjustment to the per-request CSP pattern in §9.
 4. **Tests (T11, T12) interleave throughout:** add tests as you build each layer; do not save all tests for the end.
 
@@ -871,7 +871,7 @@ This story has 12 tasks split across backend (1–3, 7–11) and frontend (4–6
 - [ ] Manual check: open browser DevTools network tab on login; verify the response body has `user.themePreference` populated
 - [ ] Manual check: open browser DevTools network tab on theme change; verify a `PUT /api/users/me/preferences` request fires
 - [ ] Manual check: PUT with `Authorization: Bearer <invalid>` returns 401; PUT with `themePreference: "bogus"` returns 422
-- [ ] **For AC-4 verification (requires a `wwwroot/index.html` present):** build the SPA into `wwwroot/` once (`npm run build && cp -r web/dist/* src/FormForge.Api/wwwroot/`), restart the API, browse to `http://localhost:5190/`, inspect the response source — confirm `nonce="..."` has a non-placeholder value AND the `Content-Security-Policy` response header includes that same value
+- [ ] **For AC-4 verification (requires a `wwwroot/index.html` present):** build the SPA into `wwwroot/` once (`npm run build && cp -r web/dist/* src/AppForge.Api/wwwroot/`), restart the API, browse to `http://localhost:5190/`, inspect the response source — confirm `nonce="..."` has a non-placeholder value AND the `Content-Security-Policy` response header includes that same value
 - [ ] No new entries in `deferred-work.md` unless explicitly noted in completion notes
 
 ---
@@ -895,7 +895,7 @@ claude-sonnet-4-6 (2026-05-27)
 ### Completion Notes List
 
 - All 12 tasks implemented and all acceptance criteria satisfied.
-- **Theme allow-list sync requirement**: The theme name allow-list is duplicated in three places that MUST stay in sync if a new theme is added in a future story: (1) `web/src/lib/theme/themes.ts` (THEMES tuple), (2) `src/FormForge.Api/Features/Users/Validators/UpdateMyPreferencesRequestValidator.cs` (AllowedThemes HashSet), (3) `web/index.html` inline script's `allowed` array. Any future theme addition also requires a new EF migration to update the CHECK constraint.
+- **Theme allow-list sync requirement**: The theme name allow-list is duplicated in three places that MUST stay in sync if a new theme is added in a future story: (1) `web/src/lib/theme/themes.ts` (THEMES tuple), (2) `src/AppForge.Api/Features/Users/Validators/UpdateMyPreferencesRequestValidator.cs` (AllowedThemes HashSet), (3) `web/index.html` inline script's `allowed` array. Any future theme addition also requires a new EF migration to update the CHECK constraint.
 - **`AuthenticatedUser` co-located in `LoginResponse.cs`**: Not a separate file as the story's §15 mentions "or co-locate in `LoginResponse.cs`". Both are auth DTOs so co-location is cleaner.
 - **`/api/{**catchAll}` fallback removed**: Story Dev Notes §11 suggested adding it as a defensive measure, but it breaks the existing 405 tests. The root-cause is `MapFallback` matching wrong-method requests before ASP.NET can emit 405. Removing it restores correct 405 semantics; unknown `/api/*` paths yield 404 (acceptable: the SPA returns its own 404 page which looks fine in a browser).
 - **ThemeProvider React state vs. DOM drift**: When login/refresh sync calls `applyTheme` directly (not `setTheme`), the DOM `data-theme` and localStorage update immediately but `ThemeProvider` React state stays stale until the next mount. This is acceptable because the DOM is the CSS source of truth; the selector dropdown will show the correct value after the next page load. Documented in Dev Notes §7 as a potential follow-up polish item.
@@ -906,16 +906,16 @@ claude-sonnet-4-6 (2026-05-27)
 ### File List
 
 **Created (backend):**
-- `src/FormForge.Api/Common/Security/CspNonceMiddleware.cs`
-- `src/FormForge.Api/Common/Spa/IndexHtmlRewriter.cs`
-- `src/FormForge.Api/Features/Users/MeEndpoints.cs`
-- `src/FormForge.Api/Features/Users/Dtos/UpdateMyPreferencesRequest.cs`
-- `src/FormForge.Api/Features/Users/Validators/UpdateMyPreferencesRequestValidator.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260527012534_AddUserThemePreference.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260527012534_AddUserThemePreference.Designer.cs`
-- `src/FormForge.Api.Tests/Features/Users/MeIntegrationTests.cs`
-- `src/FormForge.Api.Tests/Common/Security/CspNonceMiddlewareTests.cs`
-- `src/FormForge.Api.Tests/Common/Spa/IndexHtmlRewriterTests.cs`
+- `src/AppForge.Api/Common/Security/CspNonceMiddleware.cs`
+- `src/AppForge.Api/Common/Spa/IndexHtmlRewriter.cs`
+- `src/AppForge.Api/Features/Users/MeEndpoints.cs`
+- `src/AppForge.Api/Features/Users/Dtos/UpdateMyPreferencesRequest.cs`
+- `src/AppForge.Api/Features/Users/Validators/UpdateMyPreferencesRequestValidator.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260527012534_AddUserThemePreference.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260527012534_AddUserThemePreference.Designer.cs`
+- `src/AppForge.Api.Tests/Features/Users/MeIntegrationTests.cs`
+- `src/AppForge.Api.Tests/Common/Security/CspNonceMiddlewareTests.cs`
+- `src/AppForge.Api.Tests/Common/Spa/IndexHtmlRewriterTests.cs`
 
 **Created (frontend):**
 - `web/src/lib/theme/preferencesApi.ts`
@@ -924,13 +924,13 @@ claude-sonnet-4-6 (2026-05-27)
 - `web/e2e/theme-no-fouc.spec.ts`
 
 **Modified (backend):**
-- `src/FormForge.Api/Domain/Entities/User.cs` — added `ThemePreference` property
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — mapped `theme_preference` column + CHECK constraint
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.ModelSnapshot.cs` — updated by EF migrations
-- `src/FormForge.Api/Features/Auth/Dtos/LoginResponse.cs` — added `AuthenticatedUser` record + `User` field on `LoginResponse`
-- `src/FormForge.Api/Features/Auth/AuthService.cs` — constructs `AuthenticatedUser` in Login + Refresh response paths
-- `src/FormForge.Api/Program.cs` — registers CspNonceMiddleware, per-request CSP middleware, MapFallback → IndexHtmlRewriter, MapMePreferencesEndpoints; removes `/api/{**catchAll}` fallback; removes placeholder `MapGet("/")`
-- `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs` — added Login + Refresh user-profile tests
+- `src/AppForge.Api/Domain/Entities/User.cs` — added `ThemePreference` property
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — mapped `theme_preference` column + CHECK constraint
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.ModelSnapshot.cs` — updated by EF migrations
+- `src/AppForge.Api/Features/Auth/Dtos/LoginResponse.cs` — added `AuthenticatedUser` record + `User` field on `LoginResponse`
+- `src/AppForge.Api/Features/Auth/AuthService.cs` — constructs `AuthenticatedUser` in Login + Refresh response paths
+- `src/AppForge.Api/Program.cs` — registers CspNonceMiddleware, per-request CSP middleware, MapFallback → IndexHtmlRewriter, MapMePreferencesEndpoints; removes `/api/{**catchAll}` fallback; removes placeholder `MapGet("/")`
+- `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs` — added Login + Refresh user-profile tests
 
 **Modified (frontend):**
 - `web/index.html` — inserted inline FOUC-prevention `<script nonce="__CSP_NONCE__">` in `<head>`
@@ -953,24 +953,24 @@ claude-sonnet-4-6 (2026-05-27)
 
 #### Decision needed
 
-- [x] [Review][Decision] **D1 — MapFallback serves SPA for unknown `/api/*` paths** — `src/FormForge.Api/Program.cs:~538` — **Resolved: Accept trade-off.** The `/api/{**catchAll}` guard removal (Debug Log #6) preserves automatic 405 emission, which was deemed more valuable than emitting JSON 404 on unknown `/api/*` paths. Behavior moves to deferred-work as a documented quirk.
-- [x] [Review][Decision] **D2 — AC-1 literal violation: 422 body lacks `code: "VALIDATION_FAILED"`** — `src/FormForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs:~38` — **Resolved: Accept letter not met, document.** Generic `ValidationFilter` returns `Results.ValidationProblem` without a `code` extension; AC-1 weakened test (Debug Log #5) reflects the platform shortcoming. Spirit of AC-1 (422 with field errors) is met. Moves to deferred-work; AC-1 text should be reconciled in a follow-up.
-- [x] [Review][Decision] **D3 — Empty PUT body `{}` silently clears the stored theme** — `src/FormForge.Api/Features/Users/Dtos/UpdateMyPreferencesRequest.cs:1` — **Resolved: Document only.** Missing key and explicit `null` are semantically equivalent (both clear the preference). The SPA never sends `{}` in practice. Adds a Dev Notes line codifying the behavior; no code change. Moves to deferred-work.
-- [x] [Review][Decision] **D4 — `UseStaticFiles` could serve raw `index.html`** — `src/FormForge.Api/Program.cs:~467` — **Resolved: Add explicit static-files exclusion (patch).** Security-adjacent invariant: index.html must never be served without the nonce rewrite. Becomes Patch #11 below.
+- [x] [Review][Decision] **D1 — MapFallback serves SPA for unknown `/api/*` paths** — `src/AppForge.Api/Program.cs:~538` — **Resolved: Accept trade-off.** The `/api/{**catchAll}` guard removal (Debug Log #6) preserves automatic 405 emission, which was deemed more valuable than emitting JSON 404 on unknown `/api/*` paths. Behavior moves to deferred-work as a documented quirk.
+- [x] [Review][Decision] **D2 — AC-1 literal violation: 422 body lacks `code: "VALIDATION_FAILED"`** — `src/AppForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs:~38` — **Resolved: Accept letter not met, document.** Generic `ValidationFilter` returns `Results.ValidationProblem` without a `code` extension; AC-1 weakened test (Debug Log #5) reflects the platform shortcoming. Spirit of AC-1 (422 with field errors) is met. Moves to deferred-work; AC-1 text should be reconciled in a follow-up.
+- [x] [Review][Decision] **D3 — Empty PUT body `{}` silently clears the stored theme** — `src/AppForge.Api/Features/Users/Dtos/UpdateMyPreferencesRequest.cs:1` — **Resolved: Document only.** Missing key and explicit `null` are semantically equivalent (both clear the preference). The SPA never sends `{}` in practice. Adds a Dev Notes line codifying the behavior; no code change. Moves to deferred-work.
+- [x] [Review][Decision] **D4 — `UseStaticFiles` could serve raw `index.html`** — `src/AppForge.Api/Program.cs:~467` — **Resolved: Add explicit static-files exclusion (patch).** Security-adjacent invariant: index.html must never be served without the nonce rewrite. Becomes Patch #11 below.
 
 #### Patch
 
-- [x] [Review][Patch] **Use Base64Url encoding for the CSP nonce** [`src/FormForge.Api/Common/Security/CspNonceMiddleware.cs:27`] — Standard base64 (`+`, `/`, `=`) is permitted by CSP3 but tripped older CDNs/WAFs. `Convert.ToBase64String(bytes).TrimEnd('=').Replace('+','-').Replace('/','_')`.
-- [x] [Review][Patch] **Cache the "missing index.html" state to avoid lock contention on every dev fallback request** [`src/FormForge.Api/Common/Spa/IndexHtmlRewriter.cs:35-51`] — In dev (no `wwwroot/index.html`), every fallback request takes the lock, calls `File.Exists`, returns null. Add a `_cachedMissing` sentinel.
-- [x] [Review][Patch] **PUT `/me/preferences` returns 401 (not 404) when the user row no longer exists for a still-valid JWT** [`src/FormForge.Api/Features/Users/MeEndpoints.cs:43-46`] — `rows == 0` means the principal is stale; semantically the auth state is invalid. Either return `Unauthorized()` or add `.Produces(404)` and document the contract.
+- [x] [Review][Patch] **Use Base64Url encoding for the CSP nonce** [`src/AppForge.Api/Common/Security/CspNonceMiddleware.cs:27`] — Standard base64 (`+`, `/`, `=`) is permitted by CSP3 but tripped older CDNs/WAFs. `Convert.ToBase64String(bytes).TrimEnd('=').Replace('+','-').Replace('/','_')`.
+- [x] [Review][Patch] **Cache the "missing index.html" state to avoid lock contention on every dev fallback request** [`src/AppForge.Api/Common/Spa/IndexHtmlRewriter.cs:35-51`] — In dev (no `wwwroot/index.html`), every fallback request takes the lock, calls `File.Exists`, returns null. Add a `_cachedMissing` sentinel.
+- [x] [Review][Patch] **PUT `/me/preferences` returns 401 (not 404) when the user row no longer exists for a still-valid JWT** [`src/AppForge.Api/Features/Users/MeEndpoints.cs:43-46`] — `rows == 0` means the principal is stale; semantically the auth state is invalid. Either return `Unauthorized()` or add `.Produces(404)` and document the contract.
 - [x] [Review][Patch] **Add localStorage short-circuit to `useLoginMutation.onSuccess` (mirror `useAuthQuery` behavior)** [`web/src/features/auth/authMutations.ts:36-44`] — `useAuthQuery` already checks `localStorage.getItem('ff-theme') !== serverTheme` before calling `applyTheme`. Login path always overwrites, causing pre-login theme picks to flicker on login.
 - [x] [Review][Patch] **Extract duplicated `AuthenticatedUser` interface to a shared types module** [`web/src/features/auth/authMutations.ts:11-17` + `web/src/features/auth/useAuthQuery.ts:7-13`] — Identical declaration in both files. Move to `web/src/features/auth/types.ts`.
-- [x] [Review][Patch] **Guard `IndexHtmlRewriter` against TOCTOU on `File.ReadAllText`** [`src/FormForge.Api/Common/Spa/IndexHtmlRewriter.cs:46-48`] — If index.html is deleted between `File.Exists` and `File.ReadAllText`, an `IOException` bubbles up as a 500. Wrap in `try { } catch (IOException) { return null; }`.
-- [x] [Review][Patch] **Handle empty-string `env.WebRootPath` (not just null)** [`src/FormForge.Api/Common/Spa/IndexHtmlRewriter.cs:~44`] — The `??` operator skips empty string; `Path.Combine("", "index.html")` returns `"index.html"` resolving against CWD. Use `string.IsNullOrEmpty(env.WebRootPath) ? "wwwroot" : env.WebRootPath`.
+- [x] [Review][Patch] **Guard `IndexHtmlRewriter` against TOCTOU on `File.ReadAllText`** [`src/AppForge.Api/Common/Spa/IndexHtmlRewriter.cs:46-48`] — If index.html is deleted between `File.Exists` and `File.ReadAllText`, an `IOException` bubbles up as a 500. Wrap in `try { } catch (IOException) { return null; }`.
+- [x] [Review][Patch] **Handle empty-string `env.WebRootPath` (not just null)** [`src/AppForge.Api/Common/Spa/IndexHtmlRewriter.cs:~44`] — The `??` operator skips empty string; `Path.Combine("", "index.html")` returns `"index.html"` resolving against CWD. Use `string.IsNullOrEmpty(env.WebRootPath) ? "wwwroot" : env.WebRootPath`.
 - [x] [Review][Patch] **Log a console warning when the server returns an unknown `themePreference`** [`web/src/features/auth/useAuthQuery.ts:59-65`] — Silent drift between server allow-list and client `THEMES` is currently invisible. Add `else if (serverTheme !== null) console.warn('[theme] server returned unknown theme', serverTheme)`.
-- [x] [Review][Patch] **Wrap CSP header write in `context.Response.OnStarting` to survive early header flushes** [`src/FormForge.Api/Program.cs:~444-459`] — If a downstream middleware (auth challenge, exception handler) flushes the response headers before `await next()` returns, the CSP header is silently dropped. Use `ctx.Response.OnStarting(() => { ... ; return Task.CompletedTask; })`.
-- [x] [Review][Patch] **Re-enable the body-vs-header CSP nonce sync assertion by switching test env to `Production`** [`src/FormForge.Api.Tests/Common/Spa/IndexHtmlRewriterTests.cs:103-137`] — The `WebApplicationFactory` runs in Development, where the CSP middleware is gated off. Add `.WithWebHostBuilder(b => b.UseEnvironment("Production"))` to the existing fixture and re-add the header-nonce assertion. Closes a critical gap: AC-4's "body nonce == header nonce" invariant currently has zero CI coverage.
-- [x] [Review][Patch] **Explicitly exclude `index.html` from `UseStaticFiles` middleware** [`src/FormForge.Api/Program.cs:~467`] — Defense-in-depth: ensure `index.html` is never served raw with the literal `__CSP_NONCE__` placeholder. Configure `UseStaticFiles(new StaticFileOptions { OnPrepareResponse = ctx => { if (ctx.File.Name.Equals("index.html", StringComparison.OrdinalIgnoreCase)) { ctx.Context.Response.StatusCode = 404; ctx.Context.Response.ContentLength = 0; } } })`. Add a regression test asserting `GET /index.html` is NOT served by the static-files middleware when `wwwroot/index.html` exists.
+- [x] [Review][Patch] **Wrap CSP header write in `context.Response.OnStarting` to survive early header flushes** [`src/AppForge.Api/Program.cs:~444-459`] — If a downstream middleware (auth challenge, exception handler) flushes the response headers before `await next()` returns, the CSP header is silently dropped. Use `ctx.Response.OnStarting(() => { ... ; return Task.CompletedTask; })`.
+- [x] [Review][Patch] **Re-enable the body-vs-header CSP nonce sync assertion by switching test env to `Production`** [`src/AppForge.Api.Tests/Common/Spa/IndexHtmlRewriterTests.cs:103-137`] — The `WebApplicationFactory` runs in Development, where the CSP middleware is gated off. Add `.WithWebHostBuilder(b => b.UseEnvironment("Production"))` to the existing fixture and re-add the header-nonce assertion. Closes a critical gap: AC-4's "body nonce == header nonce" invariant currently has zero CI coverage.
+- [x] [Review][Patch] **Explicitly exclude `index.html` from `UseStaticFiles` middleware** [`src/AppForge.Api/Program.cs:~467`] — Defense-in-depth: ensure `index.html` is never served raw with the literal `__CSP_NONCE__` placeholder. Configure `UseStaticFiles(new StaticFileOptions { OnPrepareResponse = ctx => { if (ctx.File.Name.Equals("index.html", StringComparison.OrdinalIgnoreCase)) { ctx.Context.Response.StatusCode = 404; ctx.Context.Response.ContentLength = 0; } } })`. Add a regression test asserting `GET /index.html` is NOT served by the static-files middleware when `wwwroot/index.html` exists.
 
 #### Defer (pre-existing or out-of-scope)
 

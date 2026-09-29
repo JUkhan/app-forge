@@ -35,7 +35,7 @@ jobs:
       - run: dotnet build --no-restore -c Release
       - run: dotnet test --no-build -c Release
         env:
-          ConnectionStrings__formforge: "Host=localhost;Database=ff_test;Username=postgres;Password=postgres"
+          ConnectionStrings__appforge: "Host=localhost;Database=ff_test;Username=postgres;Password=postgres"
 
   test-frontend:
     runs-on: ubuntu-latest

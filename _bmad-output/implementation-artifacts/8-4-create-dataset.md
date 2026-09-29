@@ -57,9 +57,9 @@ so that a row and a backing PostgreSQL VIEW are created atomically.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Create `DatasetDto.cs` response DTO** (AC-1, AC-2)
-  - [x] Create `src/FormForge.Api/Features/Datasets/Dtos/DatasetDto.cs`:
+  - [x] Create `src/AppForge.Api/Features/Datasets/Dtos/DatasetDto.cs`:
     ```csharp
-    namespace FormForge.Api.Features.Datasets.Dtos;
+    namespace AppForge.Api.Features.Datasets.Dtos;
 
     internal sealed record DatasetDto(
         Guid Id,
@@ -74,14 +74,14 @@ so that a row and a backing PostgreSQL VIEW are created atomically.
   - [x] This record is returned in the 201 body and will also be used by Stories 8.5 (update), 8.7 (get).
 
 - [x] **Task 2 — Create `DatasetViewManager.cs`** (AC-1, AC-2, AC-4)
-  - [x] Create `src/FormForge.Api/Features/Datasets/DatasetViewManager.cs`:
+  - [x] Create `src/AppForge.Api/Features/Datasets/DatasetViewManager.cs`:
     ```csharp
     using Dapper;
-    using FormForge.Api.Domain.ValueTypes;
-    using FormForge.Api.Infrastructure.Persistence;
+    using AppForge.Api.Domain.ValueTypes;
+    using AppForge.Api.Infrastructure.Persistence;
     using Npgsql;
 
-    namespace FormForge.Api.Features.Datasets;
+    namespace AppForge.Api.Features.Datasets;
 
     // Story 8.4 — CREATE VIEW. Stories 8.5/8.6 will add
     // CREATE OR REPLACE / ALTER RENAME / DROP VIEW operations.
@@ -117,7 +117,7 @@ so that a row and a backing PostgreSQL VIEW are created atomically.
     ```
 
 - [x] **Task 3 — Create `IDatasetService` interface and `DatasetService` class** (AC-1 through AC-6)
-  - [x] Create `src/FormForge.Api/Features/Datasets/DatasetService.cs`
+  - [x] Create `src/AppForge.Api/Features/Datasets/DatasetService.cs`
   - [x] Define outcome enum and result record at the top of the file:
     ```csharp
     internal enum CreateDatasetOutcome { Success, NameConflict, InvalidQuery }
@@ -139,7 +139,7 @@ so that a row and a backing PostgreSQL VIEW are created atomically.
             CancellationToken ct);
     }
     ```
-  - [x] Implement `DatasetService` — constructor-inject `FormForgeDbContext db`, `DbConnectionFactory connectionFactory`, `DatasetViewManager viewManager`, `ILogger<DatasetService> logger`
+  - [x] Implement `DatasetService` — constructor-inject `AppForgeDbContext db`, `DbConnectionFactory connectionFactory`, `DatasetViewManager viewManager`, `ILogger<DatasetService> logger`
   - [x] `CreateAsync` implementation (see Dev Notes §1 for full pattern):
     - Resolve actor name: `var actorName = await db.Users.Where(u => u.Id == actorId).Select(u => u.DisplayName).FirstOrDefaultAsync(ct);`
     - Compute effective query: `var effectiveQuery = string.IsNullOrWhiteSpace(request.Query) ? "SELECT 1 AS placeholder" : request.Query;`
@@ -169,7 +169,7 @@ so that a row and a backing PostgreSQL VIEW are created atomically.
       - Return `new CreateDatasetResult(CreateDatasetOutcome.InvalidQuery, ErrorDetail: pgErrorDetail)`
 
 - [x] **Task 4 — Update `DatasetEndpoints.cs` POST handler** (AC-1 through AC-4)
-  - [x] Update `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs`
+  - [x] Update `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs`
   - [x] Inject `IDatasetService datasetService` in the `MapDatasetEndpoints` method signature (Minimal API route parameter binding pulls it from DI automatically)
   - [x] Replace the POST `/` stub handler:
     ```csharp
@@ -218,25 +218,25 @@ so that a row and a backing PostgreSQL VIEW are created atomically.
     .RequireDatasetManagement();
     ```
   - [x] **Add required usings** at the top of `DatasetEndpoints.cs`:
-    - `using FormForge.Api.Common.Logging;` (for `GetCorrelationId()`)
+    - `using AppForge.Api.Common.Logging;` (for `GetCorrelationId()`)
     - `using System.Security.Claims;` (if not already present)
   - [x] Keep the PUT, DELETE, GET stubs unchanged — they are still 501 for this story
   - [x] **IMPORTANT — do NOT add `.AddValidationFilter<CreateDatasetRequest>()` to the POST endpoint.** The FV filter emits a 400 `ValidationProblemDetails` without a root `code` field. The inline `DatasetName.TryCreate` check (from Story 8.3) is the correct path. See Story 8.3 §3 and review finding §Defer.
 
 - [x] **Task 5 — Register services in `Program.cs`** (AC-1)
-  - [x] Update `src/FormForge.Api/Program.cs` — add after the existing Dataset validator registrations:
+  - [x] Update `src/AppForge.Api/Program.cs` — add after the existing Dataset validator registrations:
     ```csharp
     // Story 8.4 — Dataset lifecycle service and VIEW DDL manager.
     builder.Services.AddScoped<DatasetViewManager>();
     builder.Services.AddScoped<IDatasetService, DatasetService>();
     ```
   - [x] Add the required usings:
-    - `using FormForge.Api.Features.Datasets;`
+    - `using AppForge.Api.Features.Datasets;`
     - (If `DatasetViewManager` is in the same namespace, no extra using needed.)
   - [x] Verify the `MapDatasetEndpoints()` call in Program.cs does NOT need changes — Minimal API DI injects `IDatasetService` automatically.
 
 - [x] **Task 6 — Integration tests: `DatasetViewLifecycleTests.cs`** (AC-1 through AC-6)
-  - [x] Create `src/FormForge.Api.Tests/Features/Datasets/DatasetViewLifecycleTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/Datasets/DatasetViewLifecycleTests.cs`
   - [x] Use the same `PostgresFixture` + `WebApplicationFactory<Program>` pattern from `DatasetPermissionTests.cs` (see Dev Notes §4)
   - [x] Seed: platform-admin role (id `00000000-0000-0000-0000-000000000001`, `can_manage_datasets=true`) + one admin user; login for JWT
   - [x] TRUNCATE `custom_dataset, dataset_audit_log` (in addition to roles/users) between test class setup to isolate from other test classes:
@@ -371,7 +371,7 @@ await conn.ExecuteAsync(new CommandDefinition(
 
 ### §2 — Transaction / connection disposal pattern
 
-Mirror the DynamicDataEndpoints disposal pattern exactly (src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs lines 800–839). Dispose the transaction and connection in `finally` blocks with `ConfigureAwait(false)`, and use `CancellationToken.None` on Commit and Rollback so host shutdown doesn't abort them mid-flight.
+Mirror the DynamicDataEndpoints disposal pattern exactly (src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs lines 800–839). Dispose the transaction and connection in `finally` blocks with `ConfigureAwait(false)`, and use `CancellationToken.None` on Commit and Rollback so host shutdown doesn't abort them mid-flight.
 
 ```csharp
 var conn = await connectionFactory.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
@@ -456,13 +456,13 @@ public async Task InitializeAsync()
     _factory = new WebApplicationFactory<Program>()
         .WithWebHostBuilder(builder =>
         {
-            builder.UseSetting("ConnectionStrings:formforge", _postgres.ConnectionString);
+            builder.UseSetting("ConnectionStrings:appforge", _postgres.ConnectionString);
             builder.UseSetting("Jwt:SigningKey", "test-signing-key-minimum-32-characters!!");
             builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:5173");
         });
 
     using var scope = _factory.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+    var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
     await db.Database.MigrateAsync();
 
     await db.Database.ExecuteSqlRawAsync(
@@ -542,17 +542,17 @@ Expected after this story:
 
 **New files:**
 ```
-src/FormForge.Api/Features/Datasets/Dtos/DatasetDto.cs              ← NEW
-src/FormForge.Api/Features/Datasets/DatasetViewManager.cs           ← NEW
-src/FormForge.Api/Features/Datasets/DatasetService.cs               ← NEW
-src/FormForge.Api.Tests/Features/Datasets/DatasetViewLifecycleTests.cs ← NEW
+src/AppForge.Api/Features/Datasets/Dtos/DatasetDto.cs              ← NEW
+src/AppForge.Api/Features/Datasets/DatasetViewManager.cs           ← NEW
+src/AppForge.Api/Features/Datasets/DatasetService.cs               ← NEW
+src/AppForge.Api.Tests/Features/Datasets/DatasetViewLifecycleTests.cs ← NEW
 ```
 
 **Modified files:**
 ```
-src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs  (POST handler — real impl replaces 501 stub)
-src/FormForge.Api/Program.cs                             (register DatasetViewManager + IDatasetService)
-src/FormForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs  (update 501→201 assertion)
+src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs  (POST handler — real impl replaces 501 stub)
+src/AppForge.Api/Program.cs                             (register DatasetViewManager + IDatasetService)
+src/AppForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs  (update 501→201 assertion)
 web/src/lib/i18n/locales/en.json                         (add nameConflict + invalidQuery keys)
 ```
 
@@ -565,20 +565,20 @@ web/src/lib/i18n/locales/en.json                         (add nameConflict + inv
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.3 — AR-59: Transactional View Lifecycle]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.9 — AR-65: Dataset API contract, error codes table (INVALID_QUERY 422, DATASET_NAME_CONFLICT 409)]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.1 — AR-57: dataset_name UNIQUE constraint; datasets schema; audit log]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — current stub state; inline validation pattern from Story 8.3]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — `InvalidDatasetName()` helper to mirror for other error shapes]
-- [Source: `src/FormForge.Api/Domain/Entities/CustomDataset.cs` — entity fields; version=1 default; created_by nullable FK]
-- [Source: `src/FormForge.Api/Domain/Entities/DatasetAuditLogEntry.cs` — audit log fields including actor_name, ddl, succeeded, correlation_id]
-- [Source: `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` lines 362–388 — CustomDataset fluent mapping; `idx_custom_dataset_dataset_name` UNIQUE index]
-- [Source: `src/FormForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs` — raw NpgsqlConnection; `DdlCommandTimeoutSeconds = 60`]
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` lines 800–840 — Dapper + NpgsqlTransaction disposal pattern]
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` line 844 — `httpContext.GetCorrelationId()` usage]
-- [Source: `src/FormForge.Api/Common/Logging/LogContextExtensions.cs` — `GetCorrelationId()` extension method]
-- [Source: `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs` lines 112–113 — `httpContext.User.FindFirst("userId")` pattern]
-- [Source: `src/FormForge.Api/Features/Datasets/Validators/DatasetNameValidator.cs` — validator registered explicitly (no assembly scan) per Story 8.3 deviation]
-- [Source: `src/FormForge.Api/Program.cs` lines 247–249 — explicit Dataset validator DI registrations]
-- [Source: `src/FormForge.Api.Tests/Features/Datasets/DatasetNameValidationTests.cs` — integration test setup, ReseedAdminRoleAsync, SeedAdminUserAsync, LoginAsync helpers]
-- [Source: `src/FormForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs` lines 169–181 — `PostDatasets_Admin_Returns501NotForbidden` test to update]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — current stub state; inline validation pattern from Story 8.3]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — `InvalidDatasetName()` helper to mirror for other error shapes]
+- [Source: `src/AppForge.Api/Domain/Entities/CustomDataset.cs` — entity fields; version=1 default; created_by nullable FK]
+- [Source: `src/AppForge.Api/Domain/Entities/DatasetAuditLogEntry.cs` — audit log fields including actor_name, ddl, succeeded, correlation_id]
+- [Source: `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` lines 362–388 — CustomDataset fluent mapping; `idx_custom_dataset_dataset_name` UNIQUE index]
+- [Source: `src/AppForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs` — raw NpgsqlConnection; `DdlCommandTimeoutSeconds = 60`]
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` lines 800–840 — Dapper + NpgsqlTransaction disposal pattern]
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` line 844 — `httpContext.GetCorrelationId()` usage]
+- [Source: `src/AppForge.Api/Common/Logging/LogContextExtensions.cs` — `GetCorrelationId()` extension method]
+- [Source: `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs` lines 112–113 — `httpContext.User.FindFirst("userId")` pattern]
+- [Source: `src/AppForge.Api/Features/Datasets/Validators/DatasetNameValidator.cs` — validator registered explicitly (no assembly scan) per Story 8.3 deviation]
+- [Source: `src/AppForge.Api/Program.cs` lines 247–249 — explicit Dataset validator DI registrations]
+- [Source: `src/AppForge.Api.Tests/Features/Datasets/DatasetNameValidationTests.cs` — integration test setup, ReseedAdminRoleAsync, SeedAdminUserAsync, LoginAsync helpers]
+- [Source: `src/AppForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs` lines 169–181 — `PostDatasets_Admin_Returns501NotForbidden` test to update]
 - [Source: Story 8.3 Dev Agent Record §deviation — validators registered explicitly (no assembly scan)]
 - [Source: Story 8.3 Review Findings — FV filter risk (deferred to Story 8.4); UpdateDatasetRequest.Version guard (deferred to Story 8.5); pg_ prefix UX inconsistency (deferred to Story 8.10)]
 
@@ -595,7 +595,7 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context) — bmad-dev-story workflow
 - Build initially failed on CA1848/CA1873 (the API enforces source-generated
   `LoggerMessage` delegates as errors). Converted `DatasetViewManager` and
   `DatasetService` to `partial` classes with `[LoggerMessage]` methods.
-- A long-running dev instance of `FormForge.Api` (PID 35876) locked the build
+- A long-running dev instance of `AppForge.Api` (PID 35876) locked the build
   output; stopped it (with user approval) to rebuild and run integration tests.
 
 ### Completion Notes List
@@ -621,16 +621,16 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context) — bmad-dev-story workflow
 ### File List
 
 **New:**
-- `src/FormForge.Api/Features/Datasets/Dtos/DatasetDto.cs`
-- `src/FormForge.Api/Features/Datasets/DatasetViewManager.cs`
-- `src/FormForge.Api/Features/Datasets/DatasetService.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetViewLifecycleTests.cs`
+- `src/AppForge.Api/Features/Datasets/Dtos/DatasetDto.cs`
+- `src/AppForge.Api/Features/Datasets/DatasetViewManager.cs`
+- `src/AppForge.Api/Features/Datasets/DatasetService.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetViewLifecycleTests.cs`
 
 **Modified:**
-- `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` (real POST handler + usings + class comment)
-- `src/FormForge.Api/Program.cs` (register `DatasetViewManager` + `IDatasetService`)
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs` (501→201 assertion, unique probe name)
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetNameValidationTests.cs` (501→201 assertion, unique probe name)
+- `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` (real POST handler + usings + class comment)
+- `src/AppForge.Api/Program.cs` (register `DatasetViewManager` + `IDatasetService`)
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs` (501→201 assertion, unique probe name)
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetNameValidationTests.cs` (501→201 assertion, unique probe name)
 - `web/src/lib/i18n/locales/en.json` (add `datasets.nameConflict` + `datasets.invalidQuery`)
 
 ### Change Log

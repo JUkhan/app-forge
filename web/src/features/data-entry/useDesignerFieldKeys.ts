@@ -73,7 +73,7 @@ export interface TableColumn {
   referenceFilter?: ReferenceFilterConfig
 }
 
-// Mirror of FormForge.Api.Features.SchemaRegistry.ComponentTypeMapper.
+// Mirror of AppForge.Api.Features.SchemaRegistry.ComponentTypeMapper.
 // Keep in sync — backend authoritative for column PG types, but the filter UI
 // needs the mapping client-side to pick the right input widget without an
 // extra round trip. Both shorthand and SPA "Title Case" component types are

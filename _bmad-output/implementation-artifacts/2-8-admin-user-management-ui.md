@@ -82,14 +82,14 @@ so that I have full control over who accesses the platform without touching the 
     - Set `users.is_active = true`, `updated_at = now()`
     - Does NOT re-mint refresh tokens (user must log in again)
 
-- [x] Task 2 — Add DTOs in `src/FormForge.Api/Features/Users/Dtos/`
+- [x] Task 2 — Add DTOs in `src/AppForge.Api/Features/Users/Dtos/`
   - [x] `UserListItem(Guid Id, string Email, string DisplayName, bool IsActive, int RoleCount, DateTimeOffset CreatedAt)`
   - [x] `UserDetailResponse(Guid Id, string Email, string DisplayName, bool IsActive, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt, IReadOnlyList<UserRoleItem> Roles)`
   - [x] `UserRoleItem(Guid Id, string Name)`
   - [x] `CreateUserRequest(string? Email, string? DisplayName, string? TemporaryPassword)` (nullable for FluentValidation — validator enforces required)
   - [x] `UpdateUserRequest(string? DisplayName, string? NewPassword)` (all optional)
 
-- [x] Task 3 — Add FluentValidation validators in `src/FormForge.Api/Features/Users/Validators/`
+- [x] Task 3 — Add FluentValidation validators in `src/AppForge.Api/Features/Users/Validators/`
   - [x] `CreateUserRequestValidator`: Email required + valid format + max 320; DisplayName required + max 200; TemporaryPassword required + min 8
   - [x] `UpdateUserRequestValidator`: if DisplayName not null → max 200; if NewPassword not null → min 8; at least one field must be non-null
 
@@ -105,7 +105,7 @@ so that I have full control over who accesses the platform without touching the 
   - [x] In `ComputePermissionsAsync`, add: `var isActive = await db.Users.Where(u => u.Id == userId).Select(u => u.IsActive).FirstOrDefaultAsync(ct)` — return with `IsActive: isActive` instead of `IsActive: true`
   - [x] No migration needed — `users.is_active` column already exists
 
-- [x] Task 6 — Add integration tests in `src/FormForge.Api.Tests/Features/Users/`
+- [x] Task 6 — Add integration tests in `src/AppForge.Api.Tests/Features/Users/`
   - [x] `UserAdminIntegrationTests.cs`: happy-path create user + list + get + deactivate/reactivate cycle
   - [x] Duplicate email → 409; self-deactivation → 409; non-admin caller → 403
   - [x] Follow the Testcontainers pattern from `RoleIntegrationTests.cs` and `UserRoleIntegrationTests.cs`
@@ -200,11 +200,11 @@ _Code review run on 2026-05-23 (bmad-code-review, 3-reviewer parallel pass: Blin
 
 - [x] [Review][Defer] `UsersPage` performs no client-side GUID validation for the `$userId` route param — malformed URL fires an unnecessary network round-trip, server returns 404 [`web/src/routes/_app/admin/users.$userId.tsx:~24-27`] — deferred, minor UX
 - [x] [Review][Defer] Create-user form maps only 409 to a field error — 422 / other 4xx collapses to a root error rather than parsing ProblemDetails `code` / `messageKey` [`web/src/routes/_app/admin/users.tsx:~169-175`] — deferred, FluentValidation already client-side covers the common cases
-- [x] [Review][Defer] `PermissionService.ComputePermissionsAsync` cannot distinguish "deactivated" from "hard-deleted" — `FirstOrDefaultAsync<bool>` returns default `false` either way [`src/FormForge.Api/Features/Permissions/PermissionService.cs:~127-134`] — deferred, hard-delete is not in current scope
-- [x] [Review][Defer] `GetUsersAsync` page-beyond-last returns 200 with empty data instead of 400 [`src/FormForge.Api/Features/Users/UserService.cs:~189-205`] — deferred, admin-only and harmless
-- [x] [Review][Defer] `temporaryPassword` is sent in HTTP body and may be logged by request-body logging middleware [`src/FormForge.Api/Features/Users/UserEndpoints.cs:~817`] — deferred, needs investigation of Serilog / correlation logging config
-- [x] [Review][Defer] Integration test `GetMyPermissions_AfterDeactivation_ReturnsIsActiveFalse` could be flaky on slow CI — relies on event-bus cache-bust completing synchronously [`src/FormForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs:~470-518`] — deferred, test stability not a code defect
-- [x] [Review][Defer] Admin can change any user's password without step-up auth, audit log entry, or notification to the target user [`src/FormForge.Api/Features/Users/UserService.cs:~1133-1136`] — deferred, production-hardening follow-up
+- [x] [Review][Defer] `PermissionService.ComputePermissionsAsync` cannot distinguish "deactivated" from "hard-deleted" — `FirstOrDefaultAsync<bool>` returns default `false` either way [`src/AppForge.Api/Features/Permissions/PermissionService.cs:~127-134`] — deferred, hard-delete is not in current scope
+- [x] [Review][Defer] `GetUsersAsync` page-beyond-last returns 200 with empty data instead of 400 [`src/AppForge.Api/Features/Users/UserService.cs:~189-205`] — deferred, admin-only and harmless
+- [x] [Review][Defer] `temporaryPassword` is sent in HTTP body and may be logged by request-body logging middleware [`src/AppForge.Api/Features/Users/UserEndpoints.cs:~817`] — deferred, needs investigation of Serilog / correlation logging config
+- [x] [Review][Defer] Integration test `GetMyPermissions_AfterDeactivation_ReturnsIsActiveFalse` could be flaky on slow CI — relies on event-bus cache-bust completing synchronously [`src/AppForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs:~470-518`] — deferred, test stability not a code defect
+- [x] [Review][Defer] Admin can change any user's password without step-up auth, audit log entry, or notification to the target user [`src/AppForge.Api/Features/Users/UserService.cs:~1133-1136`] — deferred, production-hardening follow-up
 - [x] [Review][Defer] (from D1) **Raise password complexity floor above min 8** — Validators currently enforce only `MinimumLength(8)`; OWASP ASVS L1 baseline is min 12 + class diversity [`CreateUserRequestValidator.cs:17`, `UpdateUserRequestValidator.cs:22`] — deferred, v1 scope: admin-bootstrapped passwords are rotated OOB; revisit when end-user self-service password change is introduced.
 
 ---
@@ -285,7 +285,7 @@ return new EffectivePermissions(
 ```
 This adds one additional DB round-trip per cache miss. Acceptable since this runs only on cold-start per 30 s TTL. If the userId is not found (deleted user with a valid JWT), `FirstOrDefaultAsync` returns `false` (default for bool) → correctly returns inactive.
 
-**Password hasher:** Already exists at `src/FormForge.Api/Features/Auth/PasswordHasher.cs`. Inject `IPasswordHasher` (or the concrete type if registered without interface) the same way `AuthService` does.
+**Password hasher:** Already exists at `src/AppForge.Api/Features/Auth/PasswordHasher.cs`. Inject `IPasswordHasher` (or the concrete type if registered without interface) the same way `AuthService` does.
 
 **No new EF Core migration needed.** All required columns already exist:
 - `users`: `id`, `email`, `display_name`, `password_hash`, `is_active`, `created_at`, `updated_at`
@@ -293,7 +293,7 @@ This adds one additional DB round-trip per cache miss. Acceptable since this run
 
 ### Backend: `UserDeactivated` Domain Event
 
-The event is already declared (used by `PermissionService`) and subscribed. Confirm the declaration in `src/FormForge.Api/Infrastructure/EventBus/`:
+The event is already declared (used by `PermissionService`) and subscribed. Confirm the declaration in `src/AppForge.Api/Infrastructure/EventBus/`:
 ```csharp
 public sealed record UserDeactivated(Guid UserId);
 ```
@@ -427,16 +427,16 @@ Then import `toast` from `sonner` in mutations for success confirmations. `<Toas
 
 | File | Path | Action |
 |---|---|---|
-| `UserService.cs` | `src/FormForge.Api/Features/Users/` | MODIFY — add 5 new methods |
-| `UserEndpoints.cs` | `src/FormForge.Api/Features/Users/` | MODIFY — add 5 new endpoints |
-| `UserListItem.cs` | `src/FormForge.Api/Features/Users/Dtos/` | CREATE |
-| `UserDetailResponse.cs` | `src/FormForge.Api/Features/Users/Dtos/` | CREATE |
-| `CreateUserRequest.cs` | `src/FormForge.Api/Features/Users/Dtos/` | CREATE |
-| `UpdateUserRequest.cs` | `src/FormForge.Api/Features/Users/Dtos/` | CREATE |
-| `CreateUserRequestValidator.cs` | `src/FormForge.Api/Features/Users/Validators/` | CREATE |
-| `UpdateUserRequestValidator.cs` | `src/FormForge.Api/Features/Users/Validators/` | CREATE |
-| `UserAdminIntegrationTests.cs` | `src/FormForge.Api.Tests/Features/Users/` | CREATE |
-| `PermissionService.cs` | `src/FormForge.Api/Features/Permissions/` | MODIFY — `IsActive: isActive` |
+| `UserService.cs` | `src/AppForge.Api/Features/Users/` | MODIFY — add 5 new methods |
+| `UserEndpoints.cs` | `src/AppForge.Api/Features/Users/` | MODIFY — add 5 new endpoints |
+| `UserListItem.cs` | `src/AppForge.Api/Features/Users/Dtos/` | CREATE |
+| `UserDetailResponse.cs` | `src/AppForge.Api/Features/Users/Dtos/` | CREATE |
+| `CreateUserRequest.cs` | `src/AppForge.Api/Features/Users/Dtos/` | CREATE |
+| `UpdateUserRequest.cs` | `src/AppForge.Api/Features/Users/Dtos/` | CREATE |
+| `CreateUserRequestValidator.cs` | `src/AppForge.Api/Features/Users/Validators/` | CREATE |
+| `UpdateUserRequestValidator.cs` | `src/AppForge.Api/Features/Users/Validators/` | CREATE |
+| `UserAdminIntegrationTests.cs` | `src/AppForge.Api.Tests/Features/Users/` | CREATE |
+| `PermissionService.cs` | `src/AppForge.Api/Features/Permissions/` | MODIFY — `IsActive: isActive` |
 | `types.ts` | `web/src/features/admin/users/` | CREATE |
 | `useUsersQuery.ts` | `web/src/features/admin/users/` | CREATE |
 | `useUserDetailQuery.ts` | `web/src/features/admin/users/` | CREATE |
@@ -459,7 +459,7 @@ Then import `toast` from `sonner` in mutations for success confirmations. `<Toas
 ### Deferred Items Closed by This Story
 
 1. ✅ **`isActive: false` not handled in `usePermission`** (`web/src/features/auth/usePermission.ts:11`, deferred from Story 2.7 code review) — Task 11 adds the `isActive` guard.
-2. ✅ **`EffectivePermissions.IsActive` hard-coded `true`** (`src/FormForge.Api/Features/Permissions/PermissionService.cs::ComputePermissionsAsync`, deferred from Story 2.6 code review) — Task 5 reads from `users.is_active`.
+2. ✅ **`EffectivePermissions.IsActive` hard-coded `true`** (`src/AppForge.Api/Features/Permissions/PermissionService.cs::ComputePermissionsAsync`, deferred from Story 2.6 code review) — Task 5 reads from `users.is_active`.
 
 ### Deferred Items That Remain Deferred After This Story
 
@@ -502,10 +502,10 @@ Current branch: `story-1-4-followup` — merge or branch from `main` before star
 - [Source: architecture.md §AR-48] — TanStack Query key tuple convention
 - [Source: deferred-work.md §2.7] — `isActive: false` guard in `usePermission`; permanent denial on transient failure
 - [Source: deferred-work.md §2.6] — `EffectivePermissions.IsActive` hard-coded `true`
-- [Source: src/FormForge.Api/Features/Users/UserService.cs] — `AssignRolesAsync` pattern; `UserDeactivated` event; `PlatformAdminRoleId`
-- [Source: src/FormForge.Api/Features/Roles/RoleEndpoints.cs] — endpoint registration pattern with `AddValidationFilter`, `Produces`, private helper methods
-- [Source: src/FormForge.Api/Features/Permissions/PermissionService.cs] — `ComputePermissionsAsync`, `OnUserDeactivated`, `CacheKey` method
-- [Source: src/FormForge.Api/Features/Users/UserEndpoints.cs] — existing `MapUserAdminEndpoints`, comment about future stories extending this class
+- [Source: src/AppForge.Api/Features/Users/UserService.cs] — `AssignRolesAsync` pattern; `UserDeactivated` event; `PlatformAdminRoleId`
+- [Source: src/AppForge.Api/Features/Roles/RoleEndpoints.cs] — endpoint registration pattern with `AddValidationFilter`, `Produces`, private helper methods
+- [Source: src/AppForge.Api/Features/Permissions/PermissionService.cs] — `ComputePermissionsAsync`, `OnUserDeactivated`, `CacheKey` method
+- [Source: src/AppForge.Api/Features/Users/UserEndpoints.cs] — existing `MapUserAdminEndpoints`, comment about future stories extending this class
 - [Source: web/src/features/auth/usePermission.ts] — current implementation to modify
 - [Source: web/src/routes/_app.tsx] — Admin link placeholder + `usePermissionsQuery()` / `usePermission()` usage pattern
 - [Source: web/src/features/auth/httpClient.ts] — `httpClient.get/post/put`, `ApiError`
@@ -553,20 +553,20 @@ Claude Opus 4.7 (`claude-opus-4-7[1m]`)
 
 #### Backend — Created
 
-- `src/FormForge.Api/Features/Users/Dtos/UserListItem.cs`
-- `src/FormForge.Api/Features/Users/Dtos/UserDetailResponse.cs`
-- `src/FormForge.Api/Features/Users/Dtos/CreateUserRequest.cs`
-- `src/FormForge.Api/Features/Users/Dtos/UpdateUserRequest.cs`
-- `src/FormForge.Api/Features/Users/Validators/CreateUserRequestValidator.cs`
-- `src/FormForge.Api/Features/Users/Validators/UpdateUserRequestValidator.cs`
-- `src/FormForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs`
+- `src/AppForge.Api/Features/Users/Dtos/UserListItem.cs`
+- `src/AppForge.Api/Features/Users/Dtos/UserDetailResponse.cs`
+- `src/AppForge.Api/Features/Users/Dtos/CreateUserRequest.cs`
+- `src/AppForge.Api/Features/Users/Dtos/UpdateUserRequest.cs`
+- `src/AppForge.Api/Features/Users/Validators/CreateUserRequestValidator.cs`
+- `src/AppForge.Api/Features/Users/Validators/UpdateUserRequestValidator.cs`
+- `src/AppForge.Api.Tests/Features/Users/UserAdminIntegrationTests.cs`
 
 #### Backend — Modified
 
-- `src/FormForge.Api/Features/Users/UserService.cs` — added 5 new methods + outcome enums/result records; added `IPasswordHasher` to primary constructor.
-- `src/FormForge.Api/Features/Users/UserEndpoints.cs` — added 6 new endpoint mappings (`GET /`, `GET /{id}`, `POST /`, `PUT /{id}`, `PUT /{id}/deactivate`, `PUT /{id}/reactivate`); kept the existing `PUT /{id}/roles` from Story 2.5; introduced `UserNotFoundProblem`, `UserEmailConflictProblem`, `SelfDeactivationProblem` private helpers.
-- `src/FormForge.Api/Features/Permissions/PermissionService.cs` — `ComputePermissionsAsync` now reads `users.is_active`.
-- `src/FormForge.Api/Program.cs` — registered `CreateUserRequestValidator` + `UpdateUserRequestValidator` in DI.
+- `src/AppForge.Api/Features/Users/UserService.cs` — added 5 new methods + outcome enums/result records; added `IPasswordHasher` to primary constructor.
+- `src/AppForge.Api/Features/Users/UserEndpoints.cs` — added 6 new endpoint mappings (`GET /`, `GET /{id}`, `POST /`, `PUT /{id}`, `PUT /{id}/deactivate`, `PUT /{id}/reactivate`); kept the existing `PUT /{id}/roles` from Story 2.5; introduced `UserNotFoundProblem`, `UserEmailConflictProblem`, `SelfDeactivationProblem` private helpers.
+- `src/AppForge.Api/Features/Permissions/PermissionService.cs` — `ComputePermissionsAsync` now reads `users.is_active`.
+- `src/AppForge.Api/Program.cs` — registered `CreateUserRequestValidator` + `UpdateUserRequestValidator` in DI.
 
 #### Frontend — Created
 

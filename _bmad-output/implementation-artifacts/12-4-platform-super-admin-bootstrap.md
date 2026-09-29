@@ -23,7 +23,7 @@ baseline_commit: '8aeccf5f1641fc971b248e76d202ec735044520e'
 - Seed the bootstrap account into `public.platform_admins` only, never any `users` table (per architecture.md §7.4).
 - Check `platform_admins` before `tenant_user_index` in `LoginAsync` (a platform admin is never also a tenant user).
 - Reuse the constant-time `_dummyPasswordHash` pattern (Story 12.3 precedent) for the `platform_admins` credential check.
-- Add the `tenants.created_by` → `platform_admins.id` FK (`DeleteBehavior.SetNull`, no nav property, mirrors `CustomDataset.CreatedBy` at `FormForgeDbContext.cs:387-391`) now that the referenced table exists.
+- Add the `tenants.created_by` → `platform_admins.id` FK (`DeleteBehavior.SetNull`, no nav property, mirrors `CustomDataset.CreatedBy` at `AppForgeDbContext.cs:387-391`) now that the referenced table exists.
 - Deny `"platform-super-admin"`-role JWTs at the `/api/data/{designerId}` and `/api/datasets` route-group level (`Program.cs:743`, `:770`), not per-endpoint — human-approved: this satisfies AC-2's named routes exactly and is the smallest footprint; the identical "auth-only" gap on `/api/designers` GETs is a separate, unnamed concern left for a later story if it matters.
 - **Decision (human-approved):** platform-super-admin logins are access-token only — no refresh token is issued. `LoginResponse.RefreshToken` becomes `string?`; `null` for a platform-super-admin login, unchanged (non-null) for every existing caller. A platform-super-admin's session is exactly `AccessTokenTtlMinutes` (15 min default); re-login on expiry. Zero new schema — `IssueLoginTokensAsync`/`RefreshToken` (FK'd to `users.id`) are never called on this path.
 
@@ -51,34 +51,34 @@ baseline_commit: '8aeccf5f1641fc971b248e76d202ec735044520e'
 
 ## Code Map
 
-- `src/FormForge.Api/Domain/Entities/Tenant.cs:16-18` -- comment marking exactly what this story must add (the FK, once `platform_admins` exists).
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs:28-29` (DbSet block), `:439-452` (`Tenant` mapping), `:387-391` (`CustomDataset.CreatedBy` FK pattern to mirror: `.HasOne().WithMany().HasForeignKey().OnDelete(DeleteBehavior.SetNull)`).
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260908035446_AddTenants.cs` -- most recent migration; follow its shape.
-- `src/FormForge.Api/Program.cs:569-597` (old bootstrap, hardcoded `admin@formforge.local`/`Admin1234!`), `:333` (`AddPolicy("platform-admin", ...)`), `:743-747` (`/api/data/{designerId}` group), `:770-774` (`/api/datasets` group), `:790-791` (`StartupLog.BootstrapAdminCreated` message).
-- `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs:23-30` -- `RequirePlatformAdmin()` pattern to mirror for `RequirePlatformSuperAdmin()` and `DenyPlatformSuperAdmin()`.
-- `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs:65-69` (`/options`, deliberately auth-only, no `RequirePermission`) -- confirms the group-level deny is necessary, not redundant.
-- `src/FormForge.Api/Features/Datasets/*Endpoints.cs`, `Program.cs:766-768` comment -- confirms `/api/datasets` reads are "auth-only", writes use `RequireDatasetManagement()`.
-- `src/FormForge.Api/Features/Auth/JwtTokenService.cs:12,19,40-58` -- `CreateAccessToken(User, roleNames, tenantId?)` shape to add a platform-admin counterpart alongside.
-- `src/FormForge.Api/Features/Auth/AuthService.cs:120-176` (`LoginAsync`), `:265-301` (`IssueLoginTokensAsync`, `User`-typed and FK'd to `users.id` — not reused for `PlatformAdmin`; the new path builds its own `LoginResponse` directly, no refresh-token row written).
-- `src/FormForge.Api/Features/Auth/Dtos/LoginResponse.cs:10-14` -- `RefreshToken` becomes `string?` (null for a platform-super-admin login).
-- 12 fixture files sharing the TRUNCATE+DROP-protect-list pattern, e.g. `src/FormForge.Api.Tests/Features/DynamicCrud/CreateRecordIntegrationTests.cs:51,61` (also: `ProvisioningRecoveryIntegrationTests.cs`, `ProvisioningIntegrationTests.cs`, `UpdateRecordIntegrationTests.cs`, `SoftDeleteIntegrationTests.cs`, `RestoreIntegrationTests.cs`, `RepeaterWriteIntegrationTests.cs`, `HardDeleteIntegrationTests.cs`, `GetRecordIntegrationTests.cs`, `DynamicCrudIntegrationTests.cs`, `SchemaAuditLogIntegrationTests.cs`, `MutationAuditLogIntegrationTests.cs`) -- Story 12.3 added `tenant_user_index`/`tenants` to only the DROP-protect list, not the TRUNCATE list, in these files (flagged, unfixed, in its Review Triage Log); do both this time for `platform_admins`.
+- `src/AppForge.Api/Domain/Entities/Tenant.cs:16-18` -- comment marking exactly what this story must add (the FK, once `platform_admins` exists).
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs:28-29` (DbSet block), `:439-452` (`Tenant` mapping), `:387-391` (`CustomDataset.CreatedBy` FK pattern to mirror: `.HasOne().WithMany().HasForeignKey().OnDelete(DeleteBehavior.SetNull)`).
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260908035446_AddTenants.cs` -- most recent migration; follow its shape.
+- `src/AppForge.Api/Program.cs:569-597` (old bootstrap, hardcoded `admin@appforge.local`/`Admin1234!`), `:333` (`AddPolicy("platform-admin", ...)`), `:743-747` (`/api/data/{designerId}` group), `:770-774` (`/api/datasets` group), `:790-791` (`StartupLog.BootstrapAdminCreated` message).
+- `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs:23-30` -- `RequirePlatformAdmin()` pattern to mirror for `RequirePlatformSuperAdmin()` and `DenyPlatformSuperAdmin()`.
+- `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs:65-69` (`/options`, deliberately auth-only, no `RequirePermission`) -- confirms the group-level deny is necessary, not redundant.
+- `src/AppForge.Api/Features/Datasets/*Endpoints.cs`, `Program.cs:766-768` comment -- confirms `/api/datasets` reads are "auth-only", writes use `RequireDatasetManagement()`.
+- `src/AppForge.Api/Features/Auth/JwtTokenService.cs:12,19,40-58` -- `CreateAccessToken(User, roleNames, tenantId?)` shape to add a platform-admin counterpart alongside.
+- `src/AppForge.Api/Features/Auth/AuthService.cs:120-176` (`LoginAsync`), `:265-301` (`IssueLoginTokensAsync`, `User`-typed and FK'd to `users.id` — not reused for `PlatformAdmin`; the new path builds its own `LoginResponse` directly, no refresh-token row written).
+- `src/AppForge.Api/Features/Auth/Dtos/LoginResponse.cs:10-14` -- `RefreshToken` becomes `string?` (null for a platform-super-admin login).
+- 12 fixture files sharing the TRUNCATE+DROP-protect-list pattern, e.g. `src/AppForge.Api.Tests/Features/DynamicCrud/CreateRecordIntegrationTests.cs:51,61` (also: `ProvisioningRecoveryIntegrationTests.cs`, `ProvisioningIntegrationTests.cs`, `UpdateRecordIntegrationTests.cs`, `SoftDeleteIntegrationTests.cs`, `RestoreIntegrationTests.cs`, `RepeaterWriteIntegrationTests.cs`, `HardDeleteIntegrationTests.cs`, `GetRecordIntegrationTests.cs`, `DynamicCrudIntegrationTests.cs`, `SchemaAuditLogIntegrationTests.cs`, `MutationAuditLogIntegrationTests.cs`) -- Story 12.3 added `tenant_user_index`/`tenants` to only the DROP-protect list, not the TRUNCATE list, in these files (flagged, unfixed, in its Review Triage Log); do both this time for `platform_admins`.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `src/FormForge.Api/Domain/Entities/PlatformAdmin.cs` -- new entity: `Id`, `UserEmail`, `PasswordHash`, `CreatedAt` -- mirrors `Tenant.cs`'s shape/comment style
-- [x] `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` -- add `DbSet<PlatformAdmin> PlatformAdmins`; map `platform_admins` (unique index on `user_email`); add the `Tenant.CreatedBy` → `PlatformAdmin.Id` FK
-- [x] `src/FormForge.Api/Infrastructure/Persistence/Migrations/{ts}_AddPlatformAdmins.cs` -- new migration: create `platform_admins` + unique index + the `tenants.created_by` FK
-- [x] `src/FormForge.Api/Program.cs:569-597` -- replace `!db.Users.Any()` with `!db.PlatformAdmins.Any()`, seed a `PlatformAdmin` row with the same hardcoded constants; update the `:790` log message wording
-- [x] `src/FormForge.Api/Program.cs:333` -- add `options.AddPolicy("platform-super-admin", policy => policy.RequireRole("platform-super-admin"));`
-- [x] `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs` -- add `RequirePlatformSuperAdmin()` and `DenyPlatformSuperAdmin()` (authorization requirement rejecting the `"platform-super-admin"` role)
-- [x] `src/FormForge.Api/Program.cs:743-747,770-774` -- chain `.DenyPlatformSuperAdmin()` onto both groups
-- [x] `src/FormForge.Api/Features/Auth/JwtTokenService.cs` -- add a platform-admin token-issuance path: `userId`+`email` claims, one `roles` claim `"platform-super-admin"`, no `tenantId`
-- [x] `src/FormForge.Api/Features/Auth/Dtos/LoginResponse.cs` -- change `RefreshToken` to `string?`
-- [x] `src/FormForge.Api/Features/Auth/AuthService.cs:120-145` -- add the `platform_admins` lookup before `TenantUserIndex` in `LoginAsync`; on match, constant-time credential check, then build a `LoginResponse` directly (access token only, `RefreshToken: null`, no `RefreshTokens` row written)
+- [x] `src/AppForge.Api/Domain/Entities/PlatformAdmin.cs` -- new entity: `Id`, `UserEmail`, `PasswordHash`, `CreatedAt` -- mirrors `Tenant.cs`'s shape/comment style
+- [x] `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` -- add `DbSet<PlatformAdmin> PlatformAdmins`; map `platform_admins` (unique index on `user_email`); add the `Tenant.CreatedBy` → `PlatformAdmin.Id` FK
+- [x] `src/AppForge.Api/Infrastructure/Persistence/Migrations/{ts}_AddPlatformAdmins.cs` -- new migration: create `platform_admins` + unique index + the `tenants.created_by` FK
+- [x] `src/AppForge.Api/Program.cs:569-597` -- replace `!db.Users.Any()` with `!db.PlatformAdmins.Any()`, seed a `PlatformAdmin` row with the same hardcoded constants; update the `:790` log message wording
+- [x] `src/AppForge.Api/Program.cs:333` -- add `options.AddPolicy("platform-super-admin", policy => policy.RequireRole("platform-super-admin"));`
+- [x] `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs` -- add `RequirePlatformSuperAdmin()` and `DenyPlatformSuperAdmin()` (authorization requirement rejecting the `"platform-super-admin"` role)
+- [x] `src/AppForge.Api/Program.cs:743-747,770-774` -- chain `.DenyPlatformSuperAdmin()` onto both groups
+- [x] `src/AppForge.Api/Features/Auth/JwtTokenService.cs` -- add a platform-admin token-issuance path: `userId`+`email` claims, one `roles` claim `"platform-super-admin"`, no `tenantId`
+- [x] `src/AppForge.Api/Features/Auth/Dtos/LoginResponse.cs` -- change `RefreshToken` to `string?`
+- [x] `src/AppForge.Api/Features/Auth/AuthService.cs:120-145` -- add the `platform_admins` lookup before `TenantUserIndex` in `LoginAsync`; on match, constant-time credential check, then build a `LoginResponse` directly (access token only, `RefreshToken: null`, no `RefreshTokens` row written)
 - [x] 12 fixture files (see Code Map) -- add `platform_admins` to both the `TRUNCATE TABLE` list and the DROP-protect list
-- [x] `src/FormForge.Api.Tests/Features/Auth/PlatformAdminBootstrapTests.cs` (new) -- idempotent seeding
-- [x] `src/FormForge.Api.Tests/Features/Auth/PlatformAdminLoginIntegrationTests.cs` (new) -- login success/claim shape, wrong password, denial on `/api/data/*` and `/api/datasets/*`, and confirms `/api/admin/*` is already denied
+- [x] `src/AppForge.Api.Tests/Features/Auth/PlatformAdminBootstrapTests.cs` (new) -- idempotent seeding
+- [x] `src/AppForge.Api.Tests/Features/Auth/PlatformAdminLoginIntegrationTests.cs` (new) -- login success/claim shape, wrong password, denial on `/api/data/*` and `/api/datasets/*`, and confirms `/api/admin/*` is already denied
 
 **Acceptance Criteria:**
 - Given the API starts for the first time, when the bootstrap check runs, then the first platform-super-admin is seeded into `public.platform_admins`, never into any `users` table.
@@ -142,9 +142,9 @@ independently-confirmed-unrelated failures as before the review round (see above
 
 ## Review Triage Log
 
-- **high, patch** — `LoginAsync`'s new `platform_admins` check is unconditionally terminal and runs before `tenant_user_index`, but nothing prevents a tenant's onboarded admin email (`TenantOnboardingService.ActivateAsync`) from colliding with an existing `platform_admins.user_email` (most plausibly the hardcoded bootstrap `admin@formforge.local`) — such a tenant admin would be silently, permanently locked out (or misrouted into the platform-super-admin tier by password coincidence), with no test covering the collision. Confirmed: `TenantOnboardingService.ActivateAsync` never queries `platform_admins`, and no test seeds both a `PlatformAdmin` and a colliding `TenantUserIndexEntry`. (verification-gap, pre-verified)
+- **high, patch** — `LoginAsync`'s new `platform_admins` check is unconditionally terminal and runs before `tenant_user_index`, but nothing prevents a tenant's onboarded admin email (`TenantOnboardingService.ActivateAsync`) from colliding with an existing `platform_admins.user_email` (most plausibly the hardcoded bootstrap `admin@appforge.local`) — such a tenant admin would be silently, permanently locked out (or misrouted into the platform-super-admin tier by password coincidence), with no test covering the collision. Confirmed: `TenantOnboardingService.ActivateAsync` never queries `platform_admins`, and no test seeds both a `PlatformAdmin` and a colliding `TenantUserIndexEntry`. (verification-gap, pre-verified)
 - **medium, patch** — `TenantAwareLoginIntegrationTests.cs` (Story 12.3's file, not touched by this diff) truncates `tenant_user_index, tenants, refresh_tokens, users` but omits the new `platform_admins`, unlike the 12 sibling fixtures this story did update for the same reason — a leftover `platform_admins` row (from that test class's own bootstrap, or a prior test class in a shared Postgres container) can persist across runs. No test in that file collides on email today, but the same latent cross-test-pollution risk this story's own 12-fixture edit was written to close. Confirmed: file's `InitializeAsync` TRUNCATE statement lacks `platform_admins`. (edge-case-hunter)
-- **low, patch** — The new FK's supporting index keeps EF's auto-generated name `IX_tenants_created_by`, breaking the `idx_`/`uq_`/`fk_` snake_case convention every other index/constraint in this same migration and `FormForgeDbContext` explicitly sets via `.HasDatabaseName(...)`. Confirmed: migration's `CreateIndex` call has no explicit name override. (blind-hunter)
+- **low, patch** — The new FK's supporting index keeps EF's auto-generated name `IX_tenants_created_by`, breaking the `idx_`/`uq_`/`fk_` snake_case convention every other index/constraint in this same migration and `AppForgeDbContext` explicitly sets via `.HasDatabaseName(...)`. Confirmed: migration's `CreateIndex` call has no explicit name override. (blind-hunter)
 - **low, patch** — `PlatformAdminBootstrapTests`'s class-level `SuppressMessage("Reliability", "CA2000", ...)` justification says "disposed explicitly in each test," but every factory in that class is disposed via `await using` declarations, not explicit calls — inconsistent with the more accurate wording used in the sibling `PlatformAdminLoginIntegrationTests.cs`. Confirmed by reading both files. (blind-hunter)
 - **low, patch** — `StartupLog.BootstrapAdminCreated`'s method identifier is unchanged even though its message text now reads "platform-super-admin account," and its single call site's surrounding comment was updated — the method name alone no longer matches what it logs. Confirmed: one call site, `Program.cs`. (blind-hunter)
 - **false** — Claimed `sprint-status.yaml` (`in-progress`) and the spec frontmatter (`in-review`) disagree in a way that will confuse tooling. Disproven: the two files use different, independently-defined vocabularies by design (`sync-sprint-status.md` only defines a sync for entering `in-progress`), and every other Epic 12 story (`12-1`/`12-2`/`12-3`/`12-7`) shows the identical drift — `review` in `sprint-status.yaml` vs `done` in its own spec frontmatter — a pre-existing tooling pattern, not something this story introduced. (blind-hunter)
@@ -167,5 +167,5 @@ The deny mechanism exists because `/api/data/{designerId}/options` and `/api/dat
 
 **Commands:**
 - `dotnet build` -- expected: 0 errors, 0 warnings
-- `dotnet test src/FormForge.Api.Tests --filter "PlatformAdminBootstrapTests|PlatformAdminLoginIntegrationTests|TenantAwareLoginIntegrationTests|AuthIntegrationTests"` -- expected: all pass
-- `dotnet test src/FormForge.Api.Tests --filter "FullyQualifiedName~DynamicCrud|FullyQualifiedName~Provisioning|FullyQualifiedName~Audit"` -- expected: all pass (confirms the 12 fixture edits didn't regress existing suites)
+- `dotnet test src/AppForge.Api.Tests --filter "PlatformAdminBootstrapTests|PlatformAdminLoginIntegrationTests|TenantAwareLoginIntegrationTests|AuthIntegrationTests"` -- expected: all pass
+- `dotnet test src/AppForge.Api.Tests --filter "FullyQualifiedName~DynamicCrud|FullyQualifiedName~Provisioning|FullyQualifiedName~Audit"` -- expected: all pass (confirms the 12 fixture edits didn't regress existing suites)

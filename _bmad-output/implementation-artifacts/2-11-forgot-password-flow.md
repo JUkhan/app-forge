@@ -37,16 +37,16 @@ so that I can regain access without admin involvement.
 ## Tasks / Subtasks
 
 - [x] Task 1: Add `PasswordResetToken` entity + DbContext + EF Core migration (AC-2, AC-4, AC-5)
-  - [x] Create `src/FormForge.Api/Domain/Entities/PasswordResetToken.cs` (see Dev Notes for exact shape)
-  - [x] Add `DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();` to `FormForgeDbContext`
+  - [x] Create `src/AppForge.Api/Domain/Entities/PasswordResetToken.cs` (see Dev Notes for exact shape)
+  - [x] Add `DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();` to `AppForgeDbContext`
   - [x] Add entity configuration in `OnModelCreating` (table name, unique index on `token_hash`, cascade delete, `now()` default for `created_at` — see Dev Notes)
-  - [x] Run `dotnet ef migrations add AddPasswordResetTokens` from `src/FormForge.Api/` and verify the generated SQL creates `password_reset_tokens` with the correct columns and indexes
+  - [x] Run `dotnet ef migrations add AddPasswordResetTokens` from `src/AppForge.Api/` and verify the generated SQL creates `password_reset_tokens` with the correct columns and indexes
 
 - [x] Task 2: Create request DTOs and validators (AC-1, AC-4, AC-6)
-  - [x] Create `src/FormForge.Api/Features/Auth/Dtos/ForgotPasswordRequest.cs` — record with `string Email`
-  - [x] Create `src/FormForge.Api/Features/Auth/Dtos/ResetPasswordRequest.cs` — record with `string Token` and `string NewPassword`
-  - [x] Create `src/FormForge.Api/Features/Auth/Validators/ForgotPasswordRequestValidator.cs` — Email required, valid email, max 320 chars (mirror `LoginRequestValidator` pattern)
-  - [x] Create `src/FormForge.Api/Features/Auth/Validators/ResetPasswordRequestValidator.cs` — Token required + max 128 chars; NewPassword required, min 8 chars, max 72 chars (BCrypt UTF-8 byte limit)
+  - [x] Create `src/AppForge.Api/Features/Auth/Dtos/ForgotPasswordRequest.cs` — record with `string Email`
+  - [x] Create `src/AppForge.Api/Features/Auth/Dtos/ResetPasswordRequest.cs` — record with `string Token` and `string NewPassword`
+  - [x] Create `src/AppForge.Api/Features/Auth/Validators/ForgotPasswordRequestValidator.cs` — Email required, valid email, max 320 chars (mirror `LoginRequestValidator` pattern)
+  - [x] Create `src/AppForge.Api/Features/Auth/Validators/ResetPasswordRequestValidator.cs` — Token required + max 128 chars; NewPassword required, min 8 chars, max 72 chars (BCrypt UTF-8 byte limit)
   - [x] Register both validators as `AddScoped` in `Program.cs` after the existing auth validators block
 
 - [x] Task 3: Extend `IEmailService` with password-reset method (AC-3)
@@ -119,10 +119,10 @@ This story adds the self-service password reset flow:
 
 ### New Entity: `PasswordResetToken`
 
-**File:** `src/FormForge.Api/Domain/Entities/PasswordResetToken.cs`
+**File:** `src/AppForge.Api/Domain/Entities/PasswordResetToken.cs`
 
 ```csharp
-namespace FormForge.Api.Domain.Entities;
+namespace AppForge.Api.Domain.Entities;
 
 internal sealed class PasswordResetToken
 {
@@ -160,9 +160,9 @@ builder.Entity<PasswordResetToken>(b =>
 });
 ```
 
-**EF Core migration command** — run from the solution root (where `FormForge.sln` lives):
+**EF Core migration command** — run from the solution root (where `AppForge.sln` lives):
 ```
-dotnet ef migrations add AddPasswordResetTokens --project src/FormForge.Api
+dotnet ef migrations add AddPasswordResetTokens --project src/AppForge.Api
 ```
 Inspect the generated migration to confirm `password_reset_tokens` table, unique index on `token_hash`, and cascade-delete FK to `users`.
 
@@ -399,11 +399,11 @@ public async Task<bool> TrySendPasswordResetEmailAsync(
         using var message = new MimeMessage();
         message.From.Add(MailboxAddress.Parse(_smtp.From));
         message.To.Add(MailboxAddress.Parse(recipientEmail));
-        message.Subject = "Reset your FormForge password";
+        message.Subject = "Reset your AppForge password";
         message.Body = new TextPart("plain")
         {
             Text = $"""
-                You requested a password reset for your FormForge account.
+                You requested a password reset for your AppForge account.
 
                 Click the link below to set a new password (valid for 1 hour):
 
@@ -629,11 +629,11 @@ Note: `httpClient.post<void>` for the reset endpoint — the server returns `Res
 
 | File | Purpose |
 |---|---|
-| `src/FormForge.Api/Domain/Entities/PasswordResetToken.cs` | New entity |
-| `src/FormForge.Api/Features/Auth/Dtos/ForgotPasswordRequest.cs` | Request DTO |
-| `src/FormForge.Api/Features/Auth/Dtos/ResetPasswordRequest.cs` | Request DTO |
-| `src/FormForge.Api/Features/Auth/Validators/ForgotPasswordRequestValidator.cs` | FluentValidation validator |
-| `src/FormForge.Api/Features/Auth/Validators/ResetPasswordRequestValidator.cs` | FluentValidation validator |
+| `src/AppForge.Api/Domain/Entities/PasswordResetToken.cs` | New entity |
+| `src/AppForge.Api/Features/Auth/Dtos/ForgotPasswordRequest.cs` | Request DTO |
+| `src/AppForge.Api/Features/Auth/Dtos/ResetPasswordRequest.cs` | Request DTO |
+| `src/AppForge.Api/Features/Auth/Validators/ForgotPasswordRequestValidator.cs` | FluentValidation validator |
+| `src/AppForge.Api/Features/Auth/Validators/ResetPasswordRequestValidator.cs` | FluentValidation validator |
 | `web/src/routes/forgot-password.tsx` | Unauthenticated route |
 | `web/src/routes/reset-password.tsx` | Unauthenticated route |
 | EF Core migration (generated by `dotnet ef migrations add AddPasswordResetTokens`) | DB schema |
@@ -642,20 +642,20 @@ Note: `httpClient.post<void>` for the reset endpoint — the server returns `Res
 
 | File | Change |
 |---|---|
-| `src/FormForge.Api/Domain/Entities/PasswordResetToken.cs` | NEW (above) |
-| `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` | Add `PasswordResetTokens` DbSet + entity config in `OnModelCreating` |
-| `src/FormForge.Api/Features/Auth/EmailService.cs` | Add `TrySendPasswordResetEmailAsync` to interface + `MailKitEmailService` + 3 log messages to `EmailServiceLog` |
-| `src/FormForge.Api/Features/Auth/AuthService.cs` | Add 4 enums/result-records + 2 `IAuthService` method signatures + 2 implementations |
-| `src/FormForge.Api/Features/Auth/AuthEndpoints.cs` | Add 2 `MapPost` registrations + 2 handler methods |
-| `src/FormForge.Api/Program.cs` | Add 2 rate-limit policies; register 2 validators |
+| `src/AppForge.Api/Domain/Entities/PasswordResetToken.cs` | NEW (above) |
+| `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` | Add `PasswordResetTokens` DbSet + entity config in `OnModelCreating` |
+| `src/AppForge.Api/Features/Auth/EmailService.cs` | Add `TrySendPasswordResetEmailAsync` to interface + `MailKitEmailService` + 3 log messages to `EmailServiceLog` |
+| `src/AppForge.Api/Features/Auth/AuthService.cs` | Add 4 enums/result-records + 2 `IAuthService` method signatures + 2 implementations |
+| `src/AppForge.Api/Features/Auth/AuthEndpoints.cs` | Add 2 `MapPost` registrations + 2 handler methods |
+| `src/AppForge.Api/Program.cs` | Add 2 rate-limit policies; register 2 validators |
 | `web/src/features/auth/authMutations.ts` | Add 2 mutation hooks |
 | `web/src/lib/i18n/locales/en.json` | Add `auth.forgotPassword.*`, `auth.resetPassword.*`, `auth.resetTokenInvalid`, `auth.passwordSameAsCurrent` |
 
 ### Files to Leave Untouched
 
-- `src/FormForge.Api/Features/Auth/JwtTokenService.cs` — no access token issued on reset
-- `src/FormForge.Api/Features/Auth/PasswordHasher.cs` — reused as-is; `Verify` and `Hash` methods already exist
-- `src/FormForge.AppHost/AppHost.cs` — Mailpit already wired in Story 2.10
+- `src/AppForge.Api/Features/Auth/JwtTokenService.cs` — no access token issued on reset
+- `src/AppForge.Api/Features/Auth/PasswordHasher.cs` — reused as-is; `Verify` and `Hash` methods already exist
+- `src/AppForge.AppHost/AppHost.cs` — Mailpit already wired in Story 2.10
 - `Directory.Packages.props` — MailKit 4.17.0 already added in Story 2.10
 - All Designer, Menu, CRUD, and Provisioning files — completely unrelated
 
@@ -701,11 +701,11 @@ Unit-test recommendation (follow Story 2.10 `EmailServiceTests` pattern): test `
 - [Source: `_bmad-output/planning-artifacts/epics.md` — Epic 2, Story 2.11 acceptance criteria]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` — AR-53 (email service), AR-54 (password reset token), Decision 2.4 (BCrypt), Decision 4.6 (frontend folder structure), Decision 4.9 (form composition)]
 - [Source: `_bmad-output/planning-artifacts/prd.md` — FR-51 (forgot password), FR-52 (authenticated password change), AC-1 through AC-7]
-- [Source: `src/FormForge.Api/Features/Auth/AuthService.cs` — `HashToken`, `GenerateRefreshToken`, enum + result-record patterns, constant-time guard, `ExecuteUpdateAsync` candidate]
-- [Source: `src/FormForge.Api/Features/Auth/AuthEndpoints.cs` — handler signature pattern, ProblemDetails extension dict, `AllowAnonymous` check]
-- [Source: `src/FormForge.Api/Features/Auth/EmailService.cs` — `IEmailService` interface, `MailKitEmailService` implementation, `EmailServiceLog` pattern, `SmtpOptions.BaseUrl` field]
-- [Source: `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — `RefreshToken` entity config to mirror for `PasswordResetToken`]
-- [Source: `src/FormForge.Api/Program.cs` — rate-limit policy registration pattern, validator `AddScoped` pattern]
+- [Source: `src/AppForge.Api/Features/Auth/AuthService.cs` — `HashToken`, `GenerateRefreshToken`, enum + result-record patterns, constant-time guard, `ExecuteUpdateAsync` candidate]
+- [Source: `src/AppForge.Api/Features/Auth/AuthEndpoints.cs` — handler signature pattern, ProblemDetails extension dict, `AllowAnonymous` check]
+- [Source: `src/AppForge.Api/Features/Auth/EmailService.cs` — `IEmailService` interface, `MailKitEmailService` implementation, `EmailServiceLog` pattern, `SmtpOptions.BaseUrl` field]
+- [Source: `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — `RefreshToken` entity config to mirror for `PasswordResetToken`]
+- [Source: `src/AppForge.Api/Program.cs` — rate-limit policy registration pattern, validator `AddScoped` pattern]
 - [Source: `web/src/routes/login.tsx` — route component pattern (form, react-hook-form, zod, mutation, error display)]
 - [Source: `web/src/features/auth/authMutations.ts` — `useMutation` pattern, `httpClient.post` call]
 - [Source: `web/src/lib/i18n/locales/en.json` — existing `auth.*` key structure to extend]
@@ -720,7 +720,7 @@ claude-opus-4-8 (implementation)
 
 ### Debug Log References
 
-- Initial `dotnet ef migrations add` / build failed with MSB3027 file-lock (`FormForge.Api` PID held `FormForge.ServiceDefaults.dll`). Resolved by stopping the running process (user-approved), then the migration scaffolded cleanly.
+- Initial `dotnet ef migrations add` / build failed with MSB3027 file-lock (`AppForge.Api` PID held `AppForge.ServiceDefaults.dll`). Resolved by stopping the running process (user-approved), then the migration scaffolded cleanly.
 - Generated migration tripped CA1062 (`TreatWarningsAsErrors`): added `ArgumentNullException.ThrowIfNull(migrationBuilder)` to `Up`/`Down`, matching the existing migration convention.
 - `react-refresh/only-export-components` fires on the component function in file-based route files; suppressed with `// eslint-disable-next-line` above the component (matching the precedent in `data.$designerId.tsx`) so the two new routes add zero lint errors.
 
@@ -749,25 +749,25 @@ claude-opus-4-8 (implementation)
 ### File List
 
 **Created (backend):**
-- `src/FormForge.Api/Domain/Entities/PasswordResetToken.cs`
-- `src/FormForge.Api/Features/Auth/Dtos/ForgotPasswordRequest.cs`
-- `src/FormForge.Api/Features/Auth/Dtos/ResetPasswordRequest.cs`
-- `src/FormForge.Api/Features/Auth/Validators/ForgotPasswordRequestValidator.cs`
-- `src/FormForge.Api/Features/Auth/Validators/ResetPasswordRequestValidator.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260531143906_AddPasswordResetTokens.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260531143906_AddPasswordResetTokens.Designer.cs`
+- `src/AppForge.Api/Domain/Entities/PasswordResetToken.cs`
+- `src/AppForge.Api/Features/Auth/Dtos/ForgotPasswordRequest.cs`
+- `src/AppForge.Api/Features/Auth/Dtos/ResetPasswordRequest.cs`
+- `src/AppForge.Api/Features/Auth/Validators/ForgotPasswordRequestValidator.cs`
+- `src/AppForge.Api/Features/Auth/Validators/ResetPasswordRequestValidator.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260531143906_AddPasswordResetTokens.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260531143906_AddPasswordResetTokens.Designer.cs`
 
 **Modified (backend):**
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — `PasswordResetTokens` DbSet + entity config
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` — regenerated by EF
-- `src/FormForge.Api/Features/Auth/EmailService.cs` — `TrySendPasswordResetEmailAsync` (interface + impl) + 3 `EmailServiceLog` methods
-- `src/FormForge.Api/Features/Auth/AuthService.cs` — 4 enums/result-records + 2 `IAuthService` methods + implementations
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs` — 2 endpoint registrations + 2 handlers + `IOptions` using
-- `src/FormForge.Api/Program.cs` — 2 rate-limit policies + 2 validator registrations
-- `src/FormForge.AppHost/AppHost.cs` — set `Smtp__BaseUrl=http://localhost:5173` so dev email links target the SPA, not the API's host:port (post-implementation fix; see Change Log)
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — `PasswordResetTokens` DbSet + entity config
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` — regenerated by EF
+- `src/AppForge.Api/Features/Auth/EmailService.cs` — `TrySendPasswordResetEmailAsync` (interface + impl) + 3 `EmailServiceLog` methods
+- `src/AppForge.Api/Features/Auth/AuthService.cs` — 4 enums/result-records + 2 `IAuthService` methods + implementations
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs` — 2 endpoint registrations + 2 handlers + `IOptions` using
+- `src/AppForge.Api/Program.cs` — 2 rate-limit policies + 2 validator registrations
+- `src/AppForge.AppHost/AppHost.cs` — set `Smtp__BaseUrl=http://localhost:5173` so dev email links target the SPA, not the API's host:port (post-implementation fix; see Change Log)
 
 **Modified (tests):**
-- `src/FormForge.Api.Tests/Features/Auth/EmailServiceTests.cs` — 2 password-reset email tests
+- `src/AppForge.Api.Tests/Features/Auth/EmailServiceTests.cs` — 2 password-reset email tests
 
 **Created (frontend):**
 - `web/src/routes/forgot-password.tsx`

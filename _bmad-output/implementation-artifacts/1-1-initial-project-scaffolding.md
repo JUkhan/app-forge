@@ -7,7 +7,7 @@ Status: done
 ## Story
 
 As a Developer,
-I want a scaffolded FormForge monorepo using the architecture's chosen starter templates,
+I want a scaffolded AppForge monorepo using the architecture's chosen starter templates,
 so that all subsequent feature work begins from a stable, decision-aligned foundation.
 
 ## Acceptance Criteria
@@ -15,11 +15,11 @@ so that all subsequent feature work begins from a stable, decision-aligned found
 ### AC-1 — Backend solution scaffold (Aspire starter)
 
 **Given** an empty repo root (only `_bmad/`, `_bmad-output/`, `docs/`, `.claude/`, `README.md`, `.git/` present)
-**When** I run `aspire new aspire-starter --name FormForge --output .` (or equivalent `dotnet new aspire-starter --name FormForge --output .`)
-**Then** the solution `FormForge.sln` is created with `src/FormForge.AppHost/`, `src/FormForge.ServiceDefaults/`, and the Aspire-default web project
+**When** I run `aspire new aspire-starter --name AppForge --output .` (or equivalent `dotnet new aspire-starter --name AppForge --output .`)
+**Then** the solution `AppForge.sln` is created with `src/AppForge.AppHost/`, `src/AppForge.ServiceDefaults/`, and the Aspire-default web project
 **And** the Aspire-default Blazor sample web project is removed from disk **and** from the `.sln`
-**And** `ApiService` is renamed to `FormForge.Api` everywhere — the `.csproj` filename, the folder name, the project's `AssemblyName`/`RootNamespace`, the AppHost `Projects.*` reference, and the `.sln` entry
-**And** `src/FormForge.Api.Tests/` (xUnit + `Testcontainers.PostgreSQL` package referenced) is created and added to the solution
+**And** `ApiService` is renamed to `AppForge.Api` everywhere — the `.csproj` filename, the folder name, the project's `AssemblyName`/`RootNamespace`, the AppHost `Projects.*` reference, and the `.sln` entry
+**And** `src/AppForge.Api.Tests/` (xUnit + `Testcontainers.PostgreSQL` package referenced) is created and added to the solution
 
 ### AC-2 — Frontend scaffold (Vite + React 19 + shadcn)
 
@@ -53,7 +53,7 @@ so that all subsequent feature work begins from a stable, decision-aligned found
 
 **And** `dotnet build` (from repo root) succeeds with zero warnings new to this story
 **And** `cd web && npm install && npm run build` succeeds
-**And** `dotnet test` discovers and runs the (empty) `FormForge.Api.Tests` project successfully (zero tests, zero failures)
+**And** `dotnet test` discovers and runs the (empty) `AppForge.Api.Tests` project successfully (zero tests, zero failures)
 
 ## Tasks / Subtasks
 
@@ -64,26 +64,26 @@ so that all subsequent feature work begins from a stable, decision-aligned found
   - [x] Verify `node --version` is 20.x or 22.x LTS and `npm --version` works — Node v22.15.0, npm 10.9.2
 
 - [x] **Task 2 — Backend scaffold via Aspire starter** (AC: 1)
-  - [x] From the repo root, run `aspire new aspire-starter --name FormForge --output .` (use `dotnet new aspire-starter --name FormForge --output .` as a fallback). The repo root already contains `_bmad/`, `_bmad-output/`, `docs/`, `.claude/`, `README.md`, `.git/` — these must remain untouched. **Used `dotnet new` fallback** because the `aspire` CLI requires an interactive TTY (Spectre.Console list prompt for template version). Also upgraded `Aspire.ProjectTemplates` 13.0.0 → 13.3.5 to pick up OpenTelemetry vulnerability fixes that would otherwise emit `NU1902` warnings (elevated to errors by `TreatWarningsAsErrors=true`).
-  - [x] After scaffold, verify `FormForge.sln` exists at the repo root and `src/FormForge.AppHost/` and `src/FormForge.ServiceDefaults/` exist — the starter places projects at the repo root by default; manually moved them under `src/` per Architecture § "Complete Project Directory Structure"
-  - [x] Locate the Aspire Blazor sample web project (commonly `src/FormForge.Web/`). Remove it from disk **and** run `dotnet sln FormForge.sln remove src/FormForge.Web/FormForge.Web.csproj`
-  - [x] Rename `ApiService` to `FormForge.Api`:
-    - [x] Rename folder `src/FormForge.ApiService/` → `src/FormForge.Api/`
-    - [x] Rename `FormForge.ApiService.csproj` → `FormForge.Api.csproj`
-    - [x] Update `AssemblyName` and `RootNamespace` in the `.csproj` if they were ApiService-specific — the scaffold did not set explicit `AssemblyName`/`RootNamespace`; both default to the csproj filename (`FormForge.Api`), so nothing to change
-    - [x] Update the AppHost reference: in `src/FormForge.AppHost/Program.cs`, change `builder.AddProject<Projects.FormForge_ApiService>(...)` → `builder.AddProject<Projects.FormForge_Api>("api")` — Aspire 13.3.5 uses top-level `AppHost.cs` (not `Program.cs`); also removed the `FormForge_Web` `AddProject` block since the Blazor frontend is gone
-    - [x] Update the `.sln` entry: `dotnet sln remove src/FormForge.ApiService/FormForge.ApiService.csproj` then `dotnet sln add src/FormForge.Api/FormForge.Api.csproj`
-    - [x] Remove the AppHost project reference to the old name and add the new one — done by editing `FormForge.AppHost.csproj` directly (single ProjectReference now points at `..\FormForge.Api\FormForge.Api.csproj`)
-    - [x] Updated `aspire.config.json` `appHost.path` from `FormForge.AppHost/...` to `src/FormForge.AppHost/...`
-    - [x] Renamed `FormForge.ApiService.http` → `FormForge.Api.http` (and updated `ApiService_HostAddress` → `Api_HostAddress` inside)
+  - [x] From the repo root, run `aspire new aspire-starter --name AppForge --output .` (use `dotnet new aspire-starter --name AppForge --output .` as a fallback). The repo root already contains `_bmad/`, `_bmad-output/`, `docs/`, `.claude/`, `README.md`, `.git/` — these must remain untouched. **Used `dotnet new` fallback** because the `aspire` CLI requires an interactive TTY (Spectre.Console list prompt for template version). Also upgraded `Aspire.ProjectTemplates` 13.0.0 → 13.3.5 to pick up OpenTelemetry vulnerability fixes that would otherwise emit `NU1902` warnings (elevated to errors by `TreatWarningsAsErrors=true`).
+  - [x] After scaffold, verify `AppForge.sln` exists at the repo root and `src/AppForge.AppHost/` and `src/AppForge.ServiceDefaults/` exist — the starter places projects at the repo root by default; manually moved them under `src/` per Architecture § "Complete Project Directory Structure"
+  - [x] Locate the Aspire Blazor sample web project (commonly `src/AppForge.Web/`). Remove it from disk **and** run `dotnet sln AppForge.sln remove src/AppForge.Web/AppForge.Web.csproj`
+  - [x] Rename `ApiService` to `AppForge.Api`:
+    - [x] Rename folder `src/AppForge.ApiService/` → `src/AppForge.Api/`
+    - [x] Rename `AppForge.ApiService.csproj` → `AppForge.Api.csproj`
+    - [x] Update `AssemblyName` and `RootNamespace` in the `.csproj` if they were ApiService-specific — the scaffold did not set explicit `AssemblyName`/`RootNamespace`; both default to the csproj filename (`AppForge.Api`), so nothing to change
+    - [x] Update the AppHost reference: in `src/AppForge.AppHost/Program.cs`, change `builder.AddProject<Projects.AppForge_ApiService>(...)` → `builder.AddProject<Projects.AppForge_Api>("api")` — Aspire 13.3.5 uses top-level `AppHost.cs` (not `Program.cs`); also removed the `AppForge_Web` `AddProject` block since the Blazor frontend is gone
+    - [x] Update the `.sln` entry: `dotnet sln remove src/AppForge.ApiService/AppForge.ApiService.csproj` then `dotnet sln add src/AppForge.Api/AppForge.Api.csproj`
+    - [x] Remove the AppHost project reference to the old name and add the new one — done by editing `AppForge.AppHost.csproj` directly (single ProjectReference now points at `..\AppForge.Api\AppForge.Api.csproj`)
+    - [x] Updated `aspire.config.json` `appHost.path` from `AppForge.AppHost/...` to `src/AppForge.AppHost/...`
+    - [x] Renamed `AppForge.ApiService.http` → `AppForge.Api.http` (and updated `ApiService_HostAddress` → `Api_HostAddress` inside)
   - [x] Create the test project:
-    - [x] `dotnet new xunit -n FormForge.Api.Tests -o src/FormForge.Api.Tests`
-    - [x] `dotnet sln FormForge.sln add src/FormForge.Api.Tests/FormForge.Api.Tests.csproj`
-    - [x] `dotnet add src/FormForge.Api.Tests/FormForge.Api.Tests.csproj reference src/FormForge.Api/FormForge.Api.csproj`
-    - [x] `dotnet add src/FormForge.Api.Tests/FormForge.Api.Tests.csproj package Testcontainers.PostgreSQL` — installed Testcontainers.PostgreSql 4.12.0
+    - [x] `dotnet new xunit -n AppForge.Api.Tests -o src/AppForge.Api.Tests`
+    - [x] `dotnet sln AppForge.sln add src/AppForge.Api.Tests/AppForge.Api.Tests.csproj`
+    - [x] `dotnet add src/AppForge.Api.Tests/AppForge.Api.Tests.csproj reference src/AppForge.Api/AppForge.Api.csproj`
+    - [x] `dotnet add src/AppForge.Api.Tests/AppForge.Api.Tests.csproj package Testcontainers.PostgreSQL` — installed Testcontainers.PostgreSql 4.12.0
     - [x] Delete the stub `UnitTest1.cs` produced by `dotnet new xunit`
-  - [x] Run `dotnet build FormForge.sln` and confirm a clean build — Build succeeded, 0 Warning(s), 0 Error(s)
-  - [x] Run `dotnet test FormForge.sln` and confirm zero tests run / zero failures — exit 0, "No test is available" (empty test project loads but discovers nothing, as expected)
+  - [x] Run `dotnet build AppForge.sln` and confirm a clean build — Build succeeded, 0 Warning(s), 0 Error(s)
+  - [x] Run `dotnet test AppForge.sln` and confirm zero tests run / zero failures — exit 0, "No test is available" (empty test project loads but discovers nothing, as expected)
 
 - [x] **Task 3 — Frontend scaffold (Vite + React 19 + shadcn)** (AC: 2)
   - [x] From the repo root run `npm create vite@latest web -- --template react-ts` (used `--yes` to suppress create-vite confirmation; produced `web/` with `react-ts` template intact)
@@ -102,7 +102,7 @@ so that all subsequent feature work begins from a stable, decision-aligned found
 - [x] **Task 4 — Repo-root infrastructure files** (AC: 3)
   - [x] Create `global.json` — `sdk.version 10.0.100`, `rollForward latestFeature`
   - [x] Create `Directory.Build.props` — `TreatWarningsAsErrors=true`, `AnalysisMode=AllEnabledByDefault`, `Nullable=enable`, `InvariantGlobalization=true`
-  - [x] Create `Directory.Packages.props` — migrated all Aspire-scaffold `<PackageReference … Version="…">` entries to `<PackageVersion …>` in `Directory.Packages.props` and stripped `Version` attributes from `FormForge.Api.csproj`, `FormForge.ServiceDefaults.csproj`, and `FormForge.Api.Tests.csproj`
+  - [x] Create `Directory.Packages.props` — migrated all Aspire-scaffold `<PackageReference … Version="…">` entries to `<PackageVersion …>` in `Directory.Packages.props` and stripped `Version` attributes from `AppForge.Api.csproj`, `AppForge.ServiceDefaults.csproj`, and `AppForge.Api.Tests.csproj`
   - [x] Create `.editorconfig`
   - [x] Create `.gitattributes`
   - [x] Create or merge `.gitignore` — wrote consolidated repo-root `.gitignore`; deleted `web/.gitignore` (the Vite default). Confirmed `_bmad/`, `_bmad-output/`, `.claude/`, `docs/` are NOT ignored (no entries for them). The Aspire scaffold did not drop a separate `.gitignore`.
@@ -110,15 +110,15 @@ so that all subsequent feature work begins from a stable, decision-aligned found
   - [x] Create skeleton `Dockerfile` (multi-stage skeleton with three `FROM` stages and `TODO Story 1.3` markers)
   - [x] Create skeleton `docker-compose.yml`
   - [x] Create `.config/dotnet-tools.json`. Ran `dotnet tool restore` — `dotnet-ef 10.0.0` and `dotnet-format 5.1.250801` restored successfully
-  - [x] **Analyzer cleanup**: Enabling `TreatWarningsAsErrors=true` + `AnalysisMode=AllEnabledByDefault` surfaced violations in Aspire-generated code that the scaffold ships with: `CA1062` (null check on `WebApplication app`), `CA1724` (class name `Extensions` conflicts with `Microsoft.AspNetCore.Builder.Extensions`), plus `CA5394` / `CA1852` in the WeatherForecast demo endpoint. Fixed by: (1) renaming `ServiceDefaults.Extensions` → `ServiceDefaultsExtensions` (extension methods unchanged — namespace lookup), (2) adding `ArgumentNullException.ThrowIfNull(app)` in `MapDefaultEndpoints`, (3) deleting the throwaway `/weatherforecast` demo from `FormForge.Api/Program.cs` (out of scope for the runnable shell — Story 1.1 only needs a root endpoint). After fixes: `dotnet build FormForge.sln` succeeds with 0 Warning(s), 0 Error(s).
+  - [x] **Analyzer cleanup**: Enabling `TreatWarningsAsErrors=true` + `AnalysisMode=AllEnabledByDefault` surfaced violations in Aspire-generated code that the scaffold ships with: `CA1062` (null check on `WebApplication app`), `CA1724` (class name `Extensions` conflicts with `Microsoft.AspNetCore.Builder.Extensions`), plus `CA5394` / `CA1852` in the WeatherForecast demo endpoint. Fixed by: (1) renaming `ServiceDefaults.Extensions` → `ServiceDefaultsExtensions` (extension methods unchanged — namespace lookup), (2) adding `ArgumentNullException.ThrowIfNull(app)` in `MapDefaultEndpoints`, (3) deleting the throwaway `/weatherforecast` demo from `AppForge.Api/Program.cs` (out of scope for the runnable shell — Story 1.1 only needs a root endpoint). After fixes: `dotnet build AppForge.sln` succeeds with 0 Warning(s), 0 Error(s).
 
 - [x] **Task 5 — Final verification** (AC: 1, 2, 3)
-  - [x] `dotnet build FormForge.sln` succeeds with zero new warnings — 0 Warning(s), 0 Error(s)
-  - [x] `dotnet test FormForge.sln` runs the empty test project (zero tests, zero failures) — exit 0
+  - [x] `dotnet build AppForge.sln` succeeds with zero new warnings — 0 Warning(s), 0 Error(s)
+  - [x] `dotnet test AppForge.sln` runs the empty test project (zero tests, zero failures) — exit 0
   - [x] `cd web && npm run build` succeeds — exit 0; `dist/` emitted (single informational `ENOENT scandir 'src/routes'` log from TanStack router plugin, non-fatal — Story 1.1 deliberately does not create the routes folder)
   - [x] `dotnet format --verify-no-changes` is clean (or fixed and re-verified) — initial run flagged CRLF endings in Aspire-scaffold files; ran `dotnet format` once to convert to LF (per `.gitattributes` / `.editorconfig`); re-verified clean (exit 0)
   - [x] `git status` shows only the new scaffold files; `_bmad/`, `docs/`, `.claude/` are unchanged. `README.md` modified per Task 5 last sub-item; `_bmad-output/implementation-artifacts/sprint-status.yaml` modified per dev-story workflow Step 4 (status → in-progress)
-  - [x] Update the root `README.md` with a one-paragraph "Getting Started" section pointing at `dotnet run --project src/FormForge.AppHost`
+  - [x] Update the root `README.md` with a one-paragraph "Getting Started" section pointing at `dotnet run --project src/AppForge.AppHost`
 
 ## Dev Notes
 
@@ -133,10 +133,10 @@ There is no previous story to learn from. There is no git history of code patter
 This story implements **AR-1** (starter template selection) and **AR-2** (monorepo layout). Every later story assumes the file paths and naming conventions established here. Specifically:
 
 - **AR-1 / Starter Template Evaluation:** `aspire new aspire-starter` for backend; `npm create vite@latest --template react-ts` + `npx shadcn@latest init` for frontend. **No community starters**, **no Next.js**, **no community-bundled extras (Husky, lint-staged, layered ESLint rule-presets like airbnb/standard) beyond what the official templates ship**. The Vite `react-ts` template's own default ESLint flat config is accepted as-is.
-- **AR-2 / Monorepo layout:** `src/FormForge.AppHost`, `src/FormForge.ServiceDefaults`, `src/FormForge.Api`, `src/FormForge.Api.Tests`, `web/`, `docker-compose.yml`, `docs/`, `_bmad-output/`. Project files (`.csproj`) live inside their respective folders; the solution file (`FormForge.sln`) lives at the repo root.
+- **AR-2 / Monorepo layout:** `src/AppForge.AppHost`, `src/AppForge.ServiceDefaults`, `src/AppForge.Api`, `src/AppForge.Api.Tests`, `web/`, `docker-compose.yml`, `docs/`, `_bmad-output/`. Project files (`.csproj`) live inside their respective folders; the solution file (`AppForge.sln`) lives at the repo root.
 - **AR-3 / Routing override (CRITICAL):** TanStack Router (file-based, `@tanstack/router-plugin/vite` with `autoCodeSplitting: true`) replaces the PRD Addendum's React Router v7 assumption. **Do not install `react-router` or `react-router-dom`.** The PRD addendum has not been updated yet (PM action) — the architecture document is authoritative.
 - **Naming conventions (Architecture § "Naming Conventions"):**
-  - C# projects: PascalCase, `FormForge.*` prefix.
+  - C# projects: PascalCase, `AppForge.*` prefix.
   - C# code: PascalCase types, `_camelCase` private fields, `Async` suffix on async methods.
   - TypeScript: PascalCase component/file names for components, camelCase for utilities.
 
@@ -372,7 +372,7 @@ Story 1.3 owns the working multi-stage build. This story drops a skeleton that d
 
 ```dockerfile
 # syntax=docker/dockerfile:1.7
-# Stage 1 — .NET SDK build (restore + publish FormForge.Api)
+# Stage 1 — .NET SDK build (restore + publish AppForge.Api)
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS dotnet-build
 WORKDIR /src
 # TODO Story 1.3: copy csproj graph, dotnet restore, dotnet publish
@@ -389,10 +389,10 @@ RUN addgroup -S app && adduser -S app -G app -u 1000
 USER app
 # TODO Story 1.3: copy published API + web/dist into /app/wwwroot
 EXPOSE 8080
-ENTRYPOINT ["dotnet", "FormForge.Api.dll"]
+ENTRYPOINT ["dotnet", "AppForge.Api.dll"]
 ```
 
-The build must succeed (`docker build -t formforge-api:scaffold .` should produce an image even though it does nothing useful). The TODOs are explicit pointers to Story 1.3.
+The build must succeed (`docker build -t appforge-api:scaffold .` should produce an image even though it does nothing useful). The TODOs are explicit pointers to Story 1.3.
 
 ### docker-compose.yml skeleton
 
@@ -447,9 +447,9 @@ Adjust `dotnet-ef` version to match the EF Core version Aspire pulls (`dotnet ef
 
 This story produces no executable tests beyond proving the test project loads. Future stories follow the pattern below (Architecture § "Code Organization" and § "Testing Framework"):
 
-- **Backend tests:** xUnit in `src/FormForge.Api.Tests/`. Integration tests use Testcontainers.PostgreSQL (real Postgres, not mocks) — critical for the runtime-DDL behavior in Epic 5. Test file naming: `{ClassUnderTest}Tests.cs`.
+- **Backend tests:** xUnit in `src/AppForge.Api.Tests/`. Integration tests use Testcontainers.PostgreSQL (real Postgres, not mocks) — critical for the runtime-DDL behavior in Epic 5. Test file naming: `{ClassUnderTest}Tests.cs`.
 - **Frontend tests:** Vitest + React Testing Library, files co-located as `{Component}.test.tsx`.
-- **AC for this story:** `dotnet test FormForge.sln` discovers `FormForge.Api.Tests` and reports 0 tests, 0 failures. Delete the `dotnet new xunit`-generated `UnitTest1.cs` stub before that check.
+- **AC for this story:** `dotnet test AppForge.sln` discovers `AppForge.Api.Tests` and reports 0 tests, 0 failures. Delete the `dotnet new xunit`-generated `UnitTest1.cs` stub before that check.
 
 ### Critical anti-patterns to avoid
 
@@ -460,7 +460,7 @@ This story produces no executable tests beyond proving the test project loads. F
 | Install Husky, lint-staged, community-bundled ESLint rule-presets (airbnb / standard / etc.), or any community-bundled "starter extras" | Architecture § "Starter Options Considered" explicitly rejected opinionated extras to keep lock-in to a third-party maintainer out of the project. The Vite `react-ts` template's own default `eslint.config.js` is accepted as-is — the prohibition is on layered community rule-presets, not on ESLint itself. |
 | Leave `<PackageReference … Version="…">` in any `.csproj` after enabling CPM | Central Package Management requires versions to live in `Directory.Packages.props`. Mixed projects fail to build with `NU1605` / `NU1010`. |
 | Leave the Aspire Blazor sample web project in the solution | AC-1 explicitly requires its removal. The architecture path § 5.5 has the API project — not a separate web project — serving the SPA. |
-| Keep the default `ApiService` name | Every later story references `FormForge.Api` by name. Renaming touches `.csproj`, folder name, `RootNamespace`, AppHost `Projects.*` reference, and the `.sln`. |
+| Keep the default `ApiService` name | Every later story references `AppForge.Api` by name. Renaming touches `.csproj`, folder name, `RootNamespace`, AppHost `Projects.*` reference, and the `.sln`. |
 | Ignore `_bmad/`, `_bmad-output/`, `docs/`, `.claude/` in `.gitignore` | These directories carry planning artifacts and Claude configuration; they must stay tracked. |
 | Commit secrets or `appsettings.*.json` containing JWT keys / DB passwords | Architecture § 2.8 — secrets via env vars + `dotnet user-secrets` in dev. Story 1.1 does not introduce secrets, but the `.gitignore` must already block `*.env.local`. |
 | Run `dotnet new gitignore` after the Aspire scaffold has already produced one and silently overwrite it | Merge instead. Then collapse any nested `.gitignore` files into the root one. |
@@ -481,7 +481,7 @@ tinnitus/                                       # Repo root
 ├── _bmad/                                      # PRE-EXISTING — untouched
 ├── _bmad-output/                               # PRE-EXISTING — untouched
 ├── docs/                                       # PRE-EXISTING — untouched
-├── FormForge.sln                               # NEW
+├── AppForge.sln                               # NEW
 ├── Directory.Build.props                       # NEW
 ├── Directory.Packages.props                    # NEW
 ├── global.json                                 # NEW
@@ -490,10 +490,10 @@ tinnitus/                                       # Repo root
 ├── .dockerignore                               # NEW
 ├── README.md                                   # PRE-EXISTING — light edit only
 ├── src/
-│   ├── FormForge.AppHost/                      # NEW (from Aspire starter)
-│   ├── FormForge.ServiceDefaults/              # NEW (from Aspire starter)
-│   ├── FormForge.Api/                          # NEW (renamed from ApiService)
-│   └── FormForge.Api.Tests/                    # NEW (manually added)
+│   ├── AppForge.AppHost/                      # NEW (from Aspire starter)
+│   ├── AppForge.ServiceDefaults/              # NEW (from Aspire starter)
+│   ├── AppForge.Api/                          # NEW (renamed from ApiService)
+│   └── AppForge.Api.Tests/                    # NEW (manually added)
 └── web/                                        # NEW (Vite + React 19 + shadcn)
     ├── package.json
     ├── vite.config.ts
@@ -509,7 +509,7 @@ tinnitus/                                       # Repo root
         └── lib/utils.ts                        # shadcn init creates this
 ```
 
-Folders that the Architecture diagram lists but **this story does NOT create**: `.github/workflows/`, `docs/runbooks/`, `docs/adr/`, every folder under `src/FormForge.Api/Features/*` and `src/FormForge.Api/Common/*` and `src/FormForge.Api/Domain/*` and `src/FormForge.Api/Infrastructure/*`, every folder under `web/src/routes/`, `web/src/features/`, `web/src/components/designer/`, `web/src/lib/i18n/`, `web/src/lib/theme/`, `web/src/test/`. Those land in their owning stories.
+Folders that the Architecture diagram lists but **this story does NOT create**: `.github/workflows/`, `docs/runbooks/`, `docs/adr/`, every folder under `src/AppForge.Api/Features/*` and `src/AppForge.Api/Common/*` and `src/AppForge.Api/Domain/*` and `src/AppForge.Api/Infrastructure/*`, every folder under `web/src/routes/`, `web/src/features/`, `web/src/components/designer/`, `web/src/lib/i18n/`, `web/src/lib/theme/`, `web/src/test/`. Those land in their owning stories.
 
 **Detected variances:**
 - **TanStack Router replaces React Router v7** (PRD Addendum A2 vs Architecture AR-3). The architecture decision is authoritative — install TanStack Router. PM action item to update the PRD addendum still pending.
@@ -537,7 +537,7 @@ claude-opus-4-7 (1M context)
 
 ### Debug Log References
 
-- **Aspire CLI interactive prompt**: `aspire new aspire-starter --name FormForge --output .` failed with `System.NotSupportedException: Cannot show selection prompt since the current terminal isn't interactive.` (Spectre.Console list prompt for template version). Fell back to `dotnet new aspire-starter --name FormForge --output .` per story.
+- **Aspire CLI interactive prompt**: `aspire new aspire-starter --name AppForge --output .` failed with `System.NotSupportedException: Cannot show selection prompt since the current terminal isn't interactive.` (Spectre.Console list prompt for template version). Fell back to `dotnet new aspire-starter --name AppForge --output .` per story.
 - **Aspire template vulnerability warnings**: Initial install of `Aspire.ProjectTemplates::13.0.0` emitted multiple `NU1902` warnings on `OpenTelemetry.*` packages. Upgraded to `13.3.5` (latest at scaffold time) — vulnerability warnings disappeared. (Story spec was `13.1.*`; no `13.1` patch revisions are published on NuGet at the time of work, only 13.0 → 13.3.)
 - **Project location**: Aspire starter scaffolded projects at the repo root rather than under `src/`. Moved them manually per Architecture § "Complete Project Directory Structure". Updated `aspire.config.json` `appHost.path`.
 - **shadcn CLI changes**: `npx shadcn@latest init` (v4.8) requires `-t <template>` and a `--preset`. Used `-t vite -b radix --preset nova --yes --force`. The "base color = slate" choice from the story's Dev Notes is no longer a separate flag in shadcn v4; the Nova preset's neutral grayscale palette is the equivalent default.
@@ -547,8 +547,8 @@ claude-opus-4-7 (1M context)
 
 ### Completion Notes List
 
-- Backend scaffold uses `dotnet new aspire-starter` (template 13.3.5). Projects live under `src/`: `FormForge.AppHost` (Aspire orchestrator), `FormForge.ServiceDefaults` (shared OpenTelemetry/health/resilience extensions), `FormForge.Api` (renamed from `ApiService`; minimal API with `MapOpenApi` + a root endpoint), `FormForge.Api.Tests` (xUnit + Testcontainers.PostgreSql, empty).
-- Aspire's Blazor sample web project (`FormForge.Web`) and the `/weatherforecast` demo endpoint were removed — the architecture's API project hosts the SPA, so the separate Blazor project is unused.
+- Backend scaffold uses `dotnet new aspire-starter` (template 13.3.5). Projects live under `src/`: `AppForge.AppHost` (Aspire orchestrator), `AppForge.ServiceDefaults` (shared OpenTelemetry/health/resilience extensions), `AppForge.Api` (renamed from `ApiService`; minimal API with `MapOpenApi` + a root endpoint), `AppForge.Api.Tests` (xUnit + Testcontainers.PostgreSql, empty).
+- Aspire's Blazor sample web project (`AppForge.Web`) and the `/weatherforecast` demo endpoint were removed — the architecture's API project hosts the SPA, so the separate Blazor project is unused.
 - Central Package Management is enabled (`Directory.Packages.props`); all `<PackageReference … Version="…">` attributes were migrated to `<PackageVersion …>` entries.
 - Frontend scaffold: `web/` from `npm create vite@latest --template react-ts`, upgraded to React 19.2.6, Tailwind 4.3.0 (via `@tailwindcss/vite`), shadcn 4.8.0 (Nova preset). Runtime deps: `@tanstack/react-router` + devtools, `@tanstack/react-query` + devtools, `react-hook-form`, `zod`, `@hookform/resolvers`, `i18next`, `react-i18next`. Dev deps: `@tanstack/router-plugin`, `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `@vitest/ui`, `jsdom`. `react-router`/`react-router-dom` are NOT installed (anti-pattern enforced).
 - `vite.config.ts` plugin order: `tanstackRouter` → `react` → `tailwindcss`; `build.target: 'es2022'`; `@` alias → `./src`.
@@ -567,23 +567,23 @@ claude-opus-4-7 (1M context)
 - `Directory.Packages.props`
 - `Dockerfile` — skeleton (Story 1.3 owns the working multi-stage build)
 - `docker-compose.yml` — skeleton (Story 1.3 owns the working orchestration)
-- `FormForge.sln`
+- `AppForge.sln`
 - `aspire.config.json`
 - `global.json`
-- `src/FormForge.Api/FormForge.Api.csproj`
-- `src/FormForge.Api/FormForge.Api.http`
-- `src/FormForge.Api/Program.cs`
-- `src/FormForge.Api/appsettings.Development.json`
-- `src/FormForge.Api/appsettings.json`
-- `src/FormForge.Api/Properties/launchSettings.json`
-- `src/FormForge.Api.Tests/FormForge.Api.Tests.csproj`
-- `src/FormForge.AppHost/AppHost.cs`
-- `src/FormForge.AppHost/FormForge.AppHost.csproj`
-- `src/FormForge.AppHost/appsettings.Development.json`
-- `src/FormForge.AppHost/appsettings.json`
-- `src/FormForge.AppHost/Properties/launchSettings.json`
-- `src/FormForge.ServiceDefaults/Extensions.cs` — class renamed to `ServiceDefaultsExtensions`; null-guard added
-- `src/FormForge.ServiceDefaults/FormForge.ServiceDefaults.csproj`
+- `src/AppForge.Api/AppForge.Api.csproj`
+- `src/AppForge.Api/AppForge.Api.http`
+- `src/AppForge.Api/Program.cs`
+- `src/AppForge.Api/appsettings.Development.json`
+- `src/AppForge.Api/appsettings.json`
+- `src/AppForge.Api/Properties/launchSettings.json`
+- `src/AppForge.Api.Tests/AppForge.Api.Tests.csproj`
+- `src/AppForge.AppHost/AppHost.cs`
+- `src/AppForge.AppHost/AppForge.AppHost.csproj`
+- `src/AppForge.AppHost/appsettings.Development.json`
+- `src/AppForge.AppHost/appsettings.json`
+- `src/AppForge.AppHost/Properties/launchSettings.json`
+- `src/AppForge.ServiceDefaults/Extensions.cs` — class renamed to `ServiceDefaultsExtensions`; null-guard added
+- `src/AppForge.ServiceDefaults/AppForge.ServiceDefaults.csproj`
 - `web/` — full Vite + React 19 + Tailwind 4 + shadcn scaffold (see directory listing; key files: `package.json`, `package-lock.json`, `vite.config.ts`, `tsconfig.json`, `tsconfig.app.json`, `tsconfig.node.json`, `components.json`, `eslint.config.js`, `index.html`, `src/main.tsx`, `src/App.tsx`, `src/App.css`, `src/index.css`, `src/lib/utils.ts`, `src/components/ui/button.tsx`, `src/assets/`, `public/`)
 
 **Modified (pre-existing):**
@@ -611,8 +611,8 @@ _Code review run on 2026-05-22. Three parallel layers: Blind Hunter (diff-only a
 ### Patch — APPLIED (2026-05-22)
 
 - [x] [Review][Patch] **`web/tsconfig.app.json` `"strict": true` added** — under `/* Linting */`. Note: may surface latent type errors in placeholder `App.tsx` on next `npm run build`; verify before merging.
-- [x] [Review][Patch] **`src/FormForge.Api/FormForge.Api.http`** — replaced `GET /weatherforecast/` with `GET /` (matches the new root endpoint) and `Accept: text/plain`.
-- [x] [Review][Patch] **`src/FormForge.Api/Program.cs`** — wrapped `builder.Services.AddOpenApi()` in `if (builder.Environment.IsDevelopment())` for symmetry with `MapOpenApi()`.
+- [x] [Review][Patch] **`src/AppForge.Api/AppForge.Api.http`** — replaced `GET /weatherforecast/` with `GET /` (matches the new root endpoint) and `Accept: text/plain`.
+- [x] [Review][Patch] **`src/AppForge.Api/Program.cs`** — wrapped `builder.Services.AddOpenApi()` in `if (builder.Environment.IsDevelopment())` for symmetry with `MapOpenApi()`.
 - [x] [Review][Patch] **`global.json`** — `rollForward: latestFeature` → `latestMinor`.
 - [x] [Review][Patch] **`web/package.json`** — moved `"shadcn": "^4.8.0"` from `dependencies` to `devDependencies`. (D2 follow-through; lockfile will refresh on next `npm install`.)
 - [x] [Review][Patch] **`web/src/routes/__root.tsx` + `web/src/routes/index.tsx`** — created minimal stubs so TanStack Router's plugin has files to scan. (D4 follow-through.)
@@ -630,14 +630,14 @@ _Code review run on 2026-05-22. Three parallel layers: Blind Hunter (diff-only a
 
 ### Deferred (pre-existing, out-of-scope, or owned by another story)
 
-- [x] [Review][Defer] **Dockerfile is a non-functional skeleton** [`Dockerfile`] — ENTRYPOINT runs `dotnet FormForge.Api.dll` but no COPY of published artifacts; no HEALTHCHECK; alpine missing `curl`/`wget`; EXPOSE 8080 without `ASPNETCORE_URLS`; UID 1000 not parameterized. Spec explicitly says "final content lives in Story 1.3"; deferred.
+- [x] [Review][Defer] **Dockerfile is a non-functional skeleton** [`Dockerfile`] — ENTRYPOINT runs `dotnet AppForge.Api.dll` but no COPY of published artifacts; no HEALTHCHECK; alpine missing `curl`/`wget`; EXPOSE 8080 without `ASPNETCORE_URLS`; UID 1000 not parameterized. Spec explicitly says "final content lives in Story 1.3"; deferred.
 - [x] [Review][Defer] **docker-compose.yml is a non-functional skeleton** [`docker-compose.yml`] — `minio/minio` and `minio/mc` images untagged (`:latest`), no named volumes (data wiped on `down`), no `depends_on.condition: service_healthy`, no explicit `restart: "no"` on `minio-init`. Spec says Story 1.3 owns full wiring; deferred.
-- [x] [Review][Defer] **Health endpoints only mapped in Development** [`src/FormForge.ServiceDefaults/Extensions.cs:114-126`] — Aspire template's default IsDevelopment() gate means `/health` and `/alive` 404 in prod, breaking orchestrator probes. Epic 1.6 (health-check-endpoints) will address.
-- [x] [Review][Defer] **OTLP exporter activates on env-var presence without URI validation** [`src/FormForge.ServiceDefaults/Extensions.cs:80-86`] — malformed `OTEL_EXPORTER_OTLP_ENDPOINT` causes startup crash or silent telemetry loss. Epic 1.5 (structured-logging-with-correlation-ids) owns the observability hardening.
+- [x] [Review][Defer] **Health endpoints only mapped in Development** [`src/AppForge.ServiceDefaults/Extensions.cs:114-126`] — Aspire template's default IsDevelopment() gate means `/health` and `/alive` 404 in prod, breaking orchestrator probes. Epic 1.6 (health-check-endpoints) will address.
+- [x] [Review][Defer] **OTLP exporter activates on env-var presence without URI validation** [`src/AppForge.ServiceDefaults/Extensions.cs:80-86`] — malformed `OTEL_EXPORTER_OTLP_ENDPOINT` causes startup crash or silent telemetry loss. Epic 1.5 (structured-logging-with-correlation-ids) owns the observability hardening.
 - [x] [Review][Defer] **App.tsx is the Vite placeholder with `target="_blank"` links lacking `rel="noopener noreferrer"`** [`web/src/App.tsx`] — entire file is the Vite/React boilerplate landing page, intentionally kept as placeholder for Story 1.2 replacement. Deferred — the file will be replaced wholesale.
 - [x] [Review][Defer] **`web/index.html` `<title>web</title>`** [`web/index.html:6`] — placeholder; replaced when Story 1.2 wires the AppHost shell or Epic 7 (UX polish) lands.
 - [x] [Review][Defer] **README missing dev-cert trust, frontend run instructions, env-var setup** [`README.md`] — Spec says "Story 1.2 will expand". Deferred.
-- [x] [Review][Defer] **Test project inherits `TreatWarningsAsErrors=true`** [`src/FormForge.Api.Tests/FormForge.Api.Tests.csproj`] — once real tests land, benign xUnit warnings (e.g. xUnit1026 unused parameter) will hard-fail CI. Revisit when the first test story writes actual tests.
+- [x] [Review][Defer] **Test project inherits `TreatWarningsAsErrors=true`** [`src/AppForge.Api.Tests/AppForge.Api.Tests.csproj`] — once real tests land, benign xUnit warnings (e.g. xUnit1026 unused parameter) will hard-fail CI. Revisit when the first test story writes actual tests.
 - [x] [Review][Defer] **`<WarningsNotAsErrors></WarningsNotAsErrors>` empty allowlist** [`Directory.Build.props:8`] — first analyzer noise will require populating this; defer until it fires.
 - [x] [Review][Defer] **`.dockerignore` omits `**/TestResults/`, `**/coverage/`, `*.log`** [`.dockerignore`] — bloats build context. Deferred to Story 1.3 (which owns the working multi-stage build).
 
@@ -650,7 +650,7 @@ _Code review run on 2026-05-22. Three parallel layers: Blind Hunter (diff-only a
 - `Directory.Build.props` `<TargetFramework>net10.0</TargetFramework>` + global SDK `10.0.100` — dev verified `dotnet build`/`dotnet test` clean.
 - Aspire SDK 13.3.5 with .NET 10 — explicitly documented in dev completion notes.
 - `main.tsx` non-null assertion on `getElementById('root')!` — Vite template default; not a real defect.
-- Empty `FormForge.Api.Tests` project — intentional skeleton.
+- Empty `AppForge.Api.Tests` project — intentional skeleton.
 - `vite.config.ts` build `target: 'es2022'` vs `tsconfig.app.json` `target: 'es2023'` — minor; bundler target governs emitted output.
 - `aspire.config.json` at repo root — auto-emitted by Aspire scaffold; tracked in story File List.
 - Hardcoded launchSettings.json ports / `<title>web</title>` BOM / trailing newline on `.csproj` — `dotnet format --verify-no-changes` reported clean per dev; cosmetic at most.

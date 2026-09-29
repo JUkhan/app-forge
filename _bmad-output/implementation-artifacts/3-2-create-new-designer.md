@@ -58,37 +58,37 @@ so that I can start building a new form layout.
     - `"designerIdConflict"`, `"statusPublished"`, `"statusDraft"`, `"statusArchived"`, `"rowMenuLabel"` already present from Story 3.1 review patches; no edits needed.
 
 - [x] Task 2: Create `SafeIdentifier` value type (AC-2)
-  - [x] Create `src/FormForge.Api/Features/Designer/SafeIdentifier.cs`
+  - [x] Create `src/AppForge.Api/Features/Designer/SafeIdentifier.cs`
 
 - [x] Task 3: Create PG reserved keywords list (AC-2)
-  - [x] Create `src/FormForge.Api/Features/Designer/PgReservedKeywords.cs`
+  - [x] Create `src/AppForge.Api/Features/Designer/PgReservedKeywords.cs`
 
 - [x] Task 4: Create domain entities (AC-1, AC-5, AC-6)
-  - [x] Create `src/FormForge.Api/Domain/Entities/ComponentSchema.cs`
-  - [x] Create `src/FormForge.Api/Domain/Entities/ComponentSchemaVersion.cs`
+  - [x] Create `src/AppForge.Api/Domain/Entities/ComponentSchema.cs`
+  - [x] Create `src/AppForge.Api/Domain/Entities/ComponentSchemaVersion.cs`
 
 - [x] Task 5: Create DTOs (AC-1, AC-5, AC-6)
-  - [x] Create `src/FormForge.Api/Features/Designer/Dtos/CreateDesignerRequest.cs`
-  - [x] Create `src/FormForge.Api/Features/Designer/Dtos/DesignerResponse.cs`
-  - [x] Create `src/FormForge.Api/Features/Designer/Dtos/DesignerListItem.cs`
+  - [x] Create `src/AppForge.Api/Features/Designer/Dtos/CreateDesignerRequest.cs`
+  - [x] Create `src/AppForge.Api/Features/Designer/Dtos/DesignerResponse.cs`
+  - [x] Create `src/AppForge.Api/Features/Designer/Dtos/DesignerListItem.cs`
 
 - [x] Task 6: Create FluentValidation validator (AC-2)
-  - [x] Create `src/FormForge.Api/Features/Designer/Validators/CreateDesignerRequestValidator.cs`
+  - [x] Create `src/AppForge.Api/Features/Designer/Validators/CreateDesignerRequestValidator.cs`
 
 - [x] Task 7: Create `IDesignerService` + `DesignerService` (AC-1, AC-3, AC-4, AC-5, AC-6)
-  - [x] Create `src/FormForge.Api/Features/Designer/DesignerService.cs`
+  - [x] Create `src/AppForge.Api/Features/Designer/DesignerService.cs`
   - [x] `CreateAsync` creates schema + version 1 in one `SaveChangesAsync`; race-window 23505 mapped to `DesignerExists`
   - [x] `ListAsync` paginated with latest-version status correlated subquery
   - [x] `GetLatestAsync` includes versions, picks latest in C#
   - [x] `GetVersionAsync` loads schema + version separately so missing-version still returns 404
 
 - [x] Task 8: Create `DesignerEndpoints` (AC-1, AC-2, AC-3, AC-4, AC-5, AC-6)
-  - [x] Create `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs`
+  - [x] Create `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs`
   - [x] `POST /` requires platform-admin + `AddValidationFilter<CreateDesignerRequest>()`
   - [x] `GET /`, `GET /{designerId}`, `GET /{designerId}/versions/{version:int}` open to all authenticated users
   - [x] Outcome switch + static `*Problem()` helpers (`DesignerNotFoundProblem`, `DesignerExistsProblem`)
 
-- [x] Task 9: Update `FormForgeDbContext` (AC-1, AC-5, AC-6)
+- [x] Task 9: Update `AppForgeDbContext` (AC-1, AC-5, AC-6)
   - [x] DbSets `ComponentSchemas` and `ComponentSchemaVersions` added
   - [x] `OnModelCreating` configures both tables with FKs, unique `(designer_id, version)` index, `root_element jsonb`
 
@@ -96,12 +96,12 @@ so that I can start building a new form layout.
   - [x] `20260523112633_CreateComponentSchemas` generates `component_schemas` (PK varchar(63)) and `component_schema_versions` (`root_element jsonb`, unique `(designer_id, version)`)
 
 - [x] Task 11: Register services and route group in `Program.cs` (AC-1)
-  - [x] `using` for `FormForge.Api.Features.Designer{,.Dtos,.Validators}` added
+  - [x] `using` for `AppForge.Api.Features.Designer{,.Dtos,.Validators}` added
   - [x] `IDesignerService` + `IValidator<CreateDesignerRequest>` registered as Scoped
   - [x] `/api/designers` route group registered before `app.Run()` with `RequireAuth()` + `admin` rate limiter
 
 - [x] Task 12: Build and verify (all ACs)
-  - [x] Backend: `dotnet build FormForge.sln` — 0 errors, 0 warnings
+  - [x] Backend: `dotnet build AppForge.sln` — 0 errors, 0 warnings
   - [x] Frontend: `pnpm run build` — built cleanly
   - [x] Frontend: `pnpm run lint` — 26 errors, all pre-existing `react-refresh/only-export-components` (no new errors introduced)
   - [x] `web/src/routeTree.gen.ts` confirmed untouched by `git status`
@@ -142,10 +142,10 @@ Fix ALL 7 lines: `listSchemas`, `getSchema` (×2), `createSchema`, `saveVersion`
 The `SafeIdentifier` type validates the `designerId` at construction time so that invalid identifiers can never be passed to SQL. It is also used by Stories 5.x when constructing DDL. Implement it exactly as follows:
 
 ```csharp
-// src/FormForge.Api/Features/Designer/SafeIdentifier.cs
+// src/AppForge.Api/Features/Designer/SafeIdentifier.cs
 using System.Text.RegularExpressions;
 
-namespace FormForge.Api.Features.Designer;
+namespace AppForge.Api.Features.Designer;
 
 /// <summary>
 /// A validated PostgreSQL-safe identifier (designerId or fieldKey).
@@ -200,8 +200,8 @@ internal sealed class SafeIdentifier
 The list below covers the most dangerous PG 17 reserved keywords (those that would break DDL if used as table names). The full list is ~100 entries from `SELECT word FROM pg_get_keywords() WHERE catcode IN ('R', 'U')` for PG 17.
 
 ```csharp
-// src/FormForge.Api/Features/Designer/PgReservedKeywords.cs
-namespace FormForge.Api.Features.Designer;
+// src/AppForge.Api/Features/Designer/PgReservedKeywords.cs
+namespace AppForge.Api.Features.Designer;
 
 internal static class PgReservedKeywords
 {
@@ -242,8 +242,8 @@ Note: The system-column names (`id`, `created_at`, etc.) are also blocked becaus
 ### Domain Entities
 
 ```csharp
-// src/FormForge.Api/Domain/Entities/ComponentSchema.cs
-namespace FormForge.Api.Domain.Entities;
+// src/AppForge.Api/Domain/Entities/ComponentSchema.cs
+namespace AppForge.Api.Domain.Entities;
 
 internal sealed class ComponentSchema
 {
@@ -260,8 +260,8 @@ internal sealed class ComponentSchema
 ```
 
 ```csharp
-// src/FormForge.Api/Domain/Entities/ComponentSchemaVersion.cs
-namespace FormForge.Api.Domain.Entities;
+// src/AppForge.Api/Domain/Entities/ComponentSchemaVersion.cs
+namespace AppForge.Api.Domain.Entities;
 
 internal sealed class ComponentSchemaVersion
 {
@@ -287,18 +287,18 @@ internal sealed class ComponentSchemaVersion
 ### DTOs
 
 ```csharp
-// src/FormForge.Api/Features/Designer/Dtos/CreateDesignerRequest.cs
-namespace FormForge.Api.Features.Designer.Dtos;
+// src/AppForge.Api/Features/Designer/Dtos/CreateDesignerRequest.cs
+namespace AppForge.Api.Features.Designer.Dtos;
 
 internal sealed record CreateDesignerRequest(string DesignerId, string DisplayName);
 ```
 
 ```csharp
-// src/FormForge.Api/Features/Designer/Dtos/DesignerResponse.cs
+// src/AppForge.Api/Features/Designer/Dtos/DesignerResponse.cs
 // Shape MUST match ComponentSchemaDto in web/src/types/designer.ts exactly.
 using System.Text.Json.Nodes;
 
-namespace FormForge.Api.Features.Designer.Dtos;
+namespace AppForge.Api.Features.Designer.Dtos;
 
 internal sealed record DesignerResponse(
     string DesignerId,
@@ -318,9 +318,9 @@ internal sealed record DesignerVersionSummary(
 ```
 
 ```csharp
-// src/FormForge.Api/Features/Designer/Dtos/DesignerListItem.cs
+// src/AppForge.Api/Features/Designer/Dtos/DesignerListItem.cs
 // Shape MUST match ComponentSchemaListItem in web/src/types/designer.ts exactly.
-namespace FormForge.Api.Features.Designer.Dtos;
+namespace AppForge.Api.Features.Designer.Dtos;
 
 internal sealed record DesignerListItem(
     string DesignerId,
@@ -337,10 +337,10 @@ internal sealed record DesignerListItem(
 
 ### DbContext Configuration
 
-Add to `FormForgeDbContext.OnModelCreating`:
+Add to `AppForgeDbContext.OnModelCreating`:
 
 ```csharp
-// In FormForgeDbContext.cs, inside OnModelCreating:
+// In AppForgeDbContext.cs, inside OnModelCreating:
 modelBuilder.Entity<ComponentSchema>(e =>
 {
     e.ToTable("component_schemas");
@@ -398,7 +398,7 @@ public DbSet<ComponentSchemaVersion> ComponentSchemaVersions => Set<ComponentSch
 ### DesignerService
 
 ```csharp
-// src/FormForge.Api/Features/Designer/DesignerService.cs — interface + implementation
+// src/AppForge.Api/Features/Designer/DesignerService.cs — interface + implementation
 
 internal enum CreateDesignerOutcome { Success, DesignerExists, IdentifierInvalid }
 internal sealed record CreateDesignerResult(
@@ -548,7 +548,7 @@ private static DesignerResponse ToResponse(ComponentSchema schema, ComponentSche
 Follow the exact same pattern as `RoleEndpoints.cs`:
 
 ```csharp
-// src/FormForge.Api/Features/Designer/DesignerEndpoints.cs
+// src/AppForge.Api/Features/Designer/DesignerEndpoints.cs
 internal static class DesignerEndpoints
 {
     internal static RouteGroupBuilder MapDesignerEndpoints(this RouteGroupBuilder group)
@@ -673,9 +673,9 @@ Add these blocks in the service registration section (near the other `AddScoped`
 
 ```csharp
 // Designer services (Story 3.2)
-using FormForge.Api.Features.Designer;
-using FormForge.Api.Features.Designer.Dtos;
-using FormForge.Api.Features.Designer.Validators;
+using AppForge.Api.Features.Designer;
+using AppForge.Api.Features.Designer.Dtos;
+using AppForge.Api.Features.Designer.Validators;
 
 // In the DI registration section:
 builder.Services.AddScoped<IDesignerService, DesignerService>();
@@ -730,21 +730,21 @@ Story 3.1 deferred several issues that touch adjacent code:
 ### File Summary
 
 **New files (backend):**
-- `src/FormForge.Api/Features/Designer/SafeIdentifier.cs`
-- `src/FormForge.Api/Features/Designer/PgReservedKeywords.cs`
-- `src/FormForge.Api/Features/Designer/DesignerService.cs` (add `[SuppressMessage("Performance", "CA1812", Justification = "Registered via DI.")]` on the class, same as RoleService)
-- `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs`
-- `src/FormForge.Api/Features/Designer/Dtos/CreateDesignerRequest.cs`
-- `src/FormForge.Api/Features/Designer/Dtos/DesignerResponse.cs` (used for both GET latest and GET version responses)
-- `src/FormForge.Api/Features/Designer/Dtos/DesignerListItem.cs`
-- `src/FormForge.Api/Features/Designer/Validators/CreateDesignerRequestValidator.cs` (add `[SuppressMessage("Performance", "CA1812", ...)]` on the class)
-- `src/FormForge.Api/Domain/Entities/ComponentSchema.cs`
-- `src/FormForge.Api/Domain/Entities/ComponentSchemaVersion.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/YYYYMMDD_CreateComponentSchemas.cs` (generated by EF CLI)
+- `src/AppForge.Api/Features/Designer/SafeIdentifier.cs`
+- `src/AppForge.Api/Features/Designer/PgReservedKeywords.cs`
+- `src/AppForge.Api/Features/Designer/DesignerService.cs` (add `[SuppressMessage("Performance", "CA1812", Justification = "Registered via DI.")]` on the class, same as RoleService)
+- `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs`
+- `src/AppForge.Api/Features/Designer/Dtos/CreateDesignerRequest.cs`
+- `src/AppForge.Api/Features/Designer/Dtos/DesignerResponse.cs` (used for both GET latest and GET version responses)
+- `src/AppForge.Api/Features/Designer/Dtos/DesignerListItem.cs`
+- `src/AppForge.Api/Features/Designer/Validators/CreateDesignerRequestValidator.cs` (add `[SuppressMessage("Performance", "CA1812", ...)]` on the class)
+- `src/AppForge.Api/Domain/Entities/ComponentSchema.cs`
+- `src/AppForge.Api/Domain/Entities/ComponentSchemaVersion.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/YYYYMMDD_CreateComponentSchemas.cs` (generated by EF CLI)
 
 **Modified files (backend):**
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` (add DbSets + model config)
-- `src/FormForge.Api/Program.cs` (register services + route group)
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` (add DbSets + model config)
+- `src/AppForge.Api/Program.cs` (register services + route group)
 
 **Modified files (frontend):**
 - `web/src/features/designer/designerApi.ts` (path fix: `/api/designer` → `/api/designers`)
@@ -781,28 +781,28 @@ claude-opus-4-7 (Opus 4.7, 1M context)
 ### File List
 
 **New (backend):**
-- `src/FormForge.Api/Features/Designer/SafeIdentifier.cs`
-- `src/FormForge.Api/Features/Designer/PgReservedKeywords.cs`
-- `src/FormForge.Api/Features/Designer/DesignerService.cs`
-- `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs`
-- `src/FormForge.Api/Features/Designer/Dtos/CreateDesignerRequest.cs`
-- `src/FormForge.Api/Features/Designer/Dtos/DesignerResponse.cs`
-- `src/FormForge.Api/Features/Designer/Dtos/DesignerListItem.cs`
-- `src/FormForge.Api/Features/Designer/Validators/CreateDesignerRequestValidator.cs`
-- `src/FormForge.Api/Domain/Entities/ComponentSchema.cs`
-- `src/FormForge.Api/Domain/Entities/ComponentSchemaVersion.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260523112633_CreateComponentSchemas.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260523112633_CreateComponentSchemas.Designer.cs`
+- `src/AppForge.Api/Features/Designer/SafeIdentifier.cs`
+- `src/AppForge.Api/Features/Designer/PgReservedKeywords.cs`
+- `src/AppForge.Api/Features/Designer/DesignerService.cs`
+- `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs`
+- `src/AppForge.Api/Features/Designer/Dtos/CreateDesignerRequest.cs`
+- `src/AppForge.Api/Features/Designer/Dtos/DesignerResponse.cs`
+- `src/AppForge.Api/Features/Designer/Dtos/DesignerListItem.cs`
+- `src/AppForge.Api/Features/Designer/Validators/CreateDesignerRequestValidator.cs`
+- `src/AppForge.Api/Domain/Entities/ComponentSchema.cs`
+- `src/AppForge.Api/Domain/Entities/ComponentSchemaVersion.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260523112633_CreateComponentSchemas.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260523112633_CreateComponentSchemas.Designer.cs`
 
 **Modified (backend):**
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` (added `ComponentSchemas`, `ComponentSchemaVersions` DbSets + `OnModelCreating` blocks)
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` (regenerated by EF CLI)
-- `src/FormForge.Api/Program.cs` (added Designer usings, scoped service + validator registrations, `/api/designers` route group)
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` (added `ComponentSchemas`, `ComponentSchemaVersions` DbSets + `OnModelCreating` blocks)
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` (regenerated by EF CLI)
+- `src/AppForge.Api/Program.cs` (added Designer usings, scoped service + validator registrations, `/api/designers` route group)
 
 **New (tests):**
-- `src/FormForge.Api.Tests/Features/Designer/SafeIdentifierTests.cs`
-- `src/FormForge.Api.Tests/Features/Designer/CreateDesignerRequestValidatorTests.cs`
-- `src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs`
+- `src/AppForge.Api.Tests/Features/Designer/SafeIdentifierTests.cs`
+- `src/AppForge.Api.Tests/Features/Designer/CreateDesignerRequestValidatorTests.cs`
+- `src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs`
 
 **Modified (frontend):**
 - `web/src/features/designer/designerApi.ts` (path fix `/api/designer` → `/api/designers` in all 7 routes; comment refreshed)
@@ -820,7 +820,7 @@ claude-opus-4-7 (Opus 4.7, 1M context)
 
 **Decision needed:**
 
-- [x] [Review][Defer] FK `OnDelete(Cascade)` on `component_schema_versions → component_schemas` is forward-risky — `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs:122`. Cascade wipes all version rows (including Published) when a schema is deleted. No DELETE endpoint exists today, but Story 5.x/6.x will create dynamic tables keyed by `designer_id` whose data rows reference Published versions. **Resolved: defer to Story 5.x — FK policy depends on what Story 5.x's dynamic tables decide about data-row → version coupling; choosing Cascade vs Restrict now would lock in a contract before the dependency materializes.**
+- [x] [Review][Defer] FK `OnDelete(Cascade)` on `component_schema_versions → component_schemas` is forward-risky — `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs:122`. Cascade wipes all version rows (including Published) when a schema is deleted. No DELETE endpoint exists today, but Story 5.x/6.x will create dynamic tables keyed by `designer_id` whose data rows reference Published versions. **Resolved: defer to Story 5.x — FK policy depends on what Story 5.x's dynamic tables decide about data-row → version coupling; choosing Cascade vs Restrict now would lock in a contract before the dependency materializes.**
 
 **Patches (applied 2026-05-23 after the review pass):**
 
@@ -835,16 +835,16 @@ claude-opus-4-7 (Opus 4.7, 1M context)
 
 **Deferred (pre-existing or out-of-scope, tracked in `deferred-work.md`):**
 
-- [x] [Review][Defer] `ListAsync` silent saturation for huge `page` values returns 200 empty instead of 400 [`src/FormForge.Api/Features/Designer/DesignerService.cs` ListAsync] — standard pagination caveat, no real harm.
+- [x] [Review][Defer] `ListAsync` silent saturation for huge `page` values returns 200 empty instead of 400 [`src/AppForge.Api/Features/Designer/DesignerService.cs` ListAsync] — standard pagination caveat, no real harm.
 - [x] [Review][Defer] `LongCountAsync` → `int TotalPages` theoretical overflow — needs 2B+ rows.
-- [x] [Review][Defer] `GetLatestAsync(includeVersions: true)` returns unbounded versions list [`src/FormForge.Api/Features/Designer/DesignerService.cs` ToResponse] — owned by Story 3.7/3.8 (version management).
+- [x] [Review][Defer] `GetLatestAsync(includeVersions: true)` returns unbounded versions list [`src/AppForge.Api/Features/Designer/DesignerService.cs` ToResponse] — owned by Story 3.7/3.8 (version management).
 - [x] [Review][Defer] Frontend `saveVersion` PUT returns 404 [`web/src/features/designer/designerApi.ts`] — explicitly deferred to Story 3.6 by story Dev Notes (PUT endpoint not yet implemented).
-- [x] [Review][Defer] Migration requires `pgcrypto`/`gen_random_uuid` at runtime [`src/FormForge.Api/Infrastructure/Persistence/Migrations/20260523112633_CreateComponentSchemas.cs:16-19`] — environment precondition shared with all existing migrations.
-- [x] [Review][Defer] EF correlated subquery in `ListAsync` may regress on Npgsql/EF upgrades; no in-code fallback [`src/FormForge.Api/Features/Designer/DesignerService.cs` ListAsync] — story Dev Notes already document the fallback strategy.
+- [x] [Review][Defer] Migration requires `pgcrypto`/`gen_random_uuid` at runtime [`src/AppForge.Api/Infrastructure/Persistence/Migrations/20260523112633_CreateComponentSchemas.cs:16-19`] — environment precondition shared with all existing migrations.
+- [x] [Review][Defer] EF correlated subquery in `ListAsync` may regress on Npgsql/EF upgrades; no in-code fallback [`src/AppForge.Api/Features/Designer/DesignerService.cs` ListAsync] — story Dev Notes already document the fallback strategy.
 - [x] [Review][Defer] `ListAsync` TOCTOU between `LongCountAsync` and `ToListAsync` — standard pagination caveat under concurrent writes.
-- [x] [Review][Defer] GET endpoints accept unbounded `designerId` length / `version <= 0` route values [`src/FormForge.Api/Features/Designer/DesignerEndpoints.cs`] — always return 404 via DB lookup; wasteful but harmless.
-- [x] [Review][Defer] Test infra brittleness — `_factory!`/`_client!` null-forgiving, `EnsureSuccessStatusCode` in `LoginAsync`, `viewer` user with no role assignment [`src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs:939-940, 1253, 1294-1322`] — test polish.
-- [x] [Review][Defer] `ListDesigners_WithItems_Returns200_OrderedByDesignerId` doesn't exercise `TotalPages` math beyond the trivial pageSize=25 / total=2 case [`src/FormForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs:1123-1124`] — test polish.
+- [x] [Review][Defer] GET endpoints accept unbounded `designerId` length / `version <= 0` route values [`src/AppForge.Api/Features/Designer/DesignerEndpoints.cs`] — always return 404 via DB lookup; wasteful but harmless.
+- [x] [Review][Defer] Test infra brittleness — `_factory!`/`_client!` null-forgiving, `EnsureSuccessStatusCode` in `LoginAsync`, `viewer` user with no role assignment [`src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs:939-940, 1253, 1294-1322`] — test polish.
+- [x] [Review][Defer] `ListDesigners_WithItems_Returns200_OrderedByDesignerId` doesn't exercise `TotalPages` math beyond the trivial pageSize=25 / total=2 case [`src/AppForge.Api.Tests/Features/Designer/DesignerIntegrationTests.cs:1123-1124`] — test polish.
 - [x] [Review][Defer] `RootElement` returned without max-depth/max-length guards — DoS surface theoretical; rate-limiter + jsonb storage bound it practically.
 
 **Dismissed (verified non-issues during triage):**

@@ -116,7 +116,7 @@ describe('ReorderableMenuList', () => {
 
     const dt = buildDataTransfer()
     dt.setData(
-      'application/x-formforge-menu-reorder',
+      'application/x-appforge-menu-reorder',
       JSON.stringify({ id: 'foreign', parentId: 'some-other-parent' }),
     )
     fireEvent.drop(items[1], { dataTransfer: dt })

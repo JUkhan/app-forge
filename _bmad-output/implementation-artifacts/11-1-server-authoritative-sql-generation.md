@@ -23,7 +23,7 @@ So that the client cannot bypass Query Builder security constraints with a hand-
 ## Tasks / Subtasks
 
 - [x] Task 1: Create `BuilderStateDto.cs` — C# record hierarchy mirroring the TypeScript `BuilderState` contract (AC: 1)
-  - [x] Create `src/FormForge.Api/Features/Datasets/Dtos/BuilderStateDto.cs` (NEW file)
+  - [x] Create `src/AppForge.Api/Features/Datasets/Dtos/BuilderStateDto.cs` (NEW file)
   - [x] Define all records in a single file with `using System.Text.Json.Serialization`:
     ```csharp
     internal sealed record BuilderStateDto(
@@ -145,7 +145,7 @@ So that the client cannot bypass Query Builder security constraints with a hand-
   - [x] `FilterConditionDto.Value` is typed as `JsonElement` (not `object`) because `System.Text.Json` does not deserialize JSON `null | string | string[]` into a typed union cleanly; the generator reads `Value.ValueKind` to determine the type
 
 - [x] Task 2: Create `ExpressionSecurityValidator.cs` — 3-layer check per AR-64 (AC: 1, 4)
-  - [x] Create `src/FormForge.Api/Features/Datasets/ExpressionSecurityValidator.cs` (NEW file)
+  - [x] Create `src/AppForge.Api/Features/Datasets/ExpressionSecurityValidator.cs` (NEW file)
   - [x] Static class; `Validate(string expression, string alias)` returns `ExpressionValidationResult`:
     ```csharp
     internal sealed record ExpressionValidationResult(bool IsValid, string? ErrorMessage);
@@ -184,7 +184,7 @@ So that the client cannot bypass Query Builder security constraints with a hand-
   - [x] Import `using PgSqlParser;` at the top (same package as `SqlSelectEnforcer.cs`)
 
 - [x] Task 3: Create `DatasetSqlGenerator.cs` — 10-step algorithm (AC: 1–5)
-  - [x] Create `src/FormForge.Api/Features/Datasets/DatasetSqlGenerator.cs` (NEW file)
+  - [x] Create `src/AppForge.Api/Features/Datasets/DatasetSqlGenerator.cs` (NEW file)
   - [x] Static class with the following result type and main entry point:
     ```csharp
     internal sealed record SqlGenerationResult
@@ -216,7 +216,7 @@ So that the client cannot bypass Query Builder security constraints with a hand-
     - Validate every non-empty column `alias` from checked columns, CASE columns, and calculated columns
     - `SafeIdentifier.TryCreate(alias, out _, out var err)` failure → add error including the alias and `err`
     - Note: table/column names from the allowlist + catalog do NOT need SafeIdentifier validation (they are already DB-controlled identifiers; SafeIdentifier would reject valid PG names like `created_at` with underscores). Only user-provided aliases go through SafeIdentifier.
-    - The SafeIdentifier import path: `using FormForge.Api.Domain.ValueTypes;`
+    - The SafeIdentifier import path: `using AppForge.Api.Domain.ValueTypes;`
   - [x] **Step 4 — Build FROM clause**: find left node (`n.Data.Side == "left"`), emit `FROM "public"."tableName"`. Self-join alias (same table twice): assign each node a numeric alias `t0`, `t1`, etc. and use those in all clauses. For v1, assume no self-joins (defer self-join aliasing; story spec does not require it in this release).
   - [x] **Step 5 — Build JOIN clauses**: for each `JoinEdgeDto` in `state.Edges`, look up source/target node table names:
     ```
@@ -278,7 +278,7 @@ So that the client cannot bypass Query Builder security constraints with a hand-
   - [x] Add `IDatasetAllowlist _allowlist` to `DatasetService` primary constructor (after `viewManager`):
     ```csharp
     internal sealed partial class DatasetService(
-        FormForgeDbContext db,
+        AppForgeDbContext db,
         DbConnectionFactory connectionFactory,
         DatasetViewManager viewManager,
         IDatasetAllowlist allowlist,
@@ -341,7 +341,7 @@ So that the client cannot bypass Query Builder security constraints with a hand-
     - Under `datasets` object, add: `"builderStateInvalid": "The query builder configuration is invalid. Please review your column selections and filter conditions."`
 
 - [x] Task 6: Unit tests — `DatasetSqlGeneratorTests.cs` (AC: 1–5)
-  - [x] Create `src/FormForge.Api.Tests/Features/Datasets/DatasetSqlGeneratorTests.cs` (NEW file — no DB, no `[Collection]`, no `PostgresFixture`)
+  - [x] Create `src/AppForge.Api.Tests/Features/Datasets/DatasetSqlGeneratorTests.cs` (NEW file — no DB, no `[Collection]`, no `PostgresFixture`)
   - [x] Uses `Moq` or a stub `IDatasetAllowlist` that allows all tables. Create a private helper:
     ```csharp
     private static IDatasetAllowlist AllowAll()
@@ -391,7 +391,7 @@ So that the client cannot bypass Query Builder security constraints with a hand-
     - `Generate_CaseColumn_SingleWhen_ProducesCaseExpression`: 1 WHEN arm, 1 THEN → valid CASE WHEN ... THEN ... END
 
 - [x] Task 7: Unit tests — `ExpressionSecurityValidatorTests.cs` (AC: 1, 4)
-  - [x] Create `src/FormForge.Api.Tests/Features/Datasets/ExpressionSecurityValidatorTests.cs` (NEW file)
+  - [x] Create `src/AppForge.Api.Tests/Features/Datasets/ExpressionSecurityValidatorTests.cs` (NEW file)
   - [x] Valid expressions: `price * 1.1`, `COALESCE(name, 'unknown')`, `LENGTH(description)`, `a + b - c`
   - [x] Invalid — keyword start: `DROP TABLE users`, `DELETE FROM foo`, `INSERT INTO bar VALUES (1)`, `CREATE TABLE x (id int)`
   - [x] Invalid — contains semicolon: `price; DROP TABLE users`
@@ -399,7 +399,7 @@ So that the client cannot bypass Query Builder security constraints with a hand-
   - [x] Each test calls `ExpressionSecurityValidator.Validate(expr, "test_alias")` and asserts `IsValid` / error message
 
 - [x] Task 8: Integration test — `DatasetBuilderModeTests.cs` (AC: 1, 4, 5)
-  - [x] Create `src/FormForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs` (NEW file)
+  - [x] Create `src/AppForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs` (NEW file)
   - [x] `[Collection("DatasetIntegrationTests")]` + `IClassFixture<PostgresFixture>` + `IAsyncLifetime` — same setup pattern as `DatasetUpdateTests.cs`
   - [x] `InitializeAsync`: same pattern as DatasetUpdateTests — `db.Database.MigrateAsync()`, TRUNCATE, drop views, seed admin user + role
   - [x] Helper method `CreateBuilderDataset(client, name)` → POST /api/datasets with `is_custom_query: false, query: null` → return `DatasetDto`
@@ -418,8 +418,8 @@ So that the client cannot bypass Query Builder security constraints with a hand-
     - PUT with builder_state referencing table `internal_secret_table` (not in allowlist) → 422 BUILDER_STATE_INVALID (or keep the error detail which says table not allowlisted — but the HTTP code is still 422 with code BUILDER_STATE_INVALID since that's the single outcome for all validation failures)
 
 - [x] Task 9: Verify — backend build + tests pass
-  - [x] `dotnet build src/FormForge.Api` → 0 warnings / 0 errors (CA analyzers pass)
-  - [x] `dotnet test src/FormForge.Api.Tests` → all new tests pass; pre-existing failures (2 audit 405 tests) are unchanged
+  - [x] `dotnet build src/AppForge.Api` → 0 warnings / 0 errors (CA analyzers pass)
+  - [x] `dotnet test src/AppForge.Api.Tests` → all new tests pass; pre-existing failures (2 audit 405 tests) are unchanged
   - [x] Frontend: NO frontend changes in Story 11.1. `npm run test` baseline remains 356.
 
 ### Review Findings
@@ -461,10 +461,10 @@ Story 11.1 is the first backend-only story in Epic 11. It adds three new C# clas
 ### 2. What Already Exists — Do NOT Recreate
 
 - `SqlSelectEnforcer.cs` — already validates SELECT-only; `DatasetSqlGenerator` calls it at step 10. Do NOT duplicate this logic.
-- `SafeIdentifier.cs` — `TryCreate(string? raw, out SafeIdentifier? result, out string? error)`. Import path: `using FormForge.Api.Domain.ValueTypes;`. Used only for user-provided aliases (column, CASE, calculated), NOT for catalog-sourced table/column names.
+- `SafeIdentifier.cs` — `TryCreate(string? raw, out SafeIdentifier? result, out string? error)`. Import path: `using AppForge.Api.Domain.ValueTypes;`. Used only for user-provided aliases (column, CASE, calculated), NOT for catalog-sourced table/column names.
 - `DatasetService.UpdateAsync` — already handles the full transactional lifecycle. The generator output (`ViewSql`) just needs to flow into `effectiveNewQuery` before the existing flow. The checkpoint (a) block is already guarded by `if (effectiveIsCustomQuery)` so it won't fire for builder mode. The existing UPDATE SQL already writes `query = @query` and `builder_state = @builderState::jsonb`.
 - `IDatasetAllowlist.IsAllowed(string tableName)` — synchronous, no I/O, reads from an in-memory set. Call directly in the generator. The `_allowlist` field added to `DatasetService` is the same singleton already registered for the catalog endpoint.
-- `pgsqlparser` NuGet package — already in `FormForge.Api.csproj`. Namespace: `PgSqlParser`, class: `Parser`. `Parser.Parse(sql)` returns `Result<ParseResult?>` with `.IsSuccess` / `.Value` / `.Error` — does NOT throw on parse failure.
+- `pgsqlparser` NuGet package — already in `AppForge.Api.csproj`. Namespace: `PgSqlParser`, class: `Parser`. `Parser.Parse(sql)` returns `Result<ParseResult?>` with `.IsSuccess` / `.Value` / `.Error` — does NOT throw on parse failure.
 - `DatasetDto` — already has `BuilderState: string?`. The generated SQL goes into `Query`, not `BuilderState`.
 - `UpdateDatasetRequest` — already has `BuilderState: string?`. The frontend sends the raw JSON in this field.
 - Deferred items covered by this story (see `deferred-work.md`): ExpressionSecurityValidator.cs, BuilderStateDto.cs, SQL generation of `(expr) AS "alias"`, `$1,$2,...` parameterization plan.
@@ -563,28 +563,28 @@ These do NOT apply to Story 11.1. This is a backend-only story. No React Flow co
 ### Project Structure Notes
 
 **New files:**
-- `src/FormForge.Api/Features/Datasets/Dtos/BuilderStateDto.cs` — C# mirror of `builderState.ts`; same folder as other DTO files
-- `src/FormForge.Api/Features/Datasets/DatasetSqlGenerator.cs` — pure static class; same folder as `SqlSelectEnforcer.cs`
-- `src/FormForge.Api/Features/Datasets/ExpressionSecurityValidator.cs` — pure static class; same folder as `SqlSelectEnforcer.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetSqlGeneratorTests.cs` — unit tests, no DB
-- `src/FormForge.Api.Tests/Features/Datasets/ExpressionSecurityValidatorTests.cs` — unit tests, no DB
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs` — integration tests
+- `src/AppForge.Api/Features/Datasets/Dtos/BuilderStateDto.cs` — C# mirror of `builderState.ts`; same folder as other DTO files
+- `src/AppForge.Api/Features/Datasets/DatasetSqlGenerator.cs` — pure static class; same folder as `SqlSelectEnforcer.cs`
+- `src/AppForge.Api/Features/Datasets/ExpressionSecurityValidator.cs` — pure static class; same folder as `SqlSelectEnforcer.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetSqlGeneratorTests.cs` — unit tests, no DB
+- `src/AppForge.Api.Tests/Features/Datasets/ExpressionSecurityValidatorTests.cs` — unit tests, no DB
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs` — integration tests
 
 **Modified files:**
-- `src/FormForge.Api/Features/Datasets/DatasetService.cs` — add `IDatasetAllowlist` to constructor; add `BuilderStateInvalid` to `UpdateDatasetOutcome`; add builder-mode generation block in `UpdateAsync`
-- `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — add `BuilderStateInvalid` case in PUT handler
+- `src/AppForge.Api/Features/Datasets/DatasetService.cs` — add `IDatasetAllowlist` to constructor; add `BuilderStateInvalid` to `UpdateDatasetOutcome`; add builder-mode generation block in `UpdateAsync`
+- `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — add `BuilderStateInvalid` case in PUT handler
 - `web/src/lib/i18n/locales/en.json` — add `datasets.builderStateInvalid` key
 
 ### References
 
 - Architecture: `_bmad-output/planning-artifacts/architecture.md`, Section 6.10 (AR-66 DatasetSqlGenerator), Section 6.11 (AR-67 builder_state contract), Section 6.8 (AR-64 ExpressionSecurityValidator), Section 6.9 (AR-65 error codes), Section 6.3 (AR-59 view lifecycle)
 - TypeScript BuilderState contract: `web/src/features/datasets/types/builderState.ts` — authoritative cross-layer contract (Decision 6.11); C# must mirror exactly
-- Existing enforcer pattern: `src/FormForge.Api/Features/Datasets/SqlSelectEnforcer.cs` — pgsqlparser usage pattern
-- SafeIdentifier API: `src/FormForge.Api/Features/Designer/SafeIdentifier.cs` — `TryCreate(string?, out SafeIdentifier?, out string?)` signature
-- DatasetService: `src/FormForge.Api/Features/Datasets/DatasetService.cs` — UpdateAsync implementation (full source); insert generator block after Step D, before checkpoint (a)
-- DatasetEndpoints: `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — PUT handler switch statement
-- AllowlistContract: `src/FormForge.Api/Features/Datasets/DatasetAllowlist.cs` — `IDatasetAllowlist.IsAllowed(string tableName)` is synchronous
-- Existing test patterns: `src/FormForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs` — WebApplicationFactory + PostgresFixture + collection pattern
+- Existing enforcer pattern: `src/AppForge.Api/Features/Datasets/SqlSelectEnforcer.cs` — pgsqlparser usage pattern
+- SafeIdentifier API: `src/AppForge.Api/Features/Designer/SafeIdentifier.cs` — `TryCreate(string?, out SafeIdentifier?, out string?)` signature
+- DatasetService: `src/AppForge.Api/Features/Datasets/DatasetService.cs` — UpdateAsync implementation (full source); insert generator block after Step D, before checkpoint (a)
+- DatasetEndpoints: `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — PUT handler switch statement
+- AllowlistContract: `src/AppForge.Api/Features/Datasets/DatasetAllowlist.cs` — `IDatasetAllowlist.IsAllowed(string tableName)` is synchronous
+- Existing test patterns: `src/AppForge.Api.Tests/Features/Datasets/DatasetUpdateTests.cs` — WebApplicationFactory + PostgresFixture + collection pattern
 - `SqlSelectEnforcerTests.cs` — unit test pattern (no DB, no collection)
 - Deferred work items owned by this story: `_bmad-output/implementation-artifacts/deferred-work.md` lines 39, 64–66, 72–73 (ExpressionSecurityValidator, BuilderStateDto, SQL generation)
 - Memory note: pgsqlparser package substitution — see project memory `project_pgquery_package_substitution.md`; use `pgsqlparser` NuGet / `PgSqlParser.Parser.Parse()`
@@ -598,8 +598,8 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context)
 ### Debug Log References
 
 - Initial API build hit one analyzer error (CA1859) on `RenderCaseColumn`'s `IReadOnlyDictionary` parameter; changed to the concrete `Dictionary<string, TableNodeDto>` it is always called with. Rebuild: 0 warnings / 0 errors.
-- A stale `FormForge.Api.exe` dev instance (PID 24304) held a lock on the output DLL and blocked the rebuild; stopped it and rebuilt cleanly. (Relaunch the app to pick up the new build.)
-- Story's stated `SafeIdentifier` import path (`FormForge.Api.Domain.ValueTypes`) is wrong — the class lives in `FormForge.Api.Features.Designer`; used the correct namespace.
+- A stale `AppForge.Api.exe` dev instance (PID 24304) held a lock on the output DLL and blocked the rebuild; stopped it and rebuilt cleanly. (Relaunch the app to pick up the new build.)
+- Story's stated `SafeIdentifier` import path (`AppForge.Api.Domain.ValueTypes`) is wrong — the class lives in `AppForge.Api.Features.Designer`; used the correct namespace.
 
 ### Completion Notes List
 
@@ -612,16 +612,16 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context)
 ### File List
 
 **New:**
-- `src/FormForge.Api/Features/Datasets/Dtos/BuilderStateDto.cs`
-- `src/FormForge.Api/Features/Datasets/ExpressionSecurityValidator.cs`
-- `src/FormForge.Api/Features/Datasets/DatasetSqlGenerator.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetSqlGeneratorTests.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/ExpressionSecurityValidatorTests.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs`
+- `src/AppForge.Api/Features/Datasets/Dtos/BuilderStateDto.cs`
+- `src/AppForge.Api/Features/Datasets/ExpressionSecurityValidator.cs`
+- `src/AppForge.Api/Features/Datasets/DatasetSqlGenerator.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetSqlGeneratorTests.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/ExpressionSecurityValidatorTests.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetBuilderModeTests.cs`
 
 **Modified:**
-- `src/FormForge.Api/Features/Datasets/DatasetService.cs` — `IDatasetAllowlist` ctor param; `BuilderStateInvalid` outcome; builder-mode generation block in `UpdateAsync`
-- `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — `BuilderStateInvalid` → 422 case in the PUT handler
+- `src/AppForge.Api/Features/Datasets/DatasetService.cs` — `IDatasetAllowlist` ctor param; `BuilderStateInvalid` outcome; builder-mode generation block in `UpdateAsync`
+- `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — `BuilderStateInvalid` → 422 case in the PUT handler
 - `web/src/lib/i18n/locales/en.json` — added `datasets.builderStateInvalid` key (both `datasets` objects)
 
 ## Change Log

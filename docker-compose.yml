@@ -32,13 +32,13 @@ services:
     entrypoint: >
       /bin/sh -c "
       mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
-      mc mb --ignore-existing local/formforge
+      mc mb --ignore-existing local/appforge
       "
     restart: "no"
 
   api:
     build: .
-    image: formforge-api:local
+    image: appforge-api:local
     depends_on:
       minio:
         condition: service_healthy
@@ -56,8 +56,8 @@ services:
       ASPNETCORE_ENVIRONMENT: Compose
       ASPNETCORE_URLS: http://+:8080
       # Connection strings point at the external/production Postgres (override appsettings.Compose.json).
-      ConnectionStrings__formforge: "Host=${POSTGRES_HOST};Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
-      ConnectionStrings__formforge_preview: "Host=${POSTGRES_HOST};Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${PREVIEW_DB_USER};Password=${PREVIEW_DB_PASSWORD};Maximum Pool Size=5"
+      ConnectionStrings__appforge: "Host=${POSTGRES_HOST};Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__appforge_preview: "Host=${POSTGRES_HOST};Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${PREVIEW_DB_USER};Password=${PREVIEW_DB_PASSWORD};Maximum Pool Size=5"
       DatasetManager__PreviewRolePassword: ${PREVIEW_DB_PASSWORD}
       MinIO__Endpoint: http://minio:9000
       # Browser-reachable MinIO host used to SIGN presigned URLs (the API uploads via the
@@ -98,7 +98,7 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
-    image: formforge-web:local
+    image: appforge-web:local
     depends_on:
       - api
     # Non-80 host port so it doesn't collide with Dokploy's Traefik (which owns 80/443).

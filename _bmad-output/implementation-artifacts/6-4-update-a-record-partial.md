@@ -71,7 +71,7 @@ So that I can correct a record without a full replace.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Add `RecordDeleted` to `Problems` inner class in `DynamicDataEndpoints.cs`** (AC: 2)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
   - Add after `RecordNotFound()` inside the `private static class Problems` block:
     ```csharp
     // Story 6.4 — PUT attempted against a soft-deleted record; client must restore
@@ -88,7 +88,7 @@ So that I can correct a record without a full replace.
     ```
 
 - [x] **Task 2 — Add `BuildUpdateQuery` to `DynamicQueryBuilder.cs`** (AC: 1, 10)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
   - Add after `BuildInsertQuery`:
     ```csharp
     // Story 6.4 — parameterized UPDATE for PUT /api/data/{designerId}/{id}.
@@ -146,7 +146,7 @@ So that I can correct a record without a full replace.
   - No `is_deleted` check in the WHERE clause — the handler does a SELECT first and explicitly checks existence and deletion status.
 
 - [x] **Task 3 — Add `UpdateRecordHandler` + route registration to `DynamicDataEndpoints.cs`** (AC: 1–10)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
   - Add route registration after `MapPost("/", CreateRecordHandler)` inside `MapDynamicDataEndpoints`:
     ```csharp
     // Story 6.4 — PUT /api/data/{designerId}/{id}. Rate limit overrides group
@@ -167,7 +167,7 @@ So that I can correct a record without a full replace.
         Guid id,
         JsonElement body,
         HttpContext httpContext,
-        FormForgeDbContext db,
+        AppForgeDbContext db,
         ISchemaRegistry schemaRegistry,
         DbConnectionFactory connectionFactory,
         IDynamicPayloadValidator payloadValidator,
@@ -403,7 +403,7 @@ So that I can correct a record without a full replace.
        No re-SELECT needed: `existingRow` contains the pre-update row with coerced values overlaid + new updated_at/updated_by. All values are .NET-typed (Dapper/Npgsql-coerced), same as `GetRecordHandler`.
 
 - [x] **Task 4 — Unit tests for `BuildUpdateQuery`** (AC: 1, 10)
-  - [x] Modify `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
+  - [x] Modify `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
   - Add to the existing test class (after the `BuildInsertQuery` tests):
     - `BuildUpdateQuery_EmptyPayload_SetsOnlyUpdatedAtAndUpdatedBy` — empty `coercedPayload` → SQL contains `"updated_at" = @p_updated_at` and `"updated_by" = @p_updated_by`; no `@f_` parameters; `WHERE "id" = @p_id` present
     - `BuildUpdateQuery_WithOneUserColumn_IncludesColumnInSetClause` — `coercedPayload = { "title" → "hello" }` → SQL has `, "title" = @f_title` in SET; `parameters.Get<string>("f_title")` == `"hello"`
@@ -413,7 +413,7 @@ So that I can correct a record without a full replace.
   - Estimated: +5 unit tests → running total ~465
 
 - [x] **Task 5 — Integration tests: `UpdateRecordIntegrationTests.cs`** (AC: 1–10)
-  - [x] Create `src/FormForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs`
   - Class signature: `[Collection("DynamicCrudTests")] public sealed class UpdateRecordIntegrationTests : IClassFixture<PostgresFixture>, IAsyncLifetime`
   - `InitializeAsync` / `DisposeAsync` identical to `CreateRecordIntegrationTests`:
     - Same `TRUNCATE TABLE menu_role_assignments, menus, component_schema_versions, component_schemas, role_permissions, user_roles, roles, refresh_tokens, users, schema_audit_log, mutation_audit_log RESTART IDENTITY CASCADE;`
@@ -537,7 +537,7 @@ The `/{id:guid}` route segment already validates the UUID format before the hand
 
 | New file | Path |
 |---|---|
-| `UpdateRecordIntegrationTests.cs` | `src/FormForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs` |
+| `UpdateRecordIntegrationTests.cs` | `src/AppForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs` |
 | `updateRecordApi.ts` | `web/src/features/data-entry/updateRecordApi.ts` |
 | `useUpdateRecord.ts` | `web/src/features/data-entry/useUpdateRecord.ts` |
 
@@ -549,7 +549,7 @@ The `/{id:guid}` route segment already validates the UUID format before the hand
 | `DynamicQueryBuilder.cs` | Add `BuildUpdateQuery` |
 | `DynamicQueryBuilderTests.cs` | Add 5 unit tests for `BuildUpdateQuery` |
 
-No changes needed to: `MutationAuditLogEntry.cs`, `FormForgeDbContext.cs`, `Program.cs`, `DynamicPayloadValidator.cs`, `DynamicRecord.cs`, `DynamicRecordJsonConverter.cs`. All infrastructure introduced by Stories 6.1–6.3 is sufficient.
+No changes needed to: `MutationAuditLogEntry.cs`, `AppForgeDbContext.cs`, `Program.cs`, `DynamicPayloadValidator.cs`, `DynamicRecord.cs`, `DynamicRecordJsonConverter.cs`. All infrastructure introduced by Stories 6.1–6.3 is sufficient.
 
 No new EF migration required. No new database tables or columns.
 
@@ -615,11 +615,11 @@ var row = await conn.QuerySingleAsync(
 
 ### References
 
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`] — `CreateRecordHandler` (lines 302–428) — mirror the SafeIdentifier → EF binding → registry → Layer 2 validation → actorId extraction pattern verbatim; add `UpdateRecordHandler` after `CreateRecordHandler`; add `Problems.RecordDeleted()` after `Problems.RecordNotFound()`
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`] — `BuildInsertQuery` (lines 250–305) — mirror the column-discovery loop and parameter-binding pattern for `BuildUpdateQuery`; `BuildGetByIdQuery` (lines 203–219) — used inside the handler for the pre-UPDATE SELECT
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicPayloadValidator.cs`] — unchanged; `IDynamicPayloadValidator.Validate(body, columns)` called identically from `UpdateRecordHandler` as from `CreateRecordHandler`
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicRecord.cs`] — `DynamicRecord(IDictionary<string,object?> values)` constructor; `DynamicRecordJsonConverter` — handles camelCase AR-46 Option C for the response automatically
-- [Source: `src/FormForge.Api.Tests/Features/DynamicCrud/CreateRecordIntegrationTests.cs`] — copy all helpers; TRUNCATE statement (line 51); `[Collection("DynamicCrudTests")]` attribute; dynamic-table DROP loop; seeding helpers
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`] — `CreateRecordHandler` (lines 302–428) — mirror the SafeIdentifier → EF binding → registry → Layer 2 validation → actorId extraction pattern verbatim; add `UpdateRecordHandler` after `CreateRecordHandler`; add `Problems.RecordDeleted()` after `Problems.RecordNotFound()`
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`] — `BuildInsertQuery` (lines 250–305) — mirror the column-discovery loop and parameter-binding pattern for `BuildUpdateQuery`; `BuildGetByIdQuery` (lines 203–219) — used inside the handler for the pre-UPDATE SELECT
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicPayloadValidator.cs`] — unchanged; `IDynamicPayloadValidator.Validate(body, columns)` called identically from `UpdateRecordHandler` as from `CreateRecordHandler`
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicRecord.cs`] — `DynamicRecord(IDictionary<string,object?> values)` constructor; `DynamicRecordJsonConverter` — handles camelCase AR-46 Option C for the response automatically
+- [Source: `src/AppForge.Api.Tests/Features/DynamicCrud/CreateRecordIntegrationTests.cs`] — copy all helpers; TRUNCATE statement (line 51); `[Collection("DynamicCrudTests")]` attribute; dynamic-table DROP loop; seeding helpers
 - [Source: `web/src/features/data-entry/createRecordApi.ts`] — model `updateRecordApi.ts` on this; change `httpClient.post` → `httpClient.put`, include `id` in the path
 - [Source: `web/src/features/data-entry/useCreateRecord.ts`] — model `useUpdateRecord.ts` on this; add record-specific invalidation key `['data', designerId, 'record', id]` in addition to the list key
 - [Source: `web/src/features/auth/httpClient.ts`] — verify `.put<T>(path, body?)` exists before writing `updateRecordApi.ts`; add it if absent
@@ -660,13 +660,13 @@ No debug iterations needed; all 5 unit tests and 10 integration tests passed on 
 ### File List
 
 **Modified files**
-- `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` — added `Problems.RecordDeleted()` helper, `MapPut("/{id:guid}", UpdateRecordHandler)` route registration, and the `UpdateRecordHandler` method (~120 LOC)
-- `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs` — added `BuildUpdateQuery` static method returning `(sql, parameters, updatedAt)`
-- `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` — +5 unit tests for `BuildUpdateQuery`
+- `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` — added `Problems.RecordDeleted()` helper, `MapPut("/{id:guid}", UpdateRecordHandler)` route registration, and the `UpdateRecordHandler` method (~120 LOC)
+- `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs` — added `BuildUpdateQuery` static method returning `(sql, parameters, updatedAt)`
+- `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` — +5 unit tests for `BuildUpdateQuery`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — story 6-4 status: ready-for-dev → in-progress → review
 
 **New files**
-- `src/FormForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs` — 10 integration tests (AC-1 happy + system-columns-ignored, AC-2 RECORD_DELETED, AC-3 audit, AC-4 NOT_FOUND, AC-5 TABLE_NOT_PROVISIONED, AC-6 FORBIDDEN, AC-7 type-mismatch, AC-8 unknown field, AC-1 empty payload)
+- `src/AppForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs` — 10 integration tests (AC-1 happy + system-columns-ignored, AC-2 RECORD_DELETED, AC-3 audit, AC-4 NOT_FOUND, AC-5 TABLE_NOT_PROVISIONED, AC-6 FORBIDDEN, AC-7 type-mismatch, AC-8 unknown field, AC-1 empty payload)
 - `web/src/features/data-entry/updateRecordApi.ts` — typed `updateRecord(designerId, id, payload)` wrapping `httpClient.put`
 - `web/src/features/data-entry/useUpdateRecord.ts` — TanStack mutation hook with dual invalidation (`['data', designerId]` + `['data', designerId, 'record', id]`)
 
@@ -684,20 +684,20 @@ No debug iterations needed; all 5 unit tests and 10 integration tests passed on 
 
 ### Review Findings
 
-- [x] [Review][Patch] `BuildUpdateQuery` WHERE clause missing `AND "is_deleted" = false` — a concurrent soft-delete between the SELECT and the UPDATE silently overwrites a logically-deleted row; add `AND "is_deleted" = false` to the WHERE predicate and check affected rows to surface a 422 if the race fires [src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs]
-- [x] [Review][Patch] `newValuesJson` not null-guarded for empty payload — `JsonSerializer.Serialize({})` produces `"{}"` instead of `null`, inconsistent with the `prevValuesJson` null-guard in DN-4; add the same `.Count > 0` check to `newValuesJson` [src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs]
-- [x] [Review][Patch] `cascadeEventId` / `cascade_event_id` not asserted in AC-1 happy-path test — AR-46 Option C requires all seven system columns in camelCase; `cascadeEventId` present and `cascade_event_id` absent are not verified [src/FormForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs]
-- [x] [Review][Patch] AC-3 audit-log test uses substring containment (`Assert.Contains("New", row.new_values)`) not JSON deserialization; `record_id` is used only as a SQL filter predicate, never explicitly asserted — deserialise the JSON blobs and assert concrete key-value pairs; add `Assert.Equal(recordId, row.record_id)` [src/FormForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs]
-- [x] [Review][Patch] No test verifies audit-log row for empty-payload PUT — AC-3 is only exercised for non-empty payloads; the `{}` path (`previous_values IS NULL`, `new_values = null` or `'{}'`) is untested [src/FormForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs]
-- [x] [Review][Patch] `BuildUpdateQuery_SystemColumnsInPayloadNotInSetClause` test does not actually pass system column names in `coercedPayload` — the test title claims to verify the builder independently excludes system columns, but the payload dict only contains the user column `"title"`; pass `"id"`, `"created_at"`, etc. in the payload to make the assertion meaningful [src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs]
-- [x] [Review][Patch] `PutRecordAsync` test helper does not URL-encode `designerId` — production `updateRecordApi.ts` uses `encodeURIComponent`; test paths use raw string interpolation; any future test with a non-ASCII designer ID will silently misbehave [src/FormForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs]
-- [x] [Review][Patch] `updatedBy` assertion in happy-path test is an indirect proxy (`createdBy == updatedBy`) — it passes only because the same actor creates and updates; independently verify `updatedBy` equals the JWT actor UUID extracted from the token [src/FormForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs]
+- [x] [Review][Patch] `BuildUpdateQuery` WHERE clause missing `AND "is_deleted" = false` — a concurrent soft-delete between the SELECT and the UPDATE silently overwrites a logically-deleted row; add `AND "is_deleted" = false` to the WHERE predicate and check affected rows to surface a 422 if the race fires [src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs]
+- [x] [Review][Patch] `newValuesJson` not null-guarded for empty payload — `JsonSerializer.Serialize({})` produces `"{}"` instead of `null`, inconsistent with the `prevValuesJson` null-guard in DN-4; add the same `.Count > 0` check to `newValuesJson` [src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs]
+- [x] [Review][Patch] `cascadeEventId` / `cascade_event_id` not asserted in AC-1 happy-path test — AR-46 Option C requires all seven system columns in camelCase; `cascadeEventId` present and `cascade_event_id` absent are not verified [src/AppForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs]
+- [x] [Review][Patch] AC-3 audit-log test uses substring containment (`Assert.Contains("New", row.new_values)`) not JSON deserialization; `record_id` is used only as a SQL filter predicate, never explicitly asserted — deserialise the JSON blobs and assert concrete key-value pairs; add `Assert.Equal(recordId, row.record_id)` [src/AppForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs]
+- [x] [Review][Patch] No test verifies audit-log row for empty-payload PUT — AC-3 is only exercised for non-empty payloads; the `{}` path (`previous_values IS NULL`, `new_values = null` or `'{}'`) is untested [src/AppForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs]
+- [x] [Review][Patch] `BuildUpdateQuery_SystemColumnsInPayloadNotInSetClause` test does not actually pass system column names in `coercedPayload` — the test title claims to verify the builder independently excludes system columns, but the payload dict only contains the user column `"title"`; pass `"id"`, `"created_at"`, etc. in the payload to make the assertion meaningful [src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs]
+- [x] [Review][Patch] `PutRecordAsync` test helper does not URL-encode `designerId` — production `updateRecordApi.ts` uses `encodeURIComponent`; test paths use raw string interpolation; any future test with a non-ASCII designer ID will silently misbehave [src/AppForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs]
+- [x] [Review][Patch] `updatedBy` assertion in happy-path test is an indirect proxy (`createdBy == updatedBy`) — it passes only because the same actor creates and updates; independently verify `updatedBy` equals the JWT actor UUID extracted from the token [src/AppForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs]
 
-- [x] [Review][Defer] SELECT→UPDATE race window with no transaction / `SELECT FOR UPDATE` — explicitly in story deferred items §1 [src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs] — deferred, pre-existing
-- [x] [Review][Defer] Audit INSERT not transactionally atomic with Dapper UPDATE — explicitly in story deferred items §2 [src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs] — deferred, pre-existing
-- [x] [Review][Defer] Non-object request body not guarded before payloadValidator — pre-existing deferred from Story 6.3 [src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs] — deferred, pre-existing
-- [x] [Review][Defer] `DateTimeOffset.UtcNow` captured in `BuildUpdateQuery` before DB execution — client-side timestamp subject to clock skew; design choice consistent with `CreateRecordHandler` [src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs] — deferred, pre-existing
+- [x] [Review][Defer] SELECT→UPDATE race window with no transaction / `SELECT FOR UPDATE` — explicitly in story deferred items §1 [src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs] — deferred, pre-existing
+- [x] [Review][Defer] Audit INSERT not transactionally atomic with Dapper UPDATE — explicitly in story deferred items §2 [src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs] — deferred, pre-existing
+- [x] [Review][Defer] Non-object request body not guarded before payloadValidator — pre-existing deferred from Story 6.3 [src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs] — deferred, pre-existing
+- [x] [Review][Defer] `DateTimeOffset.UtcNow` captured in `BuildUpdateQuery` before DB execution — client-side timestamp subject to clock skew; design choice consistent with `CreateRecordHandler` [src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs] — deferred, pre-existing
 - [x] [Review][Defer] No typed error surface in `updateRecordApi.ts` — 422/404 not mapped to typed errors; consistent with other `*Api.ts` modules [web/src/features/data-entry/updateRecordApi.ts] — deferred, pre-existing
-- [x] [Review][Defer] `RootElementParser.ParseFull(null)` caches empty columns when `ComponentSchemaVersions` row is missing — pre-existing from Stories 6.1–6.3 [src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs] — deferred, pre-existing
-- [x] [Review][Defer] No AC-9 rate-limit (429 / Retry-After) integration test — explicitly deferred in story completion notes; same gap as Story 6.3 [src/FormForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs] — deferred, pre-existing
-- [x] [Review][Defer] No AC-10 commandTimeout integration test — explicitly deferred in story completion notes; same gap as Story 6.3 [src/FormForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs] — deferred, pre-existing
+- [x] [Review][Defer] `RootElementParser.ParseFull(null)` caches empty columns when `ComponentSchemaVersions` row is missing — pre-existing from Stories 6.1–6.3 [src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs] — deferred, pre-existing
+- [x] [Review][Defer] No AC-9 rate-limit (429 / Retry-After) integration test — explicitly deferred in story completion notes; same gap as Story 6.3 [src/AppForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs] — deferred, pre-existing
+- [x] [Review][Defer] No AC-10 commandTimeout integration test — explicitly deferred in story completion notes; same gap as Story 6.3 [src/AppForge.Api.Tests/Features/DynamicCrud/UpdateRecordIntegrationTests.cs] — deferred, pre-existing

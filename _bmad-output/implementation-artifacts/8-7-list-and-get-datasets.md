@@ -34,9 +34,9 @@ so that I can browse and open existing Dataset definitions.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Add `DatasetSummaryDto` record** (AC-1)
-  - [x] Create `src/FormForge.Api/Features/Datasets/Dtos/DatasetSummaryDto.cs`:
+  - [x] Create `src/AppForge.Api/Features/Datasets/Dtos/DatasetSummaryDto.cs`:
     ```csharp
-    namespace FormForge.Api.Features.Datasets.Dtos;
+    namespace AppForge.Api.Features.Datasets.Dtos;
 
     // Story 8.7 (FR-62 / AR-65) — summary shape for the paginated dataset list.
     // CreatedByName is null when the creator's user row has been deleted (SET NULL FK).
@@ -61,7 +61,7 @@ so that I can browse and open existing Dataset definitions.
         Guid id,
         CancellationToken ct);
     ```
-  - [x] Add the using for `FormForge.Api.Common` (for `PagedResult<T>`) if not already present.
+  - [x] Add the using for `AppForge.Api.Common` (for `PagedResult<T>`) if not already present.
 
 - [x] **Task 3 — Implement `ListAsync` in `DatasetService`** (AC-1)
   - [x] Clamp inputs: `page = Math.Max(1, page)`, `pageSize = Math.Clamp(pageSize, 1, 100)`.
@@ -198,7 +198,7 @@ so that I can browse and open existing Dataset definitions.
   - [x] Add `[FromQuery]` — confirm `Microsoft.AspNetCore.Mvc` using is already present (it is, line 5).
 
 - [x] **Task 6 — Integration tests: `DatasetListGetTests.cs`** (AC-1 / AC-2 / AC-3)
-  - [x] Create `src/FormForge.Api.Tests/Features/Datasets/DatasetListGetTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/Datasets/DatasetListGetTests.cs`
   - [x] Use **identical** `[Collection("DatasetIntegrationTests")]`, `PostgresFixture`,
         `WebApplicationFactory<Program>`, and `InitializeAsync` pattern as `DatasetDeleteTests.cs`
         (same TRUNCATE + VIEW cleanup + ReseedAdminRoleAsync + SeedAdminUserAsync).
@@ -329,15 +329,15 @@ No new i18n keys are added by this story.
 
 ```
 NEW:
-  src/FormForge.Api/Features/Datasets/Dtos/DatasetSummaryDto.cs
-  src/FormForge.Api.Tests/Features/Datasets/DatasetListGetTests.cs
+  src/AppForge.Api/Features/Datasets/Dtos/DatasetSummaryDto.cs
+  src/AppForge.Api.Tests/Features/Datasets/DatasetListGetTests.cs
 
 MODIFIED:
-  src/FormForge.Api/Features/Datasets/DatasetService.cs
+  src/AppForge.Api/Features/Datasets/DatasetService.cs
     — extend IDatasetService with ListAsync + GetByIdAsync
     — add ListAsync implementation + ListDatasetRow private record
     — add GetByIdAsync implementation
-  src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs
+  src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs
     — replace both GET stubs; update file-header comment
 ```
 
@@ -346,13 +346,13 @@ MODIFIED:
 - [Source: `_bmad-output/planning-artifacts/epics.md` — Epic 8, Story 8.7 ACs (FR-62, AR-65)]
 - [Source: `_bmad-output/planning-artifacts/epics.md` — AR-21: `PagedResult<T>` shape; pageSize ≤100, default 25]
 - [Source: `_bmad-output/planning-artifacts/epics.md` — AR-65: Dataset API Contract: GET /api/datasets (auth), GET /api/datasets/{id} (auth)]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetService.cs` — `CurrentDatasetRow` private record + Dapper column-alias pattern]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetService.cs` — connection lifecycle pattern (`try/finally conn.DisposeAsync()`)]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — GET stubs at lines 23-27 to replace; file-header comment; `[FromQuery]` already used via `Microsoft.AspNetCore.Mvc` using]
-- [Source: `src/FormForge.Api/Common/PagedResult.cs` — `PagedResult<T>(Data, Total, Page, PageSize)` record shape]
-- [Source: `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs` — `RequireDatasetManagement` is per-endpoint, not group-level; GET endpoints do not call it]
-- [Source: `src/FormForge.Api/Program.cs:687-691` — `/api/datasets` group is `.RequireAuth()` at group level; GET endpoints inherit auth automatically]
-- [Source: `src/FormForge.Api.Tests/Features/Datasets/DatasetDeleteTests.cs` — `InitializeAsync` TRUNCATE+VIEW cleanup, `ReseedAdminRoleAsync`, `SeedAdminUserAsync`, `LoginAsync`, `CreateAsync` helper patterns]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetService.cs` — `CurrentDatasetRow` private record + Dapper column-alias pattern]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetService.cs` — connection lifecycle pattern (`try/finally conn.DisposeAsync()`)]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — GET stubs at lines 23-27 to replace; file-header comment; `[FromQuery]` already used via `Microsoft.AspNetCore.Mvc` using]
+- [Source: `src/AppForge.Api/Common/PagedResult.cs` — `PagedResult<T>(Data, Total, Page, PageSize)` record shape]
+- [Source: `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs` — `RequireDatasetManagement` is per-endpoint, not group-level; GET endpoints do not call it]
+- [Source: `src/AppForge.Api/Program.cs:687-691` — `/api/datasets` group is `.RequireAuth()` at group level; GET endpoints inherit auth automatically]
+- [Source: `src/AppForge.Api.Tests/Features/Datasets/DatasetDeleteTests.cs` — `InitializeAsync` TRUNCATE+VIEW cleanup, `ReseedAdminRoleAsync`, `SeedAdminUserAsync`, `LoginAsync`, `CreateAsync` helper patterns]
 
 ---
 
@@ -364,7 +364,7 @@ claude-opus-4-8 (1M context)
 
 ### Debug Log References
 
-- `dotnet build src/FormForge.Api` — initial build failed with CA2007 on `GetByIdAsync`'s
+- `dotnet build src/AppForge.Api` — initial build failed with CA2007 on `GetByIdAsync`'s
   `await using var conn` (this project enforces ConfigureAwait on the implicit async dispose).
   Resolved by switching to the explicit `try/finally` + `conn.DisposeAsync().ConfigureAwait(false)`
   pattern used by `UpdateAsync`/`DeleteAsync`. Second build: 0 warnings, 0 errors.
@@ -391,12 +391,12 @@ claude-opus-4-8 (1M context)
 ### File List
 
 NEW:
-- src/FormForge.Api/Features/Datasets/Dtos/DatasetSummaryDto.cs
-- src/FormForge.Api.Tests/Features/Datasets/DatasetListGetTests.cs
+- src/AppForge.Api/Features/Datasets/Dtos/DatasetSummaryDto.cs
+- src/AppForge.Api.Tests/Features/Datasets/DatasetListGetTests.cs
 
 MODIFIED:
-- src/FormForge.Api/Features/Datasets/DatasetService.cs
-- src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs
+- src/AppForge.Api/Features/Datasets/DatasetService.cs
+- src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs
 
 ## Change Log
 

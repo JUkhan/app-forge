@@ -36,13 +36,13 @@ Then a default placeholder icon is shown in the icon display area
 
 - [x] Task 1: Generate lucide icon names list (AC-1)
   - [x] Create `web/generate-icons.mjs` (temporary script)
-  - [x] Run: `cd web && node generate-icons.mjs > ../src/FormForge.Api/Features/Menus/lucide-icon-names.txt`
+  - [x] Run: `cd web && node generate-icons.mjs > ../src/AppForge.Api/Features/Menus/lucide-icon-names.txt`
   - [x] Delete `web/generate-icons.mjs` after generation
   - [x] Confirm `lucide-icon-names.txt` has one icon name per line, ~1,500+ entries (actual: 5,869 entries — each icon plus an `Icon` suffix variant in lucide-react 1.16.0; both forms are valid component lookups)
-  - [x] Add embedded resource to `FormForge.Api.csproj`
+  - [x] Add embedded resource to `AppForge.Api.csproj`
 
 - [x] Task 2: Add Minio NuGet package (AC-2, AC-3)
-  - [x] Add `<PackageReference Include="Minio" />` to `src/FormForge.Api/FormForge.Api.csproj` (and `<PackageVersion Include="Minio" Version="6.0.4" />` to `Directory.Packages.props` — central package management is enabled repo-wide; an unversioned PackageReference would fail restore)
+  - [x] Add `<PackageReference Include="Minio" />` to `src/AppForge.Api/AppForge.Api.csproj` (and `<PackageVersion Include="Minio" Version="6.0.4" />` to `Directory.Packages.props` — central package management is enabled repo-wide; an unversioned PackageReference would fail restore)
   - [x] Registered as singleton in `Program.cs` (the lazy bucket-existence check belongs once per process, not per request; the Minio SDK client is thread-safe — story Dev Notes also explicitly call this out)
 
 - [x] Task 3: Fix `MenuResponse.Icon` serialization bug (AC-1, AC-2)
@@ -52,17 +52,17 @@ Then a default placeholder icon is shown in the icon display area
   - [x] Add `ParseIcon(string? json)` private static helper to `MenuService`
 
 - [x] Task 4: Backend — `IIconStorageService` + `MinioIconStorageService` (AC-2, AC-3)
-  - [x] Create `src/FormForge.Api/Features/Menus/IIconStorageService.cs`
-  - [x] Create `src/FormForge.Api/Features/Menus/MinioIconStorageService.cs`
+  - [x] Create `src/AppForge.Api/Features/Menus/IIconStorageService.cs`
+  - [x] Create `src/AppForge.Api/Features/Menus/MinioIconStorageService.cs`
     - Reads config from `services__minio__s3__0` (Aspire) or `MinIO:Endpoint` (Compose)
     - Reads credentials from `MinIO:AccessKey` / `MinIO:SecretKey` (Compose) with fallback to `MinIO:RootUser` / `MinIO:RootPassword` (Aspire)
-    - On first call, ensures `formforge` bucket exists (fixes the deferred-work.md `minio-init` race)
+    - On first call, ensures `appforge` bucket exists (fixes the deferred-work.md `minio-init` race)
     - Stores file at `menus/icons/{uuid}.{ext}`, returns `objectKey`
     - Implements `IDisposable` (releases the Minio client and the bucket-init `SemaphoreSlim`; required to satisfy CA1001/CA2000 analyzers and lets the DI container clean up at shutdown)
     - `EnsureBucketAsync` is guarded by a `SemaphoreSlim` — concurrent first requests cannot both call `MakeBucketAsync` and race
 
 - [x] Task 5: Backend — `LucideIconRegistry` (AC-1)
-  - [x] Create `src/FormForge.Api/Features/Menus/LucideIconRegistry.cs`
+  - [x] Create `src/AppForge.Api/Features/Menus/LucideIconRegistry.cs`
   - [x] Load from embedded resource `lucide-icon-names.txt` at startup; cache as `FrozenSet<string>`
 
 - [x] Task 6: Backend — update validators (AC-1)
@@ -223,10 +223,10 @@ process.stdout.write(names.join('\n'));
 ```
 
 ```bash
-cd web && node generate-icons.mjs > ../src/FormForge.Api/Features/Menus/lucide-icon-names.txt && rm generate-icons.mjs
+cd web && node generate-icons.mjs > ../src/AppForge.Api/Features/Menus/lucide-icon-names.txt && rm generate-icons.mjs
 ```
 
-Then add to `FormForge.Api.csproj` (inside a new or existing `<ItemGroup>`):
+Then add to `AppForge.Api.csproj` (inside a new or existing `<ItemGroup>`):
 ```xml
 <EmbeddedResource Include="Features/Menus/lucide-icon-names.txt" />
 ```
@@ -234,10 +234,10 @@ Then add to `FormForge.Api.csproj` (inside a new or existing `<ItemGroup>`):
 ### Backend: `LucideIconRegistry.cs`
 
 ```csharp
-// src/FormForge.Api/Features/Menus/LucideIconRegistry.cs
+// src/AppForge.Api/Features/Menus/LucideIconRegistry.cs
 using System.Collections.Frozen;
 
-namespace FormForge.Api.Features.Menus;
+namespace AppForge.Api.Features.Menus;
 
 internal static class LucideIconRegistry
 {
@@ -248,7 +248,7 @@ internal static class LucideIconRegistry
     private static FrozenSet<string> LoadNames()
     {
         var assembly = typeof(LucideIconRegistry).Assembly;
-        const string resourceName = "FormForge.Api.Features.Menus.lucide-icon-names.txt";
+        const string resourceName = "AppForge.Api.Features.Menus.lucide-icon-names.txt";
         using var stream = assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException(
                 $"Embedded resource '{resourceName}' not found. " +
@@ -311,8 +311,8 @@ Apply the same icon validation in `UpdateMenuRequestValidator`.
 ### Backend: `IIconStorageService.cs`
 
 ```csharp
-// src/FormForge.Api/Features/Menus/IIconStorageService.cs
-namespace FormForge.Api.Features.Menus;
+// src/AppForge.Api/Features/Menus/IIconStorageService.cs
+namespace AppForge.Api.Features.Menus;
 
 internal interface IIconStorageService
 {
@@ -327,17 +327,17 @@ internal interface IIconStorageService
 ### Backend: `MinioIconStorageService.cs`
 
 ```csharp
-// src/FormForge.Api/Features/Menus/MinioIconStorageService.cs
+// src/AppForge.Api/Features/Menus/MinioIconStorageService.cs
 using Minio;
 using Minio.DataModel.Args;
 
-namespace FormForge.Api.Features.Menus;
+namespace AppForge.Api.Features.Menus;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "DI")]
 internal sealed class MinioIconStorageService(IConfiguration configuration, ILogger<MinioIconStorageService> logger)
     : IIconStorageService
 {
-    private const string BucketName = "formforge";
+    private const string BucketName = "appforge";
     private IMinioClient? _client;
     private bool _bucketEnsured;
 
@@ -513,7 +513,7 @@ builder.Services.AddSingleton<IIconStorageService, MinioIconStorageService>();
 
 ### Backend: Integration Test Setup
 
-Create `src/FormForge.Api.Tests/Features/Menus/UploadIconIntegrationTests.cs` as a new file with its own `WebApplicationFactory` override that registers a fake storage service.
+Create `src/AppForge.Api.Tests/Features/Menus/UploadIconIntegrationTests.cs` as a new file with its own `WebApplicationFactory` override that registers a fake storage service.
 
 The fake:
 ```csharp
@@ -530,7 +530,7 @@ WebApplicationFactory override:
 _factory = new WebApplicationFactory<Program>()
     .WithWebHostBuilder(builder =>
     {
-        builder.UseSetting("ConnectionStrings:formforge", _postgres.ConnectionString);
+        builder.UseSetting("ConnectionStrings:appforge", _postgres.ConnectionString);
         builder.UseSetting("Jwt:SigningKey", "test-signing-key-minimum-32-characters!!");
         builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:5173");
         builder.ConfigureServices(services =>
@@ -632,11 +632,11 @@ Frontend tests are not expected for admin UI icon picker per the established pat
 ### Key Architecture References
 
 - [Source: epics.md § Story 4.3] Upload endpoint: `POST /api/admin/menus/upload-icon`. Response: `{ type: "minio", objectKey }`. No presigned URL needed in the response (contrast with architecture AD-9 which applies to data-entry, not admin icon assignment).
-- [Source: architecture.md § 4.1] MinIO bucket `formforge`, path prefix `menus/icons/`.
+- [Source: architecture.md § 4.1] MinIO bucket `appforge`, path prefix `menus/icons/`.
 - [Source: architecture.md § 4.6] `LucideIcon.tsx` belongs in `web/src/components/icons/LucideIcon.tsx`.
 - [Source: architecture.md § 3.5] Upload endpoint inherits `/api/admin` group auth: `RequireAuth() + RequirePlatformAdmin()`.
 - [Source: deferred-work.md] "api does not depend on minio-init completing" — **Story 4.3 is the owner**. Fix by calling `BucketExistsAsync`/`MakeBucketAsync` lazily in `MinioIconStorageService.EnsureBucketAsync`.
-- [Source: architecture.md] Minio .NET client package: `Minio`. Add to `FormForge.Api.csproj`.
+- [Source: architecture.md] Minio .NET client package: `Minio`. Add to `AppForge.Api.csproj`.
 - [Source: 4-2-create-sub-menu-items.md § Dev Notes] ValidationFilter returns 422 `ValidationProblem` for FluentValidation failures; the upload endpoint returns 422 `Problem` directly (not via FluentValidation) since multipart forms don't go through the `ValidationFilter<T>` pipeline.
 
 ### Deferred Items to Document in `deferred-work.md` After Completion
@@ -690,22 +690,22 @@ No notable debug sessions. Three analyzer failures surfaced during the first bac
 ### File List
 
 **Backend (new):**
-- `src/FormForge.Api/Features/Menus/lucide-icon-names.txt` (generated embedded resource)
-- `src/FormForge.Api/Features/Menus/LucideIconRegistry.cs`
-- `src/FormForge.Api/Features/Menus/IIconStorageService.cs`
-- `src/FormForge.Api/Features/Menus/MinioIconStorageService.cs`
-- `src/FormForge.Api.Tests/Features/Menus/UploadIconIntegrationTests.cs`
+- `src/AppForge.Api/Features/Menus/lucide-icon-names.txt` (generated embedded resource)
+- `src/AppForge.Api/Features/Menus/LucideIconRegistry.cs`
+- `src/AppForge.Api/Features/Menus/IIconStorageService.cs`
+- `src/AppForge.Api/Features/Menus/MinioIconStorageService.cs`
+- `src/AppForge.Api.Tests/Features/Menus/UploadIconIntegrationTests.cs`
 
 **Backend (modified):**
 - `Directory.Packages.props` — add `<PackageVersion Include="Minio" Version="6.0.4" />` (central package management is enabled repo-wide)
-- `src/FormForge.Api/FormForge.Api.csproj` — add Minio PackageReference + EmbeddedResource
-- `src/FormForge.Api/Features/Menus/Dtos/MenuResponse.cs` — Icon type: `string?` → `JsonElement?`
-- `src/FormForge.Api/Features/Menus/MenuService.cs` — add `ParseIcon()`, update `ToResponse()` + `CreateMenuAsync` inline response
-- `src/FormForge.Api/Features/Menus/Validators/CreateMenuRequestValidator.cs` — add icon validation + shared `IconValidation` helper
-- `src/FormForge.Api/Features/Menus/Validators/UpdateMenuRequestValidator.cs` — add icon validation (delegates to shared `IconValidation.IsValidShape`)
-- `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` — add `UploadIconHandler` + `UploadIconResponse`
-- `src/FormForge.Api/Program.cs` — register `IIconStorageService` (singleton)
-- `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — add 3 icon tests + `System.Text.Json` using
+- `src/AppForge.Api/AppForge.Api.csproj` — add Minio PackageReference + EmbeddedResource
+- `src/AppForge.Api/Features/Menus/Dtos/MenuResponse.cs` — Icon type: `string?` → `JsonElement?`
+- `src/AppForge.Api/Features/Menus/MenuService.cs` — add `ParseIcon()`, update `ToResponse()` + `CreateMenuAsync` inline response
+- `src/AppForge.Api/Features/Menus/Validators/CreateMenuRequestValidator.cs` — add icon validation + shared `IconValidation` helper
+- `src/AppForge.Api/Features/Menus/Validators/UpdateMenuRequestValidator.cs` — add icon validation (delegates to shared `IconValidation.IsValidShape`)
+- `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` — add `UploadIconHandler` + `UploadIconResponse`
+- `src/AppForge.Api/Program.cs` — register `IIconStorageService` (singleton)
+- `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — add 3 icon tests + `System.Text.Json` using
 
 **Frontend (new):**
 - `web/src/components/icons/LucideIcon.tsx`

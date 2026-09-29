@@ -15,7 +15,7 @@ baseline_commit: '9c9db4a35e9b9963b4268d9bb014827fd7a1da40'
 
 **Problem:** There is no way to turn a validated `Tenant` row (Story 12.1) into a real, isolated PostgreSQL schema. Every table that has always lived in `public` (`users`, `roles`, `menus`, `component_schemas`, etc.) needs to exist inside each tenant's own schema, but nothing in this codebase has ever pointed EF Core's migration runner at a schema other than `public` — there is no dynamic-schema precedent to build on (confirmed by investigation: no `HasDefaultSchema`, no `search_path` usage anywhere in the project).
 
-**Approach:** Add `ITenantProvisioningService.ProvisionSchemaAsync(tenant)` that (1) validates `schema_name` via `SafeIdentifier.TryCreate` — the same format/reserved-keyword rule as `designerId` — and rejects a collision with an existing tenant, ahead of Story 12.1's DB-level unique-index backstop; (2) issues `CREATE SCHEMA "{schema_name}"` via the existing `DbConnectionFactory` raw-DDL pattern; (3) replays the full, unmodified static-schema EF Core migration set into that schema by opening a dedicated connection whose `SearchPath` targets the new schema and driving a fresh `FormForgeDbContext` instance's `Database.MigrateAsync()` against it. This proves out the project's first dynamic-schema migration path in isolation. The tenant's `status` stays `Provisioning` throughout this story regardless of outcome — advancing to `Active`, seeding, Dataset Manager scoping, and the recovery service are Story 12.7's job (split from the original bundled story; see `epics.md` Story 12.2's note and `deferred-work.md`).
+**Approach:** Add `ITenantProvisioningService.ProvisionSchemaAsync(tenant)` that (1) validates `schema_name` via `SafeIdentifier.TryCreate` — the same format/reserved-keyword rule as `designerId` — and rejects a collision with an existing tenant, ahead of Story 12.1's DB-level unique-index backstop; (2) issues `CREATE SCHEMA "{schema_name}"` via the existing `DbConnectionFactory` raw-DDL pattern; (3) replays the full, unmodified static-schema EF Core migration set into that schema by opening a dedicated connection whose `SearchPath` targets the new schema and driving a fresh `AppForgeDbContext` instance's `Database.MigrateAsync()` against it. This proves out the project's first dynamic-schema migration path in isolation. The tenant's `status` stays `Provisioning` throughout this story regardless of outcome — advancing to `Active`, seeding, Dataset Manager scoping, and the recovery service are Story 12.7's job (split from the original bundled story; see `epics.md` Story 12.2's note and `deferred-work.md`).
 
 ## Boundaries & Constraints
 
@@ -23,11 +23,11 @@ baseline_commit: '9c9db4a35e9b9963b4268d9bb014827fd7a1da40'
 - Validate `schema_name` via `SafeIdentifier.TryCreate` before any DDL touches it — same defense-in-depth posture as every other dynamic identifier in this codebase.
 - Reuse the existing static-schema EF migration set exactly as-is — never fork, copy, or hand-write a parallel migration set for tenant schemas.
 - Leave `Tenant.Status` untouched (stays `'Provisioning'`, Story 12.1's default) on both success and failure paths.
-- Reuse the existing `ConnectionStrings:formforge` connection string — it already has the privileges this needs (the existing migrations already issue `CREATE ROLE`/`GRANT` under it).
+- Reuse the existing `ConnectionStrings:appforge` connection string — it already has the privileges this needs (the existing migrations already issue `CREATE ROLE`/`GRANT` under it).
 
 **Never:**
 - Do not seed any data (roles, users) into the new schema — Story 12.7.
-- Do not create the tenant-scoped `{schema_name}_datasets` VIEW namespace or touch `formforge_preview` grants — Story 12.7.
+- Do not create the tenant-scoped `{schema_name}_datasets` VIEW namespace or touch `appforge_preview` grants — Story 12.7.
 - Do not dispatch any email.
 - Do not build `TenantProvisioningRecoveryService` — recovery needs the *full* schema+migrate+seed sequence to define what "stuck" means; that's Story 12.7's scope, once it exists to recover into.
 - Do not add an HTTP endpoint or wire this into the admin UI — Story 12.5 consumes this service later; this story only builds the service itself.
@@ -45,24 +45,24 @@ baseline_commit: '9c9db4a35e9b9963b4268d9bb014827fd7a1da40'
 
 ## Code Map
 
-- `src/FormForge.Api/Features/Provisioning/ProvisioningRecoveryService.cs` — pattern reference only, not modified; shows the "scan for stuck rows, swallow all but cancellation" shape for when Story 12.7 builds its analog
-- `src/FormForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs` — reuse for opening the raw connection that issues `CREATE SCHEMA`; reads `ConnectionStrings:formforge`
-- `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs` — reference for this codebase's "open connection, run DDL in a transaction" shape (671 lines; don't copy wholesale, just the pattern)
-- `src/FormForge.Api/Features/Designer/SafeIdentifier.cs` — reuse `TryCreate(string? raw, out SafeIdentifier? result, out string? error)` for `schema_name` validation
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — the DbContext whose migration set must be replayed into the new schema; do not modify
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/` — the migration set being replayed, unmodified, in original order
-- `src/FormForge.Api/Domain/Entities/Tenant.cs` — entity this service reads (Story 12.1); do not modify its schema here
-- `src/FormForge.Api/Program.cs:110-111` — existing `AddDbContext<FormForgeDbContext>` DI pattern; mirror when registering the new service
-- `src/FormForge.Api.Tests/Infrastructure/PostgresFixture.cs` — Testcontainers fixture to reuse for the new integration tests
+- `src/AppForge.Api/Features/Provisioning/ProvisioningRecoveryService.cs` — pattern reference only, not modified; shows the "scan for stuck rows, swallow all but cancellation" shape for when Story 12.7 builds its analog
+- `src/AppForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs` — reuse for opening the raw connection that issues `CREATE SCHEMA`; reads `ConnectionStrings:appforge`
+- `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs` — reference for this codebase's "open connection, run DDL in a transaction" shape (671 lines; don't copy wholesale, just the pattern)
+- `src/AppForge.Api/Features/Designer/SafeIdentifier.cs` — reuse `TryCreate(string? raw, out SafeIdentifier? result, out string? error)` for `schema_name` validation
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — the DbContext whose migration set must be replayed into the new schema; do not modify
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/` — the migration set being replayed, unmodified, in original order
+- `src/AppForge.Api/Domain/Entities/Tenant.cs` — entity this service reads (Story 12.1); do not modify its schema here
+- `src/AppForge.Api/Program.cs:110-111` — existing `AddDbContext<AppForgeDbContext>` DI pattern; mirror when registering the new service
+- `src/AppForge.Api.Tests/Infrastructure/PostgresFixture.cs` — Testcontainers fixture to reuse for the new integration tests
 - **No prior art for dynamic-schema EF migration anywhere in this repo** (confirmed: zero hits for `HasDefaultSchema`/`search_path`). See Design Notes for the approach.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `src/FormForge.Api/Features/Tenancy/ITenantProvisioningService.cs` -- define `Task ProvisionSchemaAsync(Tenant tenant, CancellationToken ct)` -- narrow contract for this story's scope only
-- [x] `src/FormForge.Api/Features/Tenancy/TenantProvisioningService.cs` -- implement `schema_name` validation (SafeIdentifier + collision check against existing tenants), `CREATE SCHEMA`, and the dynamic-schema migration replay -- the core of this story
-- [x] `src/FormForge.Api/Program.cs` -- register `ITenantProvisioningService`/`TenantProvisioningService` in DI -- wiring, no behavior change elsewhere
-- [x] `src/FormForge.Api.Tests/Features/Tenancy/TenantProvisioningServiceTests.cs` -- integration tests proving the dynamic-schema migration actually works, covering the happy path and all three edge cases in the I/O matrix -- this is what de-risks the novel mechanism
+- [x] `src/AppForge.Api/Features/Tenancy/ITenantProvisioningService.cs` -- define `Task ProvisionSchemaAsync(Tenant tenant, CancellationToken ct)` -- narrow contract for this story's scope only
+- [x] `src/AppForge.Api/Features/Tenancy/TenantProvisioningService.cs` -- implement `schema_name` validation (SafeIdentifier + collision check against existing tenants), `CREATE SCHEMA`, and the dynamic-schema migration replay -- the core of this story
+- [x] `src/AppForge.Api/Program.cs` -- register `ITenantProvisioningService`/`TenantProvisioningService` in DI -- wiring, no behavior change elsewhere
+- [x] `src/AppForge.Api.Tests/Features/Tenancy/TenantProvisioningServiceTests.cs` -- integration tests proving the dynamic-schema migration actually works, covering the happy path and all three edge cases in the I/O matrix -- this is what de-risks the novel mechanism
 
 **Acceptance Criteria:**
 - Given a valid `name` + `schema_name`, when `ProvisionSchemaAsync` runs, then the named PostgreSQL schema exists afterward and contains every static table/constraint a fresh migration of `public` would produce (verified by querying `information_schema.tables`/`information_schema.table_constraints` for that schema).
@@ -79,9 +79,9 @@ baseline_commit: '9c9db4a35e9b9963b4268d9bb014827fd7a1da40'
 - **[patch, medium]** Design Notes claim "every migration's `Up()` runs unmodified... against whatever schema `SearchPath` resolves" is false for 3 migrations that hardcode `public`/`public.<table>` in raw SQL: `CreateDatasetManagerFoundation.cs`, `GrantPreviewRoleOnProvisionedTables.cs`, `RestrictPreviewRoleUsersColumns.cs` (confirmed by reading all three). Harmless in practice — the statements are idempotent (guarded `IF NOT EXISTS`/`IF EXISTS`, or naturally idempotent GRANT/REVOKE) and always target `public`, never the tenant schema — but the claim itself is inaccurate and could mislead Story 12.7. (blind-hunter + edge-case-hunter, duplicate claims, merged)
 - **[patch, medium]** `SafeIdentifier`/`PgReservedKeywords` do not reject Postgres system schema names (`public`, `pg_catalog`, `information_schema`, `pg_temp`) — confirmed no such entries in `PgReservedKeywords.cs`. `schema_name = "public"` passes validation and the app-level collision check (no existing tenant uses it), then fails at `CREATE SCHEMA "public"` with a raw Postgres "already exists" exception instead of the friendly validation error the I/O matrix promises. (edge-case-hunter)
 - **[patch, low]** `ProvisionSchemaAsync_InvalidSchemaName_ThrowsBeforeAnyDdl` asserts against `invalidSchemaName.ToLowerInvariant()`, but `SafeIdentifier`'s regex (`^[a-z_][a-z0-9_]{0,62}$`) never accepts uppercase input and the code never lowercases it — the assertion checks a schema name the SUT never attempts. Cosmetic; assertion still passes correctly, just doesn't verify real behavior. (blind-hunter)
-- **[patch, low]** New `using FormForge.Api.Features.Tenancy;` in `Program.cs` is inserted between `FormForge.Api.Features.Roles` and `FormForge.Api.Features.Roles.Dtos`, splitting the contiguous `Roles`/`Roles.Dtos`/`Roles.Validators` using group. (blind-hunter)
+- **[patch, low]** New `using AppForge.Api.Features.Tenancy;` in `Program.cs` is inserted between `AppForge.Api.Features.Roles` and `AppForge.Api.Features.Roles.Dtos`, splitting the contiguous `Roles`/`Roles.Dtos`/`Roles.Validators` using group. (blind-hunter)
 - **[patch, low]** Migration replay's `DbContextOptionsBuilder.UseNpgsql(tenantConnection)` sets no explicit command timeout, unlike the raw-DDL connection which uses `DbConnectionFactory.DdlCommandTimeoutSeconds`. Negligible today (11 trivial migrations) but worth aligning for consistency as the migration set grows. (edge-case-hunter)
-- **[false]** Claimed the `CREATE ROLE`/`GRANT`/`REVOKE` side effects in the replayed migrations are non-idempotent. Disproven: `CREATE ROLE formforge_preview` is guarded by `IF NOT EXISTS (SELECT FROM pg_roles ...)`, and repeated `GRANT`/`REVOKE` of the same privilege is a no-op in Postgres — none of it errors on replay. (blind-hunter)
+- **[false]** Claimed the `CREATE ROLE`/`GRANT`/`REVOKE` side effects in the replayed migrations are non-idempotent. Disproven: `CREATE ROLE appforge_preview` is guarded by `IF NOT EXISTS (SELECT FROM pg_roles ...)`, and repeated `GRANT`/`REVOKE` of the same privilege is a no-op in Postgres — none of it errors on replay. (blind-hunter)
 - **[low, rejected]** Claimed no test exercises re-running `ProvisionSchemaAsync` for an already-persisted tenant (the `t.Id != tenant.Id` collision-check exclusion is unexercised). Real gap, but retry/idempotency semantics are undefined by this story's frozen intent (recovery/retry is explicitly Story 12.7's job) and not part of the frozen I/O matrix — fixing it means inventing untested-for behavior, not a direct correction. Rejected: low, fix is more than a direct correction. (blind-hunter)
 - **[false]** Claimed `TenantProvisioningServiceTests`'s lack of schema-level teardown could cause "already exists" errors across test runs if the Testcontainers container is reused. Disproven: `PostgresFixture` starts a fresh `postgres:17-alpine` container per test-class run via `IAsyncLifetime` with no container-reuse configured, so no cross-run schema residue is possible. (blind-hunter)
 - **[false]** Claimed the "ahead of the DB backstop" framing for the collision pre-check is unverified against a real caller. This is documentation framing about a not-yet-built caller (Story 12.5) — no bad outcome is demonstrated at any cited location in this story's own code or tests. (blind-hunter)
@@ -91,15 +91,15 @@ baseline_commit: '9c9db4a35e9b9963b4268d9bb014827fd7a1da40'
 
 ## Design Notes
 
-No existing code in this repository points EF Core's migration runner at a non-`public` schema. The approach: open a connection whose `SearchPath` targets the new schema, then drive a fresh `FormForgeDbContext` instance's migrator against it — since `MigrateAsync()` creates and reads `__EFMigrationsHistory` through the *connection's* effective schema resolution, not a value baked into the compiled model.
+No existing code in this repository points EF Core's migration runner at a non-`public` schema. The approach: open a connection whose `SearchPath` targets the new schema, then drive a fresh `AppForgeDbContext` instance's migrator against it — since `MigrateAsync()` creates and reads `__EFMigrationsHistory` through the *connection's* effective schema resolution, not a value baked into the compiled model.
 
 ```csharp
 var csb = new NpgsqlConnectionStringBuilder(baseConnectionString) { SearchPath = schemaName };
 await using var connection = new NpgsqlConnection(csb.ConnectionString);
-var options = new DbContextOptionsBuilder<FormForgeDbContext>()
+var options = new DbContextOptionsBuilder<AppForgeDbContext>()
     .UseNpgsql(connection)
     .Options;
-await using var tenantDb = new FormForgeDbContext(options);
+await using var tenantDb = new AppForgeDbContext(options);
 await tenantDb.Database.MigrateAsync(ct);
 ```
 
@@ -111,4 +111,4 @@ await tenantDb.Database.MigrateAsync(ct);
 
 **Commands:**
 - `dotnet build` -- expected: 0 errors, 0 warnings
-- `dotnet test src/FormForge.Api.Tests --filter TenantProvisioningServiceTests` -- expected: all pass, including a real query confirming migrated tables exist in the new schema (not just "no exception thrown")
+- `dotnet test src/AppForge.Api.Tests --filter TenantProvisioningServiceTests` -- expected: all pass, including a real query confirming migrated tables exist in the new schema (not just "no exception thrown")

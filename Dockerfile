@@ -1,19 +1,19 @@
 # syntax=docker/dockerfile:1.7
 
-# Stage 1 — .NET restore + publish (FormForge.Api only; AppHost requires the Aspire workload and is not needed in the image)
+# Stage 1 — .NET restore + publish (AppForge.Api only; AppHost requires the Aspire workload and is not needed in the image)
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS dotnet-build
 WORKDIR /src
 
 # Copy solution manifests and csproj files first for layer-cache-efficient restore
-COPY ["FormForge.sln", "global.json", ".editorconfig", "Directory.Build.props", "Directory.Packages.props", "./"]
-COPY ["src/FormForge.Api/FormForge.Api.csproj", "src/FormForge.Api/"]
-COPY ["src/FormForge.ServiceDefaults/FormForge.ServiceDefaults.csproj", "src/FormForge.ServiceDefaults/"]
+COPY ["AppForge.sln", "global.json", ".editorconfig", "Directory.Build.props", "Directory.Packages.props", "./"]
+COPY ["src/AppForge.Api/AppForge.Api.csproj", "src/AppForge.Api/"]
+COPY ["src/AppForge.ServiceDefaults/AppForge.ServiceDefaults.csproj", "src/AppForge.ServiceDefaults/"]
 # Restore only the API project graph (excludes AppHost which requires the Aspire workload)
-RUN dotnet restore "src/FormForge.Api/FormForge.Api.csproj"
+RUN dotnet restore "src/AppForge.Api/AppForge.Api.csproj"
 
 # Copy source and publish
 COPY src/ ./src/
-RUN dotnet publish "src/FormForge.Api/FormForge.Api.csproj" \
+RUN dotnet publish "src/AppForge.Api/AppForge.Api.csproj" \
     --no-restore -c Release -o /app/publish
 
 # Stage 2 — Vite build
@@ -39,4 +39,4 @@ COPY --from=dotnet-build /app/publish .
 COPY --from=web-build /web/dist ./wwwroot/
 USER app
 EXPOSE 8080
-ENTRYPOINT ["dotnet", "FormForge.Api.dll"]
+ENTRYPOINT ["dotnet", "AppForge.Api.dll"]

@@ -45,7 +45,7 @@ so that only authorised users can create, update, or delete Datasets while any a
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Extend `EffectivePermissions` record** (AC-1, AC-2, AC-3, AC-5)
-  - [x] Add `bool CanManageDatasets` as a new positional parameter to the end of `src/FormForge.Api/Features/Permissions/EffectivePermissions.cs`
+  - [x] Add `bool CanManageDatasets` as a new positional parameter to the end of `src/AppForge.Api/Features/Permissions/EffectivePermissions.cs`
   - [x] Fix the single constructor call site in `PermissionService.ComputePermissionsAsync` (compiler will flag any missing)
 
 - [x] **Task 2 — Compute `CanManageDatasets` in `PermissionService`** (AC-1, AC-2)
@@ -60,7 +60,7 @@ so that only authorised users can create, update, or delete Datasets while any a
   - [x] Pass `CanManageDatasets: canManageDatasets` to the `EffectivePermissions` constructor
 
 - [x] **Task 3 — Add `RequireDatasetManagement()` endpoint filter** (AC-2, AC-3)
-  - [x] Add to `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs`:
+  - [x] Add to `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs`:
     ```csharp
     internal static RouteHandlerBuilder RequireDatasetManagement(
         this RouteHandlerBuilder builder)
@@ -96,9 +96,9 @@ so that only authorised users can create, update, or delete Datasets while any a
   - [x] Note: This is a `RouteHandlerBuilder` extension (per-endpoint, like `RequirePermission`), not `RouteGroupBuilder` — because write and read endpoints on the same group have different requirements.
 
 - [x] **Task 4 — Scaffold `/api/datasets` route group with stub handlers** (AC-2, AC-3)
-  - [x] Create `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs`:
+  - [x] Create `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs`:
     ```csharp
-    namespace FormForge.Api.Features.Datasets;
+    namespace AppForge.Api.Features.Datasets;
 
     internal static class DatasetEndpoints
     {
@@ -130,18 +130,18 @@ so that only authorised users can create, update, or delete Datasets while any a
         }
     }
     ```
-  - [x] Register in `src/FormForge.Api/Program.cs` alongside the other `MapGroup` calls:
+  - [x] Register in `src/AppForge.Api/Program.cs` alongside the other `MapGroup` calls:
     ```csharp
     app.MapGroup("/api/datasets").RequireAuth().MapDatasetEndpoints();
     ```
     Place it in the same block as `/api/designers` and `/api/menus` (keep the route-group section tidy).
 
 - [x] **Task 5 — Expose `CanManageDatasets` on the permissions endpoint** (AC-5)
-  - [x] In `src/FormForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs`, add `bool CanManageDatasets` as the last positional parameter
+  - [x] In `src/AppForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs`, add `bool CanManageDatasets` as the last positional parameter
   - [x] In `PermissionsEndpoints.cs`, map `permissions.CanManageDatasets` into the `Results.Ok(new PermissionsResponse(...))` constructor call
 
 - [x] **Task 6 — Update Role API to accept/persist `CanManageDatasets`** (AC-4)
-  - [x] `src/FormForge.Api/Features/Roles/Dtos/UpdateRoleRequest.cs` — add `bool CanManageDatasets`
+  - [x] `src/AppForge.Api/Features/Roles/Dtos/UpdateRoleRequest.cs` — add `bool CanManageDatasets`
     ```csharp
     internal sealed record UpdateRoleRequest(
         string Name,
@@ -149,7 +149,7 @@ so that only authorised users can create, update, or delete Datasets while any a
         IReadOnlyList<PermissionRecord> Permissions,
         bool CanManageDatasets);
     ```
-  - [x] `src/FormForge.Api/Features/Roles/Dtos/RoleResponse.cs` — add `bool CanManageDatasets`
+  - [x] `src/AppForge.Api/Features/Roles/Dtos/RoleResponse.cs` — add `bool CanManageDatasets`
     ```csharp
     internal sealed record RoleResponse(
         Guid Id,
@@ -161,7 +161,7 @@ so that only authorised users can create, update, or delete Datasets while any a
         IReadOnlyList<PermissionRecord> Permissions,
         bool CanManageDatasets);
     ```
-  - [x] `src/FormForge.Api/Features/Roles/RoleService.cs`
+  - [x] `src/AppForge.Api/Features/Roles/RoleService.cs`
     - In `UpdateRoleAsync`: add `role.CanManageDatasets = request.CanManageDatasets;` alongside the other property assignments (system roles are guarded by the `IsSystem` early-return check, so no extra guard needed)
     - In `ToResponse`: add `role.CanManageDatasets` as the last constructor argument
 
@@ -211,7 +211,7 @@ so that only authorised users can create, update, or delete Datasets while any a
     ```
 
 - [x] **Task 9 — Integration tests** (AC-1 through AC-5)
-  - [x] Create `src/FormForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs`
   - [x] **AC-1 / AC-2 — `EffectivePermissions.CanManageDatasets` union computation:**
     - Seed: platform-admin user → `CanManageDatasets` = `true`
     - Seed: viewer user (no dataset permission) → `CanManageDatasets` = `false`
@@ -364,7 +364,7 @@ The `isDirty` guard mirrors the pattern already used for `name`/`description` re
 
 ### §8 — Test File Location and Patterns
 
-Integration tests for the Dataset feature live under `src/FormForge.Api.Tests/Features/Datasets/` (same directory as `DatasetMigrationTests.cs` from Story 8.1). Reuse `PostgresFixture` and `WebApplicationFactory` pattern from that file.
+Integration tests for the Dataset feature live under `src/AppForge.Api.Tests/Features/Datasets/` (same directory as `DatasetMigrationTests.cs` from Story 8.1). Reuse `PostgresFixture` and `WebApplicationFactory` pattern from that file.
 
 To set up a user without dataset permission, use the `viewer@example.com` seeded test account (same credential used across the test suite). To set up a user WITH a non-admin dataset permission: create a custom role via `POST /api/admin/roles` with `canManageDatasets: true`, assign it to a test user, then login as that user.
 
@@ -410,21 +410,21 @@ The Admin > Roles endpoint group already uses `RequireAuth().RequirePlatformAdmi
 
 **New files:**
 ```
-src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs          (NEW — stub route group)
-src/FormForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs  (NEW — integration tests)
+src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs          (NEW — stub route group)
+src/AppForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs  (NEW — integration tests)
 ```
 
 **Modified files:**
 ```
-src/FormForge.Api/Features/Permissions/EffectivePermissions.cs        (+CanManageDatasets field)
-src/FormForge.Api/Features/Permissions/PermissionService.cs           (+compute CanManageDatasets)
-src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs            (+RequireDatasetManagement)
-src/FormForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs    (+CanManageDatasets field)
-src/FormForge.Api/Features/Permissions/PermissionsEndpoints.cs        (+map CanManageDatasets)
-src/FormForge.Api/Features/Roles/Dtos/UpdateRoleRequest.cs            (+CanManageDatasets)
-src/FormForge.Api/Features/Roles/Dtos/RoleResponse.cs                 (+CanManageDatasets)
-src/FormForge.Api/Features/Roles/RoleService.cs                       (+set + map CanManageDatasets)
-src/FormForge.Api/Program.cs                                           (+/api/datasets group)
+src/AppForge.Api/Features/Permissions/EffectivePermissions.cs        (+CanManageDatasets field)
+src/AppForge.Api/Features/Permissions/PermissionService.cs           (+compute CanManageDatasets)
+src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs            (+RequireDatasetManagement)
+src/AppForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs    (+CanManageDatasets field)
+src/AppForge.Api/Features/Permissions/PermissionsEndpoints.cs        (+map CanManageDatasets)
+src/AppForge.Api/Features/Roles/Dtos/UpdateRoleRequest.cs            (+CanManageDatasets)
+src/AppForge.Api/Features/Roles/Dtos/RoleResponse.cs                 (+CanManageDatasets)
+src/AppForge.Api/Features/Roles/RoleService.cs                       (+set + map CanManageDatasets)
+src/AppForge.Api/Program.cs                                           (+/api/datasets group)
 web/src/features/admin/roles/types.ts                                  (+canManageDatasets)
 web/src/routes/_app/admin/roles.$roleId.tsx                           (+toggle UI)
 web/src/lib/i18n/locales/en.json                                      (+2 keys)
@@ -438,18 +438,18 @@ web/src/lib/i18n/locales/en.json                                      (+2 keys)
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §2.2 — EffectivePermissions record and cache]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §3.5 — Endpoint Organisation / Route Groups]
 - [Source: `_bmad-output/planning-artifacts/epics.md` — Epic 8, Story 8.2 Acceptance Criteria (FR-56)]
-- [Source: `src/FormForge.Api/Features/Permissions/EffectivePermissions.cs` — current record shape]
-- [Source: `src/FormForge.Api/Features/Permissions/PermissionService.cs` — ComputePermissionsAsync pattern]
-- [Source: `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs` — RequirePermission() filter pattern]
-- [Source: `src/FormForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs` — current response DTO]
-- [Source: `src/FormForge.Api/Features/Permissions/PermissionsEndpoints.cs` — mapping pattern]
-- [Source: `src/FormForge.Api/Features/Roles/Dtos/UpdateRoleRequest.cs` / `RoleResponse.cs` — current shapes]
-- [Source: `src/FormForge.Api/Features/Roles/RoleService.cs` — UpdateRoleAsync + ToResponse pattern]
+- [Source: `src/AppForge.Api/Features/Permissions/EffectivePermissions.cs` — current record shape]
+- [Source: `src/AppForge.Api/Features/Permissions/PermissionService.cs` — ComputePermissionsAsync pattern]
+- [Source: `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs` — RequirePermission() filter pattern]
+- [Source: `src/AppForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs` — current response DTO]
+- [Source: `src/AppForge.Api/Features/Permissions/PermissionsEndpoints.cs` — mapping pattern]
+- [Source: `src/AppForge.Api/Features/Roles/Dtos/UpdateRoleRequest.cs` / `RoleResponse.cs` — current shapes]
+- [Source: `src/AppForge.Api/Features/Roles/RoleService.cs` — UpdateRoleAsync + ToResponse pattern]
 - [Source: `web/src/routes/_app/admin/roles.$roleId.tsx` — role detail page, PermissionMatrix, state pattern]
 - [Source: `web/src/features/admin/roles/types.ts` — RoleDetail / UpdateRoleRequest TS types]
 - [Source: `web/src/lib/i18n/locales/en.json` — admin.roles key namespace]
-- [Source: `src/FormForge.Api.Tests/Features/DynamicCrud/CreateRecordIntegrationTests.cs:269` — 403 test pattern]
-- [Source: `src/FormForge.Api.Tests/Features/Datasets/DatasetMigrationTests.cs` — test project location, fixture pattern]
+- [Source: `src/AppForge.Api.Tests/Features/DynamicCrud/CreateRecordIntegrationTests.cs:269` — 403 test pattern]
+- [Source: `src/AppForge.Api.Tests/Features/Datasets/DatasetMigrationTests.cs` — test project location, fixture pattern]
 - [Source: Story 8.1 Dev Notes §9 — "EffectivePermissions extension for future Story 8.2"]
 
 ---
@@ -462,9 +462,9 @@ claude-opus-4-8 (1M context) — BMad Dev Story workflow
 
 ### Debug Log References
 
-- `dotnet build src/FormForge.Api/FormForge.Api.csproj` → Build succeeded, 0 warnings.
+- `dotnet build src/AppForge.Api/AppForge.Api.csproj` → Build succeeded, 0 warnings.
 - `dotnet test --filter DatasetPermissionTests` → 17 passed.
-- `dotnet test src/FormForge.Api.Tests` (full suite) → 804 passed, 2 failed. The 2 failures
+- `dotnet test src/AppForge.Api.Tests` (full suite) → 804 passed, 2 failed. The 2 failures
   (`SchemaAuditLogIntegrationTests.GetSchemaAuditLog_AppendOnly_DeleteVerb_Returns405`,
   `MutationAuditLogIntegrationTests.GetMutationAuditLog_AppendOnly_DeleteVerb_Returns405`)
   are pre-existing on a clean tree and unrelated to this story.
@@ -507,19 +507,19 @@ claude-opus-4-8 (1M context) — BMad Dev Story workflow
 ### File List
 
 **New:**
-- `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs`
+- `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs`
 
 **Modified:**
-- `src/FormForge.Api/Features/Permissions/EffectivePermissions.cs`
-- `src/FormForge.Api/Features/Permissions/PermissionService.cs`
-- `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs`
-- `src/FormForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs`
-- `src/FormForge.Api/Features/Permissions/PermissionsEndpoints.cs`
-- `src/FormForge.Api/Features/Roles/Dtos/UpdateRoleRequest.cs`
-- `src/FormForge.Api/Features/Roles/Dtos/RoleResponse.cs`
-- `src/FormForge.Api/Features/Roles/RoleService.cs`
-- `src/FormForge.Api/Program.cs`
+- `src/AppForge.Api/Features/Permissions/EffectivePermissions.cs`
+- `src/AppForge.Api/Features/Permissions/PermissionService.cs`
+- `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs`
+- `src/AppForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs`
+- `src/AppForge.Api/Features/Permissions/PermissionsEndpoints.cs`
+- `src/AppForge.Api/Features/Roles/Dtos/UpdateRoleRequest.cs`
+- `src/AppForge.Api/Features/Roles/Dtos/RoleResponse.cs`
+- `src/AppForge.Api/Features/Roles/RoleService.cs`
+- `src/AppForge.Api/Program.cs`
 - `web/src/features/admin/roles/types.ts`
 - `web/src/routes/_app/admin/roles.$roleId.tsx`
 - `web/src/lib/i18n/locales/en.json`
@@ -530,14 +530,14 @@ claude-opus-4-8 (1M context) — BMad Dev Story workflow
 
 - [x] [Review][Patch] Checkbox `canManageDatasets` not tracked by `isDirty` — Fixed: added `checkboxDirty = canManageDatasets !== lastSyncedDatasets` guard to the sync-during-render block so a background refetch does not overwrite an in-progress toggle. [`web/src/routes/_app/admin/roles.$roleId.tsx:~170`]
 - [x] [Review][Patch] `lastSyncedDatasets` not updated after save — Fixed: `setLastSyncedDatasets(canManageDatasets)` added after `reset(...)` in `submit()` to mark the saved value as the new server baseline. [`web/src/routes/_app/admin/roles.$roleId.tsx:~184`]
-- [x] [Review][Patch] `ReseedSystemRolesAsync` check-then-insert not atomic — Fixed: replaced `AnyAsync` + `db.Roles.Add` + `SaveChangesAsync` with atomic `ExecuteSqlRawAsync` + `ON CONFLICT (id) DO NOTHING`. [`src/FormForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs:376`]
-- [x] [Review][Patch] `AssertForbiddenDatasetManagementAsync` does not assert absence of `"resource"` key — Fixed: added `Assert.False(TryGetProperty("resource", out _))` assertion. [`src/FormForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs:312`]
+- [x] [Review][Patch] `ReseedSystemRolesAsync` check-then-insert not atomic — Fixed: replaced `AnyAsync` + `db.Roles.Add` + `SaveChangesAsync` with atomic `ExecuteSqlRawAsync` + `ON CONFLICT (id) DO NOTHING`. [`src/AppForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs:376`]
+- [x] [Review][Patch] `AssertForbiddenDatasetManagementAsync` does not assert absence of `"resource"` key — Fixed: added `Assert.False(TryGetProperty("resource", out _))` assertion. [`src/AppForge.Api.Tests/Features/Datasets/DatasetPermissionTests.cs:312`]
 
-- [x] [Review][Defer] `RequireDatasetManagement` omits `IsActive` check — consistent with existing `RequirePermission` pattern (same filter omits it); pre-existing architectural choice across all permission filters [`src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs:106`] — deferred, pre-existing
-- [x] [Review][Defer] `POST /preview` registered after `POST /` — latent route-shadowing risk when Story 8.4 replaces the `/` stub; register `/preview` before `/` when real handlers land [`src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs:32`] — deferred, pre-existing
-- [x] [Review][Defer] `CreateRoleAsync` has no `CanManageDatasets` — asymmetric create/update API; new roles silently default to `false` with no create-time affordance; out of Story 8.2 scope, address in Story 8.10 [`src/FormForge.Api/Features/Roles/RoleService.cs`] — deferred, pre-existing
-- [x] [Review][Defer] TOCTOU gap between `RequireDatasetManagement` filter and real write handlers — acknowledged in dev notes; deferred to Stories 8.4–8.6 [`src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs:106`] — deferred, pre-existing
-- [x] [Review][Defer] Write endpoints share `"admin"` rate-limit bucket with reads — consistent with existing route-group pattern; consider a separate `"data-write"` bucket when real handlers are built in Stories 8.4–8.6 [`src/FormForge.Api/Program.cs:675`] — deferred, pre-existing
+- [x] [Review][Defer] `RequireDatasetManagement` omits `IsActive` check — consistent with existing `RequirePermission` pattern (same filter omits it); pre-existing architectural choice across all permission filters [`src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs:106`] — deferred, pre-existing
+- [x] [Review][Defer] `POST /preview` registered after `POST /` — latent route-shadowing risk when Story 8.4 replaces the `/` stub; register `/preview` before `/` when real handlers land [`src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs:32`] — deferred, pre-existing
+- [x] [Review][Defer] `CreateRoleAsync` has no `CanManageDatasets` — asymmetric create/update API; new roles silently default to `false` with no create-time affordance; out of Story 8.2 scope, address in Story 8.10 [`src/AppForge.Api/Features/Roles/RoleService.cs`] — deferred, pre-existing
+- [x] [Review][Defer] TOCTOU gap between `RequireDatasetManagement` filter and real write handlers — acknowledged in dev notes; deferred to Stories 8.4–8.6 [`src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs:106`] — deferred, pre-existing
+- [x] [Review][Defer] Write endpoints share `"admin"` rate-limit bucket with reads — consistent with existing route-group pattern; consider a separate `"data-write"` bucket when real handlers are built in Stories 8.4–8.6 [`src/AppForge.Api/Program.cs:675`] — deferred, pre-existing
 
 ---
 

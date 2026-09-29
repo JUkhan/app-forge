@@ -267,7 +267,7 @@ export interface PermissionsResponse {
 
 Match this exactly to the Story 2.6 `PermissionsResponse` DTO:
 ```csharp
-// src/FormForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs
+// src/AppForge.Api/Features/Permissions/Dtos/PermissionsResponse.cs
 record PermissionsResponse(Guid UserId, DateTimeOffset ComputedAt, bool IsActive,
     Dictionary<string, CrudFlagsResponse> PerResource, IEnumerable<Guid> RoleIds);
 record CrudFlagsResponse(bool CanCreate, bool CanRead, bool CanUpdate, bool CanDelete);

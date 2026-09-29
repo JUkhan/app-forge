@@ -9,12 +9,12 @@ AppForge is a no-code application development platform that empowers you to visu
 App run(Aspire AppHost):
 
 ```bash
-dotnet run --project src/FormForge.AppHost
+dotnet run --project src/AppForge.AppHost
 ```
 
 ## Admin credentials
 ```
-adminEmail:admin@formforge.local
+adminEmail:admin@appforge.local
 adminPassword:Admin1234!
 ```
 

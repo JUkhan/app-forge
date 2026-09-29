@@ -1,11 +1,11 @@
 ---
-title: FormForge
+title: AppForge
 status: draft
 created: 2026-05-22
 updated: 2026-09-08
 ---
 
-# PRD: FormForge
+# PRD: AppForge
 
 ---
 
@@ -19,7 +19,7 @@ This PRD defines requirements for a schema-driven, low-code Content Management S
 
 ## 1. Vision
 
-The FormForge lets non-developer Platform Admins design data-entry forms visually, bind each form to a navigation menu item, and have the platform automatically provision a backing PostgreSQL table. End-users then Create, Read, Update, and Delete records through a generic, permission-gated UI — no code written, no migrations run manually.
+The AppForge lets non-developer Platform Admins design data-entry forms visually, bind each form to a navigation menu item, and have the platform automatically provision a backing PostgreSQL table. End-users then Create, Read, Update, and Delete records through a generic, permission-gated UI — no code written, no migrations run manually.
 
 The platform is a **low-code internal data application factory**: one design session produces a database table, a menu entry, and a fully functional CRUD UI in a single workflow. Schema changes are always additive — no data is lost when a form evolves. Role-based permissions are enforced on both server and client. The platform ships with three visual themes switchable at runtime, a mobile-first responsive layout, and a public REST API with an OpenAPI specification for integrator use.
 
@@ -100,7 +100,7 @@ The platform is a **low-code internal data application factory**: one design ses
 - **CRUD Mutation Audit Log** — append-only log of data-level changes: actor, timestamp, and field-level diff.
 - **DynamicComponent** — the React component that consumes a RootElement JSON and renders a live, interactive form. Used in the designer preview and all data-entry views.
 - **Aspire AppHost** — the .NET Aspire orchestration entry point wiring the API, PostgreSQL, MinIO, and frontend into a single local dev environment.
-- **MFA (Multi-Factor Authentication)** — A security mechanism requiring two or more verification factors to authenticate. FormForge implements TOTP as a voluntary second factor.
+- **MFA (Multi-Factor Authentication)** — A security mechanism requiring two or more verification factors to authenticate. AppForge implements TOTP as a voluntary second factor.
 - **TOTP (Time-Based One-Time Password)** — An algorithm (RFC 6238) generating a rotating 6-digit code every 30 seconds. Compatible with Google Authenticator, Authy, 1Password, and any TOTP-compliant app.
 - **Password Reset Token** — A short-lived (1-hour TTL), single-use opaque token emailed to a user to allow setting a new password without knowing the current one. Only its SHA-256 hash is stored server-side.
 - **Backup Code** — A one-time-use alphanumeric code generated at MFA enrolment. Allows a user to authenticate when their authenticator device is unavailable. Stored as bcrypt hashes; shown only once at enrolment.
@@ -116,7 +116,7 @@ The platform is a **low-code internal data application factory**: one design ses
 - **Join Inspector** — a property panel opened by clicking a Join Edge, allowing configuration of join type (INNER / LEFT / RIGHT / FULL OUTER) and display of the two joined columns.
 - **dataset-management** — the RBAC permission required to create, update, and delete Datasets. Enforced server-side on write/delete endpoints. Read endpoints (GET /api/datasets) require authentication but not this permission.
 - **Table Allowlist** — the server-side list of PostgreSQL tables that are authorized for use in the Query Builder. Enforced during SQL generation; tables outside the allowlist cannot be referenced in any Dataset query. As of FR-78, discovery and enforcement are scoped to the requesting user's tenant schema.
-- **Tenant** *(added FR-74)* — an isolated customer/organization instance of FormForge. Identified by a row in the `tenants` table and backed by its own PostgreSQL schema (`tenant_{slug}`) containing that tenant's complete copy of every static and dynamic table. Created only by a Platform-Super-Admin (admin-provisioned onboarding; no self-service signup in this phase).
+- **Tenant** *(added FR-74)* — an isolated customer/organization instance of AppForge. Identified by a row in the `tenants` table and backed by its own PostgreSQL schema (`tenant_{slug}`) containing that tenant's complete copy of every static and dynamic table. Created only by a Platform-Super-Admin (admin-provisioned onboarding; no self-service signup in this phase).
 - **Tenant Schema** *(added FR-74)* — the PostgreSQL schema holding one tenant's data, isolated from every other tenant's schema. The unit of data isolation — no `tenant_id` column or row-level filter is used; isolation is structural, at the schema level.
 - **Tenant Context** *(added FR-76)* — the resolved identity of "which tenant" for the current request, derived from the `tenantId` claim in the caller's JWT and set before any tenant-scoped data is read or written.
 - **Platform-Super-Admin** *(added FR-77)* — an account that exists outside any tenant schema, able to create and suspend tenants, with no implicit access to any tenant's data.
@@ -152,7 +152,7 @@ A `tenants` table (id, name, `schema_name`, status, timestamps) lives in a small
 A Platform-Super-Admin creates a new tenant; there is no self-service signup in this phase (see updated §5 Non-Goals).
 
 ##### Story T-2: Tenant Provisioning Service
-**As a** Platform-Super-Admin, **I can** create a new tenant **so that** a new customer/organization gets an isolated, ready-to-use instance of FormForge.
+**As a** Platform-Super-Admin, **I can** create a new tenant **so that** a new customer/organization gets an isolated, ready-to-use instance of AppForge.
 
 **Acceptance Criteria:**
 - AC-1: `CREATE SCHEMA "{schema_name}"` runs, followed by the full static-schema migration set applied into that schema.
@@ -401,7 +401,7 @@ Users can voluntarily enable TOTP MFA on their account. When MFA is enabled, log
 **As a** user, **I can** enrol in TOTP multi-factor authentication by scanning a QR code with an authenticator app and confirming with a one-time code **so that** my account is protected by a second factor.
 
 **Acceptance Criteria:**
-- AC-1: GET /api/users/me/mfa/enrol returns `{ secret, qrCodeDataUrl, backupCodes[] }`. `secret` is a base32-encoded TOTP secret; `qrCodeDataUrl` is a `data:image/png;base64,...` QR code encoding the `otpauth://totp/FormForge:<email>?secret=<secret>&issuer=FormForge` URI.
+- AC-1: GET /api/users/me/mfa/enrol returns `{ secret, qrCodeDataUrl, backupCodes[] }`. `secret` is a base32-encoded TOTP secret; `qrCodeDataUrl` is a `data:image/png;base64,...` QR code encoding the `otpauth://totp/AppForge:<email>?secret=<secret>&issuer=AppForge` URI.
 - AC-2: `backupCodes` is an array of 8 single-use 8-character alphanumeric codes; only their bcrypt hashes are stored in the DB; the raw codes are shown to the user only at this enrolment step.
 - AC-3: POST /api/users/me/mfa/verify accepts `{ code }`. Verifies a 6-digit TOTP code (±1 step tolerance) against the pending secret. On success: `mfaEnabled` set to `true` on the user record; encrypted `mfaSecret` and backup code hashes persisted; HTTP 200 returned.
 - AC-4: Wrong or expired TOTP code → HTTP 400. The secret is not persisted until this verification succeeds.
@@ -1745,7 +1745,7 @@ The following decisions carry significant implementation consequences. Each is l
 
 Most open questions resolved. New open questions from the v1.1 update:
 
-1. ~~Product name~~ — **FormForge.**
+1. ~~Product name~~ — **AppForge.**
 2. ~~Soft-delete child cascade~~ — **Resolved:** cascade confirmed. See FR-33 AC-3, FR-34 AC-1, AD-5.
 3. ~~Nested Repeater omit semantics~~ — **Resolved:** omit = soft-delete. See FR-35 AC-4.
 4. ~~Re-bind trigger~~ — **Resolved:** explicit manual admin action. See FR-17.

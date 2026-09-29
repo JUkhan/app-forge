@@ -14,7 +14,7 @@ so that I have my credentials without requiring an out-of-band handoff.
    Given a Platform Admin submits a valid `POST /api/admin/users` request and the user record is created successfully, a welcome email is dispatched (fire-and-forget pattern per AR-53). The HTTP response is never blocked by SMTP delivery time.
 
 2. **AC-2 â€” Email content**
-   The email is sent to the new user's registered email address and its body contains: the platform name ("FormForge"), the user's email address, their temporary password (plaintext as supplied by the admin), and a link to the login page (derived from the request's origin or a configured base URL).
+   The email is sent to the new user's registered email address and its body contains: the platform name ("AppForge"), the user's email address, their temporary password (plaintext as supplied by the admin), and a link to the login page (derived from the request's origin or a configured base URL).
 
 3. **AC-3 â€” SMTP failure is non-blocking with warning in response**
    Given SMTP delivery fails (connection refused, timeout, misconfiguration, etc.), the exception is caught and logged at `Warning` level with structured fields: `recipient`, `templateType: "welcome"`, `correlationId`, and the error message. User creation still returns HTTP 201. The response body includes `warnings: ["Welcome email could not be sent"]` when dispatch fails.
@@ -32,19 +32,19 @@ so that I have my credentials without requiring an out-of-band handoff.
 
 - [x] Task 1: Add MailKit NuGet package (AC-1, AC-3, AC-4)
   - [x] Add `<PackageVersion Include="MailKit" Version="4.11.0" />` to `Directory.Packages.props` under the API section
-  - [x] Add `<PackageReference Include="MailKit" />` to `src/FormForge.Api/FormForge.Api.csproj`
+  - [x] Add `<PackageReference Include="MailKit" />` to `src/AppForge.Api/AppForge.Api.csproj`
 
 - [x] Task 2: Create IEmailService + MailKitEmailService (AC-1, AC-2, AC-3, AC-5)
-  - [x] Create `src/FormForge.Api/Features/Auth/EmailService.cs` with `IEmailService` interface and `MailKitEmailService` implementation (see Dev Notes for exact pattern and implementation)
+  - [x] Create `src/AppForge.Api/Features/Auth/EmailService.cs` with `IEmailService` interface and `MailKitEmailService` implementation (see Dev Notes for exact pattern and implementation)
   - [x] Bind `SmtpOptions` config class to `"Smtp"` config section in `Program.cs`
   - [x] Register `IEmailService` as `AddSingleton<IEmailService, MailKitEmailService>()` in `Program.cs` (before route group registrations)
 
 - [x] Task 3: Add Mailpit container to AppHost (AC-4, AC-5)
-  - [x] In `src/FormForge.AppHost/AppHost.cs`, add Mailpit container after MinIO and wire SMTP env vars into the `api` resource (see Dev Notes for exact code)
+  - [x] In `src/AppForge.AppHost/AppHost.cs`, add Mailpit container after MinIO and wire SMTP env vars into the `api` resource (see Dev Notes for exact code)
   - [x] Add `WaitFor(mailpit)` to the `api` builder chain so the API starts after Mailpit is ready
 
 - [x] Task 4: Create CreateUserResponse DTO (AC-3)
-  - [x] Create `src/FormForge.Api/Features/Users/Dtos/CreateUserResponse.cs` â€” a flat record including all `UserDetailResponse` fields plus `IReadOnlyList<string> Warnings`
+  - [x] Create `src/AppForge.Api/Features/Users/Dtos/CreateUserResponse.cs` â€” a flat record including all `UserDetailResponse` fields plus `IReadOnlyList<string> Warnings`
 
 - [x] Task 5: Update CreateUserHandler to dispatch email and return CreateUserResponse (AC-1, AC-2, AC-3)
   - [x] Inject `IEmailService` and `ILogger<UserEndpoints>` into `CreateUserHandler` via parameter binding
@@ -71,7 +71,7 @@ This story is entirely **new infrastructure** â€” no existing logic changes
 
 ### EmailService.cs â€” IEmailService + MailKitEmailService
 
-File location: `src/FormForge.Api/Features/Auth/EmailService.cs` (per architecture project structure at line 1094 of architecture.md)
+File location: `src/AppForge.Api/Features/Auth/EmailService.cs` (per architecture project structure at line 1094 of architecture.md)
 
 **Pattern:** Synchronous dispatch attempt with a short timeout so the warning can be surfaced in the HTTP response (see "Fire-and-forget vs. warning" below).
 
@@ -81,7 +81,7 @@ using MimeKit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace FormForge.Api.Features.Auth;
+namespace AppForge.Api.Features.Auth;
 
 internal interface IEmailService
 {
@@ -100,7 +100,7 @@ internal sealed class SmtpOptions
     public int Port { get; init; } = 1025;
     public string User { get; init; } = string.Empty;
     public string Pass { get; init; } = string.Empty;
-    public string From { get; init; } = "noreply@formforge.local";
+    public string From { get; init; } = "noreply@appforge.local";
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
@@ -129,12 +129,12 @@ internal sealed class MailKitEmailService(
         var message = new MimeMessage();
         message.From.Add(MailboxAddress.Parse(_smtp.From));
         message.To.Add(MailboxAddress.Parse(recipientEmail));
-        message.Subject = "Welcome to FormForge";
+        message.Subject = "Welcome to AppForge";
 
         message.Body = new TextPart("plain")
         {
             Text = $"""
-                Welcome to FormForge!
+                Welcome to AppForge!
 
                 Your account has been created. Here are your credentials:
 
@@ -213,10 +213,10 @@ var warnings = emailSent
 
 ### CreateUserResponse DTO
 
-New file: `src/FormForge.Api/Features/Users/Dtos/CreateUserResponse.cs`
+New file: `src/AppForge.Api/Features/Users/Dtos/CreateUserResponse.cs`
 
 ```csharp
-namespace FormForge.Api.Features.Users.Dtos;
+namespace AppForge.Api.Features.Users.Dtos;
 
 internal sealed record CreateUserResponse(
     Guid Id,
@@ -265,15 +265,15 @@ var mailpit = builder.AddContainer("mailpit", "axllent/mailpit")
     .WithHttpEndpoint(containerPort: 1025, hostPort: 1025, name: "smtp")
     .WithHttpEndpoint(containerPort: 8025, hostPort: 8025, name: "ui");
 
-var api = builder.AddProject<Projects.FormForge_Api>("api")
-    .WithReference(formforgeDb)
+var api = builder.AddProject<Projects.AppForge_Api>("api")
+    .WithReference(appforgeDb)
     .WithReference(minio.GetEndpoint("s3"))
     .WithEnvironment("MinIO__RootUser", "minioadmin")
     .WithEnvironment("MinIO__RootPassword", "minioadmin")
     .WithEnvironment("Smtp__Host", mailpit.GetEndpoint("smtp").Property(EndpointProperty.Host))
     .WithEnvironment("Smtp__Port", mailpit.GetEndpoint("smtp").Property(EndpointProperty.Port))
-    .WithEnvironment("Smtp__From", "noreply@formforge.local")
-    .WaitFor(formforgeDb)
+    .WithEnvironment("Smtp__From", "noreply@appforge.local")
+    .WaitFor(appforgeDb)
     .WaitFor(minio)
     .WaitFor(mailpit)
     .WithHttpHealthCheck("/health/live");
@@ -299,7 +299,7 @@ builder.Services.AddSingleton<IEmailService, MailKitEmailService>();
 
 Add the using at the top of Program.cs:
 ```csharp
-using FormForge.Api.Features.Auth;
+using AppForge.Api.Features.Auth;
 ```
 (IEmailService and MailKitEmailService are in the Auth namespace per architecture decision.)
 
@@ -313,7 +313,7 @@ Add an empty `Smtp` section so `SmtpOptions` binds without error on startup if n
   "Port": 1025,
   "User": "",
   "Pass": "",
-  "From": "noreply@formforge.local"
+  "From": "noreply@appforge.local"
 }
 ```
 
@@ -356,27 +356,27 @@ export function useCreateUserMutation() {
 
 | File | Purpose |
 |---|---|
-| `src/FormForge.Api/Features/Auth/EmailService.cs` | `IEmailService` interface + `SmtpOptions` + `MailKitEmailService` implementation |
-| `src/FormForge.Api/Features/Users/Dtos/CreateUserResponse.cs` | Flat DTO: all user fields + `Warnings` |
+| `src/AppForge.Api/Features/Auth/EmailService.cs` | `IEmailService` interface + `SmtpOptions` + `MailKitEmailService` implementation |
+| `src/AppForge.Api/Features/Users/Dtos/CreateUserResponse.cs` | Flat DTO: all user fields + `Warnings` |
 
 ### Files to MODIFY
 
 | File | Change |
 |---|---|
 | `Directory.Packages.props` | Add `MailKit` version entry |
-| `src/FormForge.Api/FormForge.Api.csproj` | Add `<PackageReference Include="MailKit" />` |
-| `src/FormForge.AppHost/AppHost.cs` | Add Mailpit container; wire SMTP env vars into `api`; add `WaitFor(mailpit)` |
-| `src/FormForge.Api/Program.cs` | Register `SmtpOptions` + `IEmailService`; add `using FormForge.Api.Features.Auth;` |
-| `src/FormForge.Api/Features/Users/UserEndpoints.cs` | Update `CreateUserHandler` signature, dispatch email, return `CreateUserResponse` |
-| `src/FormForge.Api/appsettings.json` | Add `"Smtp"` section with empty defaults |
+| `src/AppForge.Api/AppForge.Api.csproj` | Add `<PackageReference Include="MailKit" />` |
+| `src/AppForge.AppHost/AppHost.cs` | Add Mailpit container; wire SMTP env vars into `api`; add `WaitFor(mailpit)` |
+| `src/AppForge.Api/Program.cs` | Register `SmtpOptions` + `IEmailService`; add `using AppForge.Api.Features.Auth;` |
+| `src/AppForge.Api/Features/Users/UserEndpoints.cs` | Update `CreateUserHandler` signature, dispatch email, return `CreateUserResponse` |
+| `src/AppForge.Api/appsettings.json` | Add `"Smtp"` section with empty defaults |
 | `web/src/features/admin/users/types.ts` | Add `CreateUserResponse` interface |
 | `web/src/features/admin/users/userMutations.ts` | Update `useCreateUserMutation` to use `CreateUserResponse`, show warning toast |
 | `web/src/lib/i18n/locales/en.json` | Update `passwordHelp`, add `emailWarning` |
 
 ### Files to Leave Untouched
 
-- `src/FormForge.Api/Features/Users/UserService.cs` â€” email dispatch is endpoint-layer concern (AR-53 pattern is in the handler, not the service; the service owns only data persistence)
-- `src/FormForge.Api/Features/Users/Dtos/UserDetailResponse.cs` â€” preserved; `CreateUserResponse` is a separate flat DTO, not a modification of this type
+- `src/AppForge.Api/Features/Users/UserService.cs` â€” email dispatch is endpoint-layer concern (AR-53 pattern is in the handler, not the service; the service owns only data persistence)
+- `src/AppForge.Api/Features/Users/Dtos/UserDetailResponse.cs` â€” preserved; `CreateUserResponse` is a separate flat DTO, not a modification of this type
 - All EF Core migrations â€” no new DB tables for email (AD-12 resolved: logs only, no DB email audit table)
 - `web/src/routes/_app/admin/users.$userId.tsx` â€” user detail page, not affected
 
@@ -389,7 +389,7 @@ From Story 2.9 (most recent completed backend-aware story):
 
 From Story 2.8 UserEndpoints pattern:
 - Handler params are resolved by Minimal API DI â€” no `[FromServices]` needed; Minimal APIs detect `HttpContext`, `CancellationToken`, and registered services automatically
-- `GetCorrelationId()` extension is in `FormForge.Api.Common.Logging` namespace, already used throughout the codebase (`CorrelationIdMiddleware.GetCorrelationId(httpContext)`)
+- `GetCorrelationId()` extension is in `AppForge.Api.Common.Logging` namespace, already used throughout the codebase (`CorrelationIdMiddleware.GetCorrelationId(httpContext)`)
 
 ### MailKit API Quick Reference
 
@@ -415,12 +415,12 @@ No new integration tests are required for this story (email dispatch is fire-and
 - [Source: `_bmad-output/planning-artifacts/architecture.md` â€” AR-53 (email service pattern), Decision 2.9 (MailKit choice, Mailpit dev container, SMTP config, fire-and-forget, AD-12)]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` â€” line 1094 (EmailService.cs location in Features/Auth/)]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` â€” line 198 (AppHost Mailpit wiring outline)]
-- [Source: `src/FormForge.Api/Features/Users/UserEndpoints.cs` â€” CreateUserHandler pattern to update]
-- [Source: `src/FormForge.Api/Features/Users/UserService.cs` â€” CreateUserAsync returns CreateUserResult; do NOT add email logic here]
-- [Source: `src/FormForge.Api/Features/Users/Dtos/UserDetailResponse.cs` â€” shape to replicate in CreateUserResponse]
-- [Source: `src/FormForge.AppHost/AppHost.cs` â€” existing MinIO container pattern to mirror for Mailpit]
-- [Source: `src/FormForge.Api/Program.cs` â€” service registration site; SMTP registration goes after auth services block]
-- [Source: `src/FormForge.Api/FormForge.Api.csproj` â€” NuGet reference list]
+- [Source: `src/AppForge.Api/Features/Users/UserEndpoints.cs` â€” CreateUserHandler pattern to update]
+- [Source: `src/AppForge.Api/Features/Users/UserService.cs` â€” CreateUserAsync returns CreateUserResult; do NOT add email logic here]
+- [Source: `src/AppForge.Api/Features/Users/Dtos/UserDetailResponse.cs` â€” shape to replicate in CreateUserResponse]
+- [Source: `src/AppForge.AppHost/AppHost.cs` â€” existing MinIO container pattern to mirror for Mailpit]
+- [Source: `src/AppForge.Api/Program.cs` â€” service registration site; SMTP registration goes after auth services block]
+- [Source: `src/AppForge.Api/AppForge.Api.csproj` â€” NuGet reference list]
 - [Source: `Directory.Packages.props` â€” centralized version management; MailKit entry goes in API section]
 - [Source: `web/src/features/admin/users/userMutations.ts` â€” mutation to update with warning toast]
 - [Source: `web/src/features/admin/users/types.ts` â€” add CreateUserResponse interface]
@@ -455,21 +455,21 @@ claude-sonnet-4-6 (story authoring); claude-opus-4-8 (1M context) (implementatio
 ### File List
 
 **Added**
-- `src/FormForge.Api/Features/Auth/EmailService.cs`
-- `src/FormForge.Api/Features/Users/Dtos/CreateUserResponse.cs`
-- `src/FormForge.Api.Tests/Features/Auth/EmailServiceTests.cs`
+- `src/AppForge.Api/Features/Auth/EmailService.cs`
+- `src/AppForge.Api/Features/Users/Dtos/CreateUserResponse.cs`
+- `src/AppForge.Api.Tests/Features/Auth/EmailServiceTests.cs`
 
 **Modified**
 - `Directory.Packages.props` (MailKit 4.17.0)
-- `src/FormForge.Api/FormForge.Api.csproj` (MailKit `PackageReference`)
-- `src/FormForge.Api/Program.cs` (`SmtpOptions` binding + `IEmailService` singleton)
-- `src/FormForge.Api/Features/Users/UserEndpoints.cs` (welcome-email dispatch + `CreateUserResponse`)
-- `src/FormForge.Api/appsettings.json` (`Smtp` section)
-- `src/FormForge.AppHost/AppHost.cs` (Mailpit container + SMTP env vars + `WaitFor`)
+- `src/AppForge.Api/AppForge.Api.csproj` (MailKit `PackageReference`)
+- `src/AppForge.Api/Program.cs` (`SmtpOptions` binding + `IEmailService` singleton)
+- `src/AppForge.Api/Features/Users/UserEndpoints.cs` (welcome-email dispatch + `CreateUserResponse`)
+- `src/AppForge.Api/appsettings.json` (`Smtp` section)
+- `src/AppForge.AppHost/AppHost.cs` (Mailpit container + SMTP env vars + `WaitFor`)
 - `web/src/features/admin/users/types.ts` (`CreateUserResponse` interface)
 - `web/src/features/admin/users/userMutations.ts` (warning toast on `warnings`)
 - `web/src/lib/i18n/locales/en.json` (`passwordHelp` reworded + `emailWarning`)
-- `src/FormForge.Api.Tests/Features/Menus/UploadIconIntegrationTests.cs` (incidental: `FakeIconStorageService` interface stubs)
+- `src/AppForge.Api.Tests/Features/Menus/UploadIconIntegrationTests.cs` (incidental: `FakeIconStorageService` interface stubs)
 
 ## Change Log
 
@@ -483,23 +483,23 @@ Code review run 2026-05-31 (blind + edge-case + acceptance layers, full-spec mod
 
 ### Decision-Needed
 
-- [ ] [Review][Patch] D1â†’P â€” Add nullable `Smtp__BaseUrl` to `SmtpOptions`; use it as the login-link base URL, falling back to `Request.Scheme + Request.Host` when unset. Prevents spoofed Host-header phishing in misconfigured reverse-proxy setups; also primes email base URL config for Stories 2.11/2.12. [`src/FormForge.Api/Features/Auth/EmailService.cs`, `src/FormForge.Api/Features/Users/UserEndpoints.cs:134`, `src/FormForge.Api/appsettings.json`]
+- [ ] [Review][Patch] D1â†’P â€” Add nullable `Smtp__BaseUrl` to `SmtpOptions`; use it as the login-link base URL, falling back to `Request.Scheme + Request.Host` when unset. Prevents spoofed Host-header phishing in misconfigured reverse-proxy setups; also primes email base URL config for Stories 2.11/2.12. [`src/AppForge.Api/Features/Auth/EmailService.cs`, `src/AppForge.Api/Features/Users/UserEndpoints.cs:134`, `src/AppForge.Api/appsettings.json`]
 
 ### Patches
 
-- [x] [Review][Patch] P1 â€” `MailboxAddress.Parse` called outside the try/catch â€” malformed `Smtp__From` config or edge-case recipient email throws unhandled `FormatException`, escaping the "never throw" guarantee and surfacing as a 500 [`src/FormForge.Api/Features/Auth/EmailService.cs:58-59`]
-- [x] [Review][Patch] P2 â€” `Smtp__User` non-empty but `Smtp__Pass` empty â†’ `AuthenticateAsync` sends empty password; guard: only authenticate when both User AND Pass are non-empty [`src/FormForge.Api/Features/Auth/EmailService.cs:85-88`]
-- [x] [Review][Patch] P3 â€” `httpContext.Request.Host` unvalidated â€” empty/missing Host header produces `"https://"` with no hostname; login link in the welcome email is broken [`src/FormForge.Api/Features/Users/UserEndpoints.cs:134`]
-- [x] [Review][Patch] P4 â€” `WithHttpEndpoint` used for SMTP port 1025 in AppHost â€” SMTP is not HTTP; Aspire's `WithHttpEndpoint` configures HTTP-specific probing; use generic `WithEndpoint` (TCP) for port 1025 [`src/FormForge.AppHost/AppHost.cs`]
-- [x] [Review][Patch] P5 â€” No `SmtpOptions` startup validation â€” malformed `From` address or invalid port not caught until first email send; add `ValidateDataAnnotations()` / `ValidateOnStart()` [`src/FormForge.Api/Program.cs`]
+- [x] [Review][Patch] P1 â€” `MailboxAddress.Parse` called outside the try/catch â€” malformed `Smtp__From` config or edge-case recipient email throws unhandled `FormatException`, escaping the "never throw" guarantee and surfacing as a 500 [`src/AppForge.Api/Features/Auth/EmailService.cs:58-59`]
+- [x] [Review][Patch] P2 â€” `Smtp__User` non-empty but `Smtp__Pass` empty â†’ `AuthenticateAsync` sends empty password; guard: only authenticate when both User AND Pass are non-empty [`src/AppForge.Api/Features/Auth/EmailService.cs:85-88`]
+- [x] [Review][Patch] P3 â€” `httpContext.Request.Host` unvalidated â€” empty/missing Host header produces `"https://"` with no hostname; login link in the welcome email is broken [`src/AppForge.Api/Features/Users/UserEndpoints.cs:134`]
+- [x] [Review][Patch] P4 â€” `WithHttpEndpoint` used for SMTP port 1025 in AppHost â€” SMTP is not HTTP; Aspire's `WithHttpEndpoint` configures HTTP-specific probing; use generic `WithEndpoint` (TCP) for port 1025 [`src/AppForge.AppHost/AppHost.cs`]
+- [x] [Review][Patch] P5 â€” No `SmtpOptions` startup validation â€” malformed `From` address or invalid port not caught until first email send; add `ValidateDataAnnotations()` / `ValidateOnStart()` [`src/AppForge.Api/Program.cs`]
 
 ### Deferred
 
-- [x] [Review][Defer] W1 â€” `ILoggerFactory` injection smell in handler; outer catch logger redundant for non-cancellation paths (those are already logged by `MailKitEmailService`); logger is only needed for the timeout/OperationCanceledException path [`src/FormForge.Api/Features/Users/UserEndpoints.cs`] â€” deferred, refactor
+- [x] [Review][Defer] W1 â€” `ILoggerFactory` injection smell in handler; outer catch logger redundant for non-cancellation paths (those are already logged by `MailKitEmailService`); logger is only needed for the timeout/OperationCanceledException path [`src/AppForge.Api/Features/Users/UserEndpoints.cs`] â€” deferred, refactor
 - [x] [Review][Defer] W2 â€” Plaintext temporary password over unencrypted SMTP (`SecureSocketOptions.None`) with no production TLS enforcement or documentation â€” deferred, architecture/ops decision
 - [x] [Review][Defer] W3 â€” `SmtpOptions.Pass` in plaintext config; no secret management guidance for production â€” deferred, ops documentation gap
 - [x] [Review][Defer] W4 â€” Warning message is a hard-coded English string in backend response, not a machine-readable code; non-UI consumers cannot parse structurally â€” deferred, matches spec literal
-- [x] [Review][Defer] W5 â€” `CreateUserResponse` duplicates all 7 `UserDetailResponse` fields positionally instead of composing â€” drift risk if user detail shape evolves [`src/FormForge.Api/Features/Users/Dtos/CreateUserResponse.cs`] â€” deferred, design choice per dev notes
+- [x] [Review][Defer] W5 â€” `CreateUserResponse` duplicates all 7 `UserDetailResponse` fields positionally instead of composing â€” drift risk if user detail shape evolves [`src/AppForge.Api/Features/Users/Dtos/CreateUserResponse.cs`] â€” deferred, design choice per dev notes
 - [x] [Review][Defer] W6 â€” `EmailServiceTests` has no happy-path test (successful SMTP send); only not-configured and unreachable-server paths covered â€” deferred, story guidance says no new integration tests
-- [x] [Review][Defer] W7 â€” `request.TemporaryPassword!` null-forgiving operator suppresses compiler warning instead of making the validated-upstream invariant explicit [`src/FormForge.Api/Features/Users/UserEndpoints.cs`] â€” deferred, validation filter guarantees non-null
+- [x] [Review][Defer] W7 â€” `request.TemporaryPassword!` null-forgiving operator suppresses compiler warning instead of making the validated-upstream invariant explicit [`src/AppForge.Api/Features/Users/UserEndpoints.cs`] â€” deferred, validation filter guarantees non-null
 

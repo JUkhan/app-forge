@@ -5,7 +5,7 @@ import type {
 } from '../../types/designer'
 import type { PagedResult } from '../admin/users/types'
 
-// FormForge designer API surface. Replaces ESG's `componentDesignerApi`.
+// AppForge designer API surface. Replaces ESG's `componentDesignerApi`.
 // Story 3.2 implements the create/list/get endpoints below. Save/publish/archive/
 // duplicate land in Stories 3.6/3.7/3.8 — their stubs here POST/PUT against routes
 // that 404 today, surfacing in the SPA as the documented "Could not save" toast.

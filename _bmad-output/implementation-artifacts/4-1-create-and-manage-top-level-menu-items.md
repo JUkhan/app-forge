@@ -47,51 +47,51 @@ All endpoints require `RequireAuth()` + `RequirePlatformAdmin()` (inherited from
 ## Tasks / Subtasks
 
 - [x] Task 1: Domain entities (AC-1, AC-2, AC-3, AC-4)
-  - [x] Create `src/FormForge.Api/Domain/Entities/Menu.cs` (NEW) — see Dev Notes for full shape
-  - [x] Create `src/FormForge.Api/Domain/Entities/MenuRoleAssignment.cs` (NEW) — FK join table; role assignment logic is Story 4.4, but the table must exist now
-  - [x] Update `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — add `DbSet<Menu> Menus` + `DbSet<MenuRoleAssignment> MenuRoleAssignments` + `OnModelCreating` config (see Dev Notes for full mapping)
+  - [x] Create `src/AppForge.Api/Domain/Entities/Menu.cs` (NEW) — see Dev Notes for full shape
+  - [x] Create `src/AppForge.Api/Domain/Entities/MenuRoleAssignment.cs` (NEW) — FK join table; role assignment logic is Story 4.4, but the table must exist now
+  - [x] Update `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — add `DbSet<Menu> Menus` + `DbSet<MenuRoleAssignment> MenuRoleAssignments` + `OnModelCreating` config (see Dev Notes for full mapping)
 
 - [x] Task 2: EF Core migration (AC-1)
-  - [x] Run `dotnet ef migrations add CreateMenusAndMenuRoleAssignments --project src/FormForge.Api --startup-project src/FormForge.Api`
+  - [x] Run `dotnet ef migrations add CreateMenusAndMenuRoleAssignments --project src/AppForge.Api --startup-project src/AppForge.Api`
   - [x] Verify migration creates: `menus` table, `menu_role_assignments` table, indexes per Dev Notes
 
 - [x] Task 3: Feature folder — DTOs (AC-1, AC-5)
-  - [x] Create `src/FormForge.Api/Features/Menus/Dtos/CreateMenuRequest.cs`
+  - [x] Create `src/AppForge.Api/Features/Menus/Dtos/CreateMenuRequest.cs`
     - Fields: `string Name`, `int Order`, `JsonElement? Icon = null`, `bool IsActive = true`
     - Note: `JsonElement?` accepts any JSON value or null; Story 4.3 adds type validation
-  - [x] Create `src/FormForge.Api/Features/Menus/Dtos/UpdateMenuRequest.cs`
+  - [x] Create `src/AppForge.Api/Features/Menus/Dtos/UpdateMenuRequest.cs`
     - Fields: `string Name`, `int Order`, `JsonElement? Icon`, `bool IsActive`
-  - [x] Create `src/FormForge.Api/Features/Menus/Dtos/MenuListItem.cs`
+  - [x] Create `src/AppForge.Api/Features/Menus/Dtos/MenuListItem.cs`
     - Fields: `Guid Id`, `string Name`, `int Order`, `bool IsActive`, `Guid? ParentId`, `DateTimeOffset CreatedAt`
-  - [x] Create `src/FormForge.Api/Features/Menus/Dtos/MenuResponse.cs`
+  - [x] Create `src/AppForge.Api/Features/Menus/Dtos/MenuResponse.cs`
     - Fields: `Guid Id`, `string Name`, `int Order`, `string? Icon`, `bool IsActive`, `Guid? ParentId`, `IReadOnlyList<Guid> AllowedRoleIds`, `DateTimeOffset CreatedAt`, `DateTimeOffset? UpdatedAt`
     - `AllowedRoleIds` is always `[]` in Story 4.1; Story 4.4 populates it
 
 - [x] Task 4: Feature folder — Validators (AC-1)
-  - [x] Create `src/FormForge.Api/Features/Menus/Validators/CreateMenuRequestValidator.cs`
+  - [x] Create `src/AppForge.Api/Features/Menus/Validators/CreateMenuRequestValidator.cs`
     - `Name`: `NotEmpty().MaximumLength(200)`
     - `Order`: `GreaterThanOrEqualTo(0)` (no upper bound; gaps are fine per AC-4)
     - No validation on `Icon` in Story 4.1 — that is Story 4.3's scope
-  - [x] Create `src/FormForge.Api/Features/Menus/Validators/UpdateMenuRequestValidator.cs` — same rules
+  - [x] Create `src/AppForge.Api/Features/Menus/Validators/UpdateMenuRequestValidator.cs` — same rules
 
 - [x] Task 5: Feature folder — MenuCache stub (prepares for Story 4.7)
-  - [x] Create `src/FormForge.Api/Features/Menus/MenuCache.cs` — see Dev Notes for shape
+  - [x] Create `src/AppForge.Api/Features/Menus/MenuCache.cs` — see Dev Notes for shape
   - [x] Register `IMenuCache` / `MenuCache` in `Program.cs` (stub — no-op; Story 4.7 fills in the 5 s TTL logic)
 
 - [x] Task 6: Feature folder — MenuService (AC-1 through AC-5)
-  - [x] Create `src/FormForge.Api/Features/Menus/MenuService.cs` — see Dev Notes for full interface + implementation notes
+  - [x] Create `src/AppForge.Api/Features/Menus/MenuService.cs` — see Dev Notes for full interface + implementation notes
   - [x] Register `IMenuService`, validators in `Program.cs` — see Dev Notes for exact lines
 
 - [x] Task 7: Feature folder — admin endpoints (AC-1 through AC-5)
-  - [x] Create `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` — see Dev Notes for mapping pattern
+  - [x] Create `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` — see Dev Notes for mapping pattern
 
 - [x] Task 8: Feature folder — domain event placeholder (used by Story 5.2)
-  - [x] Create `src/FormForge.Api/Features/Menus/Events/MenuBindingCreated.cs`
+  - [x] Create `src/AppForge.Api/Features/Menus/Events/MenuBindingCreated.cs`
     - `internal sealed record MenuBindingCreated(string DesignerId);`
     - This event is published by Story 5.2 when a binding is created; defined here so the file is in the right location
 
 - [x] Task 9: Wire admin endpoint group (AC-5)
-  - [x] Update `src/FormForge.Api/Features/Roles/AdminEndpoints.cs`
+  - [x] Update `src/AppForge.Api/Features/Roles/AdminEndpoints.cs`
     - Add: `group.MapGroup("/menus").WithTags("Admin — Menus").MapMenuAdminEndpoints();`
     - Placement: after the existing `/roles` and `/users` groups
 
@@ -132,7 +132,7 @@ All endpoints require `RequireAuth()` + `RequirePlatformAdmin()` (inherited from
     - Add `admin.menus` namespace keys (see Dev Notes for full key list)
 
 - [x] Task 15: Integration tests (all ACs)
-  - [x] Create `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs`
     - Follow `RoleIntegrationTests.cs` for class fixture, setup, teardown, and auth helper patterns
     - See Dev Notes for required test scenarios
 
@@ -142,7 +142,7 @@ All endpoints require `RequireAuth()` + `RequirePlatformAdmin()` (inherited from
 
 **`Domain/Entities/Menu.cs`** (NEW):
 ```csharp
-namespace FormForge.Api.Domain.Entities;
+namespace AppForge.Api.Domain.Entities;
 
 internal sealed class Menu
 {
@@ -163,7 +163,7 @@ internal sealed class Menu
 
 **`Domain/Entities/MenuRoleAssignment.cs`** (NEW):
 ```csharp
-namespace FormForge.Api.Domain.Entities;
+namespace AppForge.Api.Domain.Entities;
 
 internal sealed class MenuRoleAssignment
 {
@@ -176,7 +176,7 @@ internal sealed class MenuRoleAssignment
 }
 ```
 
-### FormForgeDbContext Additions
+### AppForgeDbContext Additions
 
 Add to `DbSet` declarations (after existing sets):
 ```csharp
@@ -234,8 +234,8 @@ modelBuilder.Entity<MenuRoleAssignment>(e =>
 ### MenuCache.cs Stub
 
 ```csharp
-// src/FormForge.Api/Features/Menus/MenuCache.cs
-namespace FormForge.Api.Features.Menus;
+// src/AppForge.Api/Features/Menus/MenuCache.cs
+namespace AppForge.Api.Features.Menus;
 
 internal interface IMenuCache
 {
@@ -297,7 +297,7 @@ internal interface IMenuService
 ### MenuAdminEndpoints.cs Pattern
 
 ```csharp
-// src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs
+// src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs
 internal static class MenuAdminEndpoints
 {
     internal static RouteGroupBuilder MapMenuAdminEndpoints(this RouteGroupBuilder group)
@@ -320,9 +320,9 @@ internal static class MenuAdminEndpoints
 
 ### AdminEndpoints.cs Update
 
-File: `src/FormForge.Api/Features/Roles/AdminEndpoints.cs`
+File: `src/AppForge.Api/Features/Roles/AdminEndpoints.cs`
 
-Add import: `using FormForge.Api.Features.Menus;`
+Add import: `using AppForge.Api.Features.Menus;`
 
 Add after existing groups:
 ```csharp
@@ -455,7 +455,7 @@ Add to `web/src/lib/i18n/locales/en.json` under `admin`:
 
 ### Integration Test Scenarios
 
-File: `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs`
+File: `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs`
 
 Follow `RoleIntegrationTests.cs` for:
 - Class fixture pattern (`IClassFixture<PostgresFixture>`, `IAsyncLifetime`)
@@ -498,11 +498,11 @@ Ordering test:
 
 ### Project Structure Notes
 
-- All C# files go in `src/FormForge.Api/` (not `src/FormForge.Api.Tests/`)
-- Backend feature folder: `src/FormForge.Api/Features/Menus/` (new)
-- Domain entities: `src/FormForge.Api/Domain/Entities/` (existing, add 2 files)
-- Persistence: `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` (update)
-- Admin endpoint wiring: `src/FormForge.Api/Features/Roles/AdminEndpoints.cs` (existing — update)
+- All C# files go in `src/AppForge.Api/` (not `src/AppForge.Api.Tests/`)
+- Backend feature folder: `src/AppForge.Api/Features/Menus/` (new)
+- Domain entities: `src/AppForge.Api/Domain/Entities/` (existing, add 2 files)
+- Persistence: `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` (update)
+- Admin endpoint wiring: `src/AppForge.Api/Features/Roles/AdminEndpoints.cs` (existing — update)
 - Frontend feature: `web/src/features/menu/types.ts` + `web/src/features/admin/menus/` (new)
 - Frontend route: `web/src/routes/_app/admin/menus.tsx` + `web/src/routes/_app/admin/menus.$menuId.tsx` (new)
 - Admin layout: `web/src/routes/_app/admin.tsx` (existing — update nav link)
@@ -562,25 +562,25 @@ claude-sonnet-4-6
 
 ### File List
 
-- src/FormForge.Api/Domain/Entities/Menu.cs (NEW)
-- src/FormForge.Api/Domain/Entities/MenuRoleAssignment.cs (NEW)
-- src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs (MODIFIED)
-- src/FormForge.Api/Infrastructure/Persistence/Migrations/20260524054931_CreateMenusAndMenuRoleAssignments.cs (NEW)
-- src/FormForge.Api/Infrastructure/Persistence/Migrations/20260524054931_CreateMenusAndMenuRoleAssignments.Designer.cs (NEW)
-- src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs (MODIFIED)
-- src/FormForge.Api/Features/Menus/Dtos/CreateMenuRequest.cs (NEW)
-- src/FormForge.Api/Features/Menus/Dtos/UpdateMenuRequest.cs (NEW)
-- src/FormForge.Api/Features/Menus/Dtos/MenuListItem.cs (NEW)
-- src/FormForge.Api/Features/Menus/Dtos/MenuResponse.cs (NEW)
-- src/FormForge.Api/Features/Menus/Validators/CreateMenuRequestValidator.cs (NEW)
-- src/FormForge.Api/Features/Menus/Validators/UpdateMenuRequestValidator.cs (NEW)
-- src/FormForge.Api/Features/Menus/MenuCache.cs (NEW)
-- src/FormForge.Api/Features/Menus/MenuService.cs (NEW)
-- src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs (NEW)
-- src/FormForge.Api/Features/Menus/Events/MenuBindingCreated.cs (NEW)
-- src/FormForge.Api/Features/Roles/AdminEndpoints.cs (MODIFIED)
-- src/FormForge.Api/Program.cs (MODIFIED)
-- src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs (NEW)
+- src/AppForge.Api/Domain/Entities/Menu.cs (NEW)
+- src/AppForge.Api/Domain/Entities/MenuRoleAssignment.cs (NEW)
+- src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs (MODIFIED)
+- src/AppForge.Api/Infrastructure/Persistence/Migrations/20260524054931_CreateMenusAndMenuRoleAssignments.cs (NEW)
+- src/AppForge.Api/Infrastructure/Persistence/Migrations/20260524054931_CreateMenusAndMenuRoleAssignments.Designer.cs (NEW)
+- src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs (MODIFIED)
+- src/AppForge.Api/Features/Menus/Dtos/CreateMenuRequest.cs (NEW)
+- src/AppForge.Api/Features/Menus/Dtos/UpdateMenuRequest.cs (NEW)
+- src/AppForge.Api/Features/Menus/Dtos/MenuListItem.cs (NEW)
+- src/AppForge.Api/Features/Menus/Dtos/MenuResponse.cs (NEW)
+- src/AppForge.Api/Features/Menus/Validators/CreateMenuRequestValidator.cs (NEW)
+- src/AppForge.Api/Features/Menus/Validators/UpdateMenuRequestValidator.cs (NEW)
+- src/AppForge.Api/Features/Menus/MenuCache.cs (NEW)
+- src/AppForge.Api/Features/Menus/MenuService.cs (NEW)
+- src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs (NEW)
+- src/AppForge.Api/Features/Menus/Events/MenuBindingCreated.cs (NEW)
+- src/AppForge.Api/Features/Roles/AdminEndpoints.cs (MODIFIED)
+- src/AppForge.Api/Program.cs (MODIFIED)
+- src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs (NEW)
 - web/src/features/menu/types.ts (NEW)
 - web/src/features/admin/menus/useMenusAdminQuery.ts (NEW)
 - web/src/features/admin/menus/useMenuDetailQuery.ts (NEW)

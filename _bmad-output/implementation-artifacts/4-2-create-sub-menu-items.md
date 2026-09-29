@@ -40,17 +40,17 @@ Then a "← View Parent Menu" link navigates to the parent's detail page
 ## Tasks / Subtasks
 
 - [x] Task 1: Backend — extend `CreateMenuRequest` DTO (AC-1, AC-2, AC-3)
-  - [x] Update `src/FormForge.Api/Features/Menus/Dtos/CreateMenuRequest.cs`
+  - [x] Update `src/AppForge.Api/Features/Menus/Dtos/CreateMenuRequest.cs`
     - Added `Guid? ParentId = null` as optional positional parameter on the existing `record` (preserves the established record idiom in this file; backward-compatible with all existing call sites; JSON deserializes by property name)
 
 - [x] Task 2: Backend — depth validation in `MenuService` (AC-1, AC-2, AC-3)
-  - [x] Update `src/FormForge.Api/Features/Menus/MenuService.cs`
+  - [x] Update `src/AppForge.Api/Features/Menus/MenuService.cs`
     - Added `ParentNotFound` and `MaxDepthExceeded` to the `CreateMenuOutcome` enum
     - In `CreateMenuAsync`: pre-construction guard loads parent via `AsNoTracking()` when `request.ParentId.HasValue`; returns `ParentNotFound` if parent missing, `MaxDepthExceeded` if `parent.ParentId.HasValue` (enforcing 2-level cap)
     - Replaced hardcoded `ParentId = null` with `ParentId = request.ParentId` on the new `Menu` entity
 
 - [x] Task 3: Backend — map new outcomes in endpoint (AC-2, AC-3)
-  - [x] Update `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs`
+  - [x] Update `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs`
     - Added `ParentNotFound` → 422 `MENU_PARENT_NOT_FOUND` and `MaxDepthExceeded` → 422 `MAX_MENU_DEPTH_EXCEEDED` arms in `CreateMenuHandler` switch (using `StringComparer.Ordinal` dictionary, matching the existing 404/409 patterns)
 
 - [x] Task 4: Frontend — extend `CreateMenuRequest` type (AC-1)
@@ -67,7 +67,7 @@ Then a "← View Parent Menu" link navigates to the parent's detail page
     - Added 8 keys to `admin.menus`: `subMenusTitle`, `noSubMenus`, `addSubMenuButton`, `addingSubMenuButton`, `viewParent`, `parentNotFound`, `maxDepthExceeded`, `createSubMenuSuccess`
 
 - [x] Task 7: Integration tests (AC-1, AC-2, AC-3)
-  - [x] Update `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs`
+  - [x] Update `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs`
     - Added 3 new tests + 1 helper (`CreateSubMenuViaApiAsync`):
       - `CreateMenu_WithValidParent_Returns201WithParentIdSet`
       - `CreateMenu_WithUnknownParent_Returns422ParentNotFound`
@@ -75,14 +75,14 @@ Then a "← View Parent Menu" link navigates to the parent's detail page
 
 ### Review Findings (2026-05-24)
 
-- [x] [Review][Patch] Add backend `?parentId=` filter + paginated children query in `SubMenusSection` (resolves former [Decision] on the 100-child cap) — extend `GET /api/admin/menus` with an optional `parentId` query param (validated as Guid, applied as `Where(m => m.ParentId == parentId)`), add an `useMenuChildrenQuery(parentId, page, pageSize)` hook, replace the client-side filter in `SubMenusSection` with that hook + local `page` state + Next/Prev controls. Mirror the existing list-endpoint contract (PagedResult, OrderBy Order + ThenBy Id). Decision 2026-05-24: pagination UI alone is cosmetic without the backend filter; the user opted for the full fix. [`src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` GET handler + `src/FormForge.Api/Features/Menus/MenuService.cs` GetMenusAsync + `web/src/features/admin/menus/` new useMenuChildrenQuery + `web/src/routes/_app/admin/menus.$menuId.tsx` SubMenusSection]
-- [x] [Review][Patch] TOCTOU on parent delete during `CreateMenuAsync` [`src/FormForge.Api/Features/Menus/MenuService.cs:90`] — parent is loaded `AsNoTracking`, then `SaveChangesAsync` inserts a child; if the parent is deleted in between, `fk_menus_parent ON DELETE RESTRICT` raises sqlstate 23503 and surfaces as unmapped 500. Mirror Story 4.1's `DeleteMenuAsync` fix: wrap `SaveChangesAsync` in `try/catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23503" })` → return `CreateMenuOutcome.ParentNotFound`.
+- [x] [Review][Patch] Add backend `?parentId=` filter + paginated children query in `SubMenusSection` (resolves former [Decision] on the 100-child cap) — extend `GET /api/admin/menus` with an optional `parentId` query param (validated as Guid, applied as `Where(m => m.ParentId == parentId)`), add an `useMenuChildrenQuery(parentId, page, pageSize)` hook, replace the client-side filter in `SubMenusSection` with that hook + local `page` state + Next/Prev controls. Mirror the existing list-endpoint contract (PagedResult, OrderBy Order + ThenBy Id). Decision 2026-05-24: pagination UI alone is cosmetic without the backend filter; the user opted for the full fix. [`src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` GET handler + `src/AppForge.Api/Features/Menus/MenuService.cs` GetMenusAsync + `web/src/features/admin/menus/` new useMenuChildrenQuery + `web/src/routes/_app/admin/menus.$menuId.tsx` SubMenusSection]
+- [x] [Review][Patch] TOCTOU on parent delete during `CreateMenuAsync` [`src/AppForge.Api/Features/Menus/MenuService.cs:90`] — parent is loaded `AsNoTracking`, then `SaveChangesAsync` inserts a child; if the parent is deleted in between, `fk_menus_parent ON DELETE RESTRICT` raises sqlstate 23503 and surfaces as unmapped 500. Mirror Story 4.1's `DeleteMenuAsync` fix: wrap `SaveChangesAsync` in `try/catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23503" })` → return `CreateMenuOutcome.ParentNotFound`.
 - [x] [Review][Patch] `Number(e.target.value)` returns `NaN` for non-numeric `subOrder` input [`web/src/routes/_app/admin/menus.$menuId.tsx` SubMenusSection order onChange] — `NaN` serializes as `null`, hits server, falls through to generic `saveError` toast. Guard with `Number.isFinite` (e.g., `const n = Number(e.target.value); setSubOrder(Number.isFinite(n) ? n : 0)`).
 - [x] [Review][Patch] Dead `createSubMenuSuccess` i18n key [`web/src/lib/i18n/locales/en.json` admin.menus block] — added to en.json but never referenced in code. `useCreateMenuMutation.onSuccess` already toasts `admin.menus.createSuccess` for every create. Remove the unused key, or replace the generic toast with a sub-menu-specific one when `parentId` was passed.
 - [x] [Review][Patch] `isTopLevel` strict `=== null` check rejects `undefined` `parentId` [`web/src/routes/_app/admin/menus.$menuId.tsx:108`] — TypeScript declares `string | null` but a stale TanStack cache or future API drift could yield `undefined`, which would hide both the SubMenusSection AND the "View Parent" link, orphaning the menu in the UI. Switch to `!menu.parentId` to defend against the tri-state.
-- [x] [Review][Patch] AC-1 test asserts POST response only — no GET round-trip to verify `parentId` actually persists [`src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` CreateMenu_WithValidParent_Returns201WithParentIdSet] — a regression that restores `ParentId = null` on entity construction (Story 4.1's prior behavior) would still pass since the response is built from the mutated in-memory entity. Add a follow-up `GET /api/admin/menus/{id}` and assert `body.ParentId == parentId`.
+- [x] [Review][Patch] AC-1 test asserts POST response only — no GET round-trip to verify `parentId` actually persists [`src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` CreateMenu_WithValidParent_Returns201WithParentIdSet] — a regression that restores `ParentId = null` on entity construction (Story 4.1's prior behavior) would still pass since the response is built from the mutated in-memory entity. Add a follow-up `GET /api/admin/menus/{id}` and assert `body.ParentId == parentId`.
 
-- [x] [Review][Defer] `UpdateMenuAsync` ignores `ParentId` — no re-parent path, no test asserts the invariant [`src/FormForge.Api/Features/Menus/MenuService.cs:99-122`] — explicitly spec-deferred to Story 4.5 (drag-and-drop reorder); deferred, pre-existing
+- [x] [Review][Defer] `UpdateMenuAsync` ignores `ParentId` — no re-parent path, no test asserts the invariant [`src/AppForge.Api/Features/Menus/MenuService.cs:99-122`] — explicitly spec-deferred to Story 4.5 (drag-and-drop reorder); deferred, pre-existing
 - [x] [Review][Defer] Concurrent admin promotes parent to sub-menu between check and insert → permits 3-level chain — relies on re-parent path that doesn't exist; relevant once Story 4.5 lands; deferred, pre-existing
 - [x] [Review][Defer] Sub-menus section client-side filter over the full admin list [`web/src/routes/_app/admin/menus.$menuId.tsx` SubMenusSection] — spec Dev Notes accept `pageSize=100` as over-provisioned; backend `?parentId=` filter endpoint is future work; deferred, pre-existing
 - [x] [Review][Defer] `viewParent` "← View Parent Menu" hardcodes the directional arrow in the i18n string [`web/src/lib/i18n/locales/en.json` viewParent] — RTL-flip concern is broader than this story; project is English-only currently; deferred, pre-existing
@@ -98,7 +98,7 @@ The `menus` table already has the `parent_id` column, the `fk_menus_parent ON DE
 ### Backend: Updated `CreateMenuRequest.cs`
 
 ```csharp
-// src/FormForge.Api/Features/Menus/Dtos/CreateMenuRequest.cs
+// src/AppForge.Api/Features/Menus/Dtos/CreateMenuRequest.cs
 internal sealed class CreateMenuRequest
 {
     public string Name { get; set; } = string.Empty;
@@ -236,7 +236,7 @@ Add the following keys to the `admin.menus` block in `web/src/lib/i18n/locales/e
 
 ### Integration Test Scenarios
 
-Add to `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs`.
+Add to `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs`.
 
 Auth tests for POST (`401`, `403`) are already covered in Story 4.1 — do **not** duplicate them.
 
@@ -300,10 +300,10 @@ None — no halts or rework. One mid-edit typo (extra `}` in `MenuService.cs` li
 ### File List
 
 **Backend**:
-- `src/FormForge.Api/Features/Menus/Dtos/CreateMenuRequest.cs` (modified) — added `Guid? ParentId = null` positional parameter
-- `src/FormForge.Api/Features/Menus/MenuService.cs` (modified) — added `ParentNotFound` + `MaxDepthExceeded` outcomes, depth-validation guard block in `CreateMenuAsync`, `ParentId = request.ParentId` on entity construction
-- `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` (modified) — added 422 Problem arms for new outcomes
-- `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` (modified) — added 3 new sub-menu tests + `CreateSubMenuViaApiAsync` helper
+- `src/AppForge.Api/Features/Menus/Dtos/CreateMenuRequest.cs` (modified) — added `Guid? ParentId = null` positional parameter
+- `src/AppForge.Api/Features/Menus/MenuService.cs` (modified) — added `ParentNotFound` + `MaxDepthExceeded` outcomes, depth-validation guard block in `CreateMenuAsync`, `ParentId = request.ParentId` on entity construction
+- `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` (modified) — added 422 Problem arms for new outcomes
+- `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` (modified) — added 3 new sub-menu tests + `CreateSubMenuViaApiAsync` helper
 
 **Frontend**:
 - `web/src/features/menu/types.ts` (modified) — added `parentId?: string | null` to `CreateMenuRequest`

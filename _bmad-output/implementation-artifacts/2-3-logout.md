@@ -19,14 +19,14 @@ so that my session cannot be resumed from this browser or from a stolen refresh 
 **Then** the server returns HTTP 204 No Content
 **And** the corresponding `refresh_tokens` row is marked `RevokedAt = now()` server-side
 **And** the response sets a `refresh_token` cookie with `Expires=Thu, 01 Jan 1970 00:00:00 GMT` (or equivalent past date) + `Max-Age=0`, same `Path=/api/auth`, `HttpOnly`, `SameSite=Strict`, and `Secure` flags as the original cookie, so the browser drops the cookie atomically with the server-side revoke
-**And** the `formforge.refresh_token.revoked` OTel counter (from Story 2.2's `AuthMetrics`) is incremented by 1
+**And** the `appforge.refresh_token.revoked` OTel counter (from Story 2.2's `AuthMetrics`) is incremented by 1
 
 ### AC-2 — Subsequent refresh with the revoked token fails closed
 
 **Given** the user has just logged out (the previously valid refresh token is now `RevokedAt != null`)
 **When** the client POSTs `/api/auth/refresh` with that same revoked token (e.g., a stale cached cookie, a stolen token, or an attacker)
 **Then** the server returns HTTP 401 with `ProblemDetails { code: "REFRESH_TOKEN_INVALID", messageKey: "auth.refreshTokenInvalid", correlationId: "..." }`
-**And** the `formforge.refresh_token.replayed` counter is incremented (the existing `AuthService.RefreshAsync` Replayed branch handles this — see Dev Notes)
+**And** the `appforge.refresh_token.replayed` counter is incremented (the existing `AuthService.RefreshAsync` Replayed branch handles this — see Dev Notes)
 
 ### AC-3 — Logout is idempotent / no-information-leak on missing/invalid token
 
@@ -79,7 +79,7 @@ so that my session cannot be resumed from this browser or from a stolen refresh 
 
 ### Task 1 — Extend `IAuthService` with `LogoutAsync` (AC: 1, 2, 3)
 
-Add a new outcome enum + result record + interface method to `src/FormForge.Api/Features/Auth/AuthService.cs`. Place them next to the existing `AuthRefreshOutcome` / `AuthRefreshResult` (around lines 22–31).
+Add a new outcome enum + result record + interface method to `src/AppForge.Api/Features/Auth/AuthService.cs`. Place them next to the existing `AuthRefreshOutcome` / `AuthRefreshResult` (around lines 22–31).
 
 ```csharp
 internal enum AuthLogoutOutcome
@@ -166,11 +166,11 @@ public async Task<AuthLogoutResult> LogoutAsync(string? rawToken, CancellationTo
 }
 ```
 
-> **Why no `formforge.refresh_token.logged_out` counter is added in this story:** architecture (Decision 5.3, lines 645–651) lists exactly `formforge.refresh_token.{issued, revoked, replayed}`. Logout produces a `revoked` (when a row transitions); no new counter is in the spec for v1. If post-launch you want to disambiguate "revoked-by-logout" vs "revoked-by-rotation" vs "revoked-by-deactivation", add a `cause` tag to `RecordRevoked` in a later story — out of scope here.
+> **Why no `appforge.refresh_token.logged_out` counter is added in this story:** architecture (Decision 5.3, lines 645–651) lists exactly `appforge.refresh_token.{issued, revoked, replayed}`. Logout produces a `revoked` (when a row transitions); no new counter is in the spec for v1. If post-launch you want to disambiguate "revoked-by-logout" vs "revoked-by-rotation" vs "revoked-by-deactivation", add a `cause` tag to `RecordRevoked` in a later story — out of scope here.
 
 ### Task 3 — Add the `/logout` endpoint to `AuthEndpoints` (AC: 1, 3, 5, 6)
 
-Add the route registration inside `MapAuthEndpoints` in `src/FormForge.Api/Features/Auth/AuthEndpoints.cs` (after the existing `/refresh` registration at line 22–28):
+Add the route registration inside `MapAuthEndpoints` in `src/AppForge.Api/Features/Auth/AuthEndpoints.cs` (after the existing `/refresh` registration at line 22–28):
 
 ```csharp
 group.MapPost("/logout", LogoutHandler)
@@ -231,7 +231,7 @@ private static async Task<IResult> LogoutHandler(
 
 ### Task 4 — Backend integration tests for `/logout` (AC: 1, 2, 3, 5, 6)
 
-Append the following tests to `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`, after the existing `Refresh_*` tests (after line 280). All tests share the existing `LoginAndGetTokensAsync` helper and the `_client` configured with `HandleCookies = false` (critical for predictable cookie behavior — see Story 2.2 Debug Log).
+Append the following tests to `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`, after the existing `Refresh_*` tests (after line 280). All tests share the existing `LoginAndGetTokensAsync` helper and the `_client` configured with `HandleCookies = false` (critical for predictable cookie behavior — see Story 2.2 Debug Log).
 
 ```csharp
 [Fact]
@@ -247,7 +247,7 @@ public async Task Logout_ValidCookie_Returns204AndRevokesToken()
 
     // DB assertion: the token row is now revoked
     using var scope = _factory!.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+    var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
     var tokenHash = HashTokenForTest(rawToken);
     var row = await db.RefreshTokens.AsNoTracking().FirstAsync(r => r.TokenHash == tokenHash);
     Assert.NotNull(row.RevokedAt);
@@ -312,7 +312,7 @@ public async Task Logout_AlreadyRevokedToken_Returns204_NoSecondRevoke()
     DateTimeOffset? firstRevokedAt;
     using (var scope = _factory!.Services.CreateScope())
     {
-        var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
         var hash = HashTokenForTest(rawToken);
         firstRevokedAt = (await db.RefreshTokens.AsNoTracking().FirstAsync(r => r.TokenHash == hash)).RevokedAt;
     }
@@ -327,7 +327,7 @@ public async Task Logout_AlreadyRevokedToken_Returns204_NoSecondRevoke()
     // RevokedAt is unchanged — we did not overwrite the original revocation timestamp
     using (var scope = _factory!.Services.CreateScope())
     {
-        var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
         var hash = HashTokenForTest(rawToken);
         var row = await db.RefreshTokens.AsNoTracking().FirstAsync(r => r.TokenHash == hash);
         Assert.Equal(firstRevokedAt, row.RevokedAt);
@@ -513,16 +513,16 @@ No `Bearer` security requirement should appear on this endpoint (cookie-only, AC
 
 Two reviewers ran in parallel against commit `6e4afa8`: Blind Hunter (diff only) and Edge Case Hunter (diff + repo). The Acceptance Auditor (diff + spec) found zero violations — the diff implements the prescribed recipe verbatim. Most Blind Hunter findings were dismissed as intentional spec decisions (AC-6 cookie-only auth, AC-4 unconditional client logout, shared `auth-refresh` rate-limit policy justified in Task 3, JWT-revocation explicitly out of scope, `_ = ` discard documented in Task 3, `HashTokenForTest` duplication justified in Task 4).
 
-- [x] [Review][Patch] Add `Set-Cookie` header assertion to `Logout_NoCookie_Returns204_NotChallenge` — AC-3 requires the cookie-clearing header on the no-cookie path; current test only asserts 204 + empty body, so a regression that conditioned the `Cookies.Append(...)` call on token presence would not be caught. [src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs around the `Logout_NoCookie_Returns204_NotChallenge` body] — applied 2026-05-23
-- [x] [Review][Patch] Add `Set-Cookie` header assertion to `Logout_UnknownToken_Returns204` — same AC-3 coverage gap as above on the unknown-token NoOp branch. [src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs around the `Logout_UnknownToken_Returns404` test] — applied 2026-05-23
-- [x] [Review][Defer] Concurrent logout-vs-refresh race leaves rotated-chain token valid [src/FormForge.Api/Features/Auth/AuthService.cs `LogoutAsync`] — deferred, real concurrency gap not addressed by spec
-- [x] [Review][Defer] No test exercises the `DbUpdateConcurrencyException` NoOp branch [src/FormForge.Api/Features/Auth/AuthService.cs catch block] — deferred, hard to reproduce in integration tests
+- [x] [Review][Patch] Add `Set-Cookie` header assertion to `Logout_NoCookie_Returns204_NotChallenge` — AC-3 requires the cookie-clearing header on the no-cookie path; current test only asserts 204 + empty body, so a regression that conditioned the `Cookies.Append(...)` call on token presence would not be caught. [src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs around the `Logout_NoCookie_Returns204_NotChallenge` body] — applied 2026-05-23
+- [x] [Review][Patch] Add `Set-Cookie` header assertion to `Logout_UnknownToken_Returns204` — same AC-3 coverage gap as above on the unknown-token NoOp branch. [src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs around the `Logout_UnknownToken_Returns404` test] — applied 2026-05-23
+- [x] [Review][Defer] Concurrent logout-vs-refresh race leaves rotated-chain token valid [src/AppForge.Api/Features/Auth/AuthService.cs `LogoutAsync`] — deferred, real concurrency gap not addressed by spec
+- [x] [Review][Defer] No test exercises the `DbUpdateConcurrencyException` NoOp branch [src/AppForge.Api/Features/Auth/AuthService.cs catch block] — deferred, hard to reproduce in integration tests
 - [x] [Review][Defer] Logout button missing `aria-busy` [web/src/routes/_app.tsx button] — deferred, Story 4.7 / Epic 7 owns navbar polish
 - [x] [Review][Defer] `fetch('/api/auth/logout')` has no `AbortSignal` / timeout [web/src/features/auth/authMutations.ts] — deferred, hung-network edge case
-- [x] [Review][Defer] No length / format guard on `rawToken` before SHA-256 hashing [src/FormForge.Api/Features/Auth/AuthService.cs `LogoutAsync`] — deferred, DoS amplifier shared with refresh path
-- [x] [Review][Defer] Rate-limited 429 response on `/logout` does NOT emit cookie-clearing Set-Cookie [src/FormForge.Api/Program.cs `OnRejected` handler] — deferred, conflicts with AC-1/AC-3 "always emits" but is cross-cutting middleware change
-- [x] [Review][Defer] `Logout_AlreadyRevokedToken_Returns204_NoSecondRevoke` does not assert `RecordRevoked()` was NOT called second time [src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs] — deferred, needs metric-test infrastructure
-- [x] [Review][Defer] Misconfigured proxy can strip HTTPS, leaving `Secure=true` and dropping the cookie-clearing Set-Cookie over plain HTTP [src/FormForge.Api/Features/Auth/AuthEndpoints.cs `secure` computation] — deferred, deployment hardening affecting login path too
+- [x] [Review][Defer] No length / format guard on `rawToken` before SHA-256 hashing [src/AppForge.Api/Features/Auth/AuthService.cs `LogoutAsync`] — deferred, DoS amplifier shared with refresh path
+- [x] [Review][Defer] Rate-limited 429 response on `/logout` does NOT emit cookie-clearing Set-Cookie [src/AppForge.Api/Program.cs `OnRejected` handler] — deferred, conflicts with AC-1/AC-3 "always emits" but is cross-cutting middleware change
+- [x] [Review][Defer] `Logout_AlreadyRevokedToken_Returns204_NoSecondRevoke` does not assert `RecordRevoked()` was NOT called second time [src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs] — deferred, needs metric-test infrastructure
+- [x] [Review][Defer] Misconfigured proxy can strip HTTPS, leaving `Secure=true` and dropping the cookie-clearing Set-Cookie over plain HTTP [src/AppForge.Api/Features/Auth/AuthEndpoints.cs `secure` computation] — deferred, deployment hardening affecting login path too
 
 ### Task 9 — Build gates and manual verification (AC: all)
 
@@ -532,7 +532,7 @@ Two reviewers ran in parallel against commit `6e4afa8`: Blind Hunter (diff only)
 - [x] `cd web && npm run build` — clean TypeScript + Vite build.
 - [x] `cd web && npx tsc --noEmit` — type check passes (run via `tsc -b --noEmit` step inside `npm run build`).
 - [ ] Manual verification (interactive) — deferred to reviewer; no headed browser / full docker-compose stack available in this dev session. Automated coverage (integration tests + OpenAPI doc check) covers all server-side behavior; SPA logout button compiles and the `_app.tsx` rendering is exercised by the existing route tree.
-  - `dotnet run --project src/FormForge.AppHost` — Aspire Dashboard shows all services healthy.
+  - `dotnet run --project src/AppForge.AppHost` — Aspire Dashboard shows all services healthy.
   - Log in at `http://localhost:5173/login` with `test@example.com / Password1!`. Confirm landing on `/`.
   - Click "Sign out" in the top-right of `/`. Confirm:
     - Browser navigates to `/login`.
@@ -563,7 +563,7 @@ Two reviewers ran in parallel against commit `6e4afa8`: Blind Hunter (diff only)
 - Bearer token blacklist / JWT revocation list — the spec accepts the 15-min grace window; the access token is not server-revocable in v1. Adding a blacklist would contradict NFR-5 (stateless JWT verification).
 - Full styled logout button with shadcn/ui — Story 4.7 / Epic 7 owns final navbar UX.
 - `Cache-Control: no-store` on `/api/auth/*` responses — deferred from Story 2.2 (single sweep planned).
-- `formforge.refresh_token.logged_out` counter — not in architecture (Decision 5.3 lines 645–651); revisit if v2 needs cause disambiguation.
+- `appforge.refresh_token.logged_out` counter — not in architecture (Decision 5.3 lines 645–651); revisit if v2 needs cause disambiguation.
 - Logout-related security audit log entry — `schema_audit_log` and `mutation_audit_log` cover DDL and CRUD only (FR-28, FR-36); no auth-audit table exists in v1.
 
 ### Architecture compliance
@@ -582,11 +582,11 @@ Two reviewers ran in parallel against commit `6e4afa8`: Blind Hunter (diff only)
 
 ### Current code state (files being modified)
 
-`src/FormForge.Api/Features/Auth/AuthService.cs` — Add `AuthLogoutOutcome`, `AuthLogoutResult`, `IAuthService.LogoutAsync`, and the `LogoutAsync` method body. The existing `HashToken` (line 228) and `RefreshTokenConcurrencyConflict` LoggerMessage (line 242) are reused unchanged.
+`src/AppForge.Api/Features/Auth/AuthService.cs` — Add `AuthLogoutOutcome`, `AuthLogoutResult`, `IAuthService.LogoutAsync`, and the `LogoutAsync` method body. The existing `HashToken` (line 228) and `RefreshTokenConcurrencyConflict` LoggerMessage (line 242) are reused unchanged.
 
-`src/FormForge.Api/Features/Auth/AuthEndpoints.cs` — Add `MapPost("/logout", LogoutHandler)` registration (after `/refresh` registration at line 22–28) and the `LogoutHandler` static method (after `RefreshHandler`). The `SetRefreshCookieAndReturn` helper is NOT reused — logout writes a different cookie (Max-Age=0). However, the cookie *attributes* (`Path`, `HttpOnly`, `SameSite`, `Secure`) must mirror `SetRefreshCookieAndReturn` exactly so the browser identifies and overwrites the existing cookie rather than creating a parallel one.
+`src/AppForge.Api/Features/Auth/AuthEndpoints.cs` — Add `MapPost("/logout", LogoutHandler)` registration (after `/refresh` registration at line 22–28) and the `LogoutHandler` static method (after `RefreshHandler`). The `SetRefreshCookieAndReturn` helper is NOT reused — logout writes a different cookie (Max-Age=0). However, the cookie *attributes* (`Path`, `HttpOnly`, `SameSite`, `Secure`) must mirror `SetRefreshCookieAndReturn` exactly so the browser identifies and overwrites the existing cookie rather than creating a parallel one.
 
-`src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs` — Append 6–7 logout integration tests after the refresh tests (current end of class at line 280). Add the `HashTokenForTest` private helper next to `LoginAndGetTokensAsync` (line 282).
+`src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs` — Append 6–7 logout integration tests after the refresh tests (current end of class at line 280). Add the `HashTokenForTest` private helper next to `LoginAndGetTokensAsync` (line 282).
 
 `web/src/features/auth/authMutations.ts` — Add `useLogoutMutation` after the existing `useLoginMutation`. Add `useQueryClient` to the imports from `@tanstack/react-query`. Add `generateCorrelationId` import.
 
@@ -596,12 +596,12 @@ Two reviewers ran in parallel against commit `6e4afa8`: Blind Hunter (diff only)
 
 ### Do NOT touch
 
-- `src/FormForge.Api/Features/Auth/JwtTokenService.cs` — JWT issuance is unchanged.
-- `src/FormForge.Api/Features/Auth/AuthMetrics.cs` — counters are unchanged. `RecordRevoked()` is reused as-is.
-- `src/FormForge.Api/Features/Auth/Dtos/LoginResponse.cs` — logout has no response body.
-- `src/FormForge.Api/Domain/Entities/RefreshToken.cs` — no schema change. `[ConcurrencyCheck]` from Story 2.2 is already in place and is what makes the logout race-safe.
+- `src/AppForge.Api/Features/Auth/JwtTokenService.cs` — JWT issuance is unchanged.
+- `src/AppForge.Api/Features/Auth/AuthMetrics.cs` — counters are unchanged. `RecordRevoked()` is reused as-is.
+- `src/AppForge.Api/Features/Auth/Dtos/LoginResponse.cs` — logout has no response body.
+- `src/AppForge.Api/Domain/Entities/RefreshToken.cs` — no schema change. `[ConcurrencyCheck]` from Story 2.2 is already in place and is what makes the logout race-safe.
 - Any existing EF Core migration files.
-- `src/FormForge.Api/Program.cs` — no changes. The "auth-refresh" policy is reused; no third policy added; no new service registrations needed (`AuthMetrics` and `IAuthService` are already registered).
+- `src/AppForge.Api/Program.cs` — no changes. The "auth-refresh" policy is reused; no third policy added; no new service registrations needed (`AuthMetrics` and `IAuthService` are already registered).
 - `web/src/features/auth/httpClient.ts` — the existing 401-retry logic correctly excludes `/api/auth/login` and `/api/auth/refresh`; `/api/auth/logout` is not 401-retried because it returns 204 on the happy path (no 401 to trigger retry). Do not add a third exclusion.
 - `web/src/features/auth/useAuthQuery.ts` — the 13-min refetch is naturally cancelled when `_app.tsx` unmounts on navigation to `/login`. No code change needed.
 - `web/src/routes/login.tsx` — no change.
@@ -620,7 +620,7 @@ Two reviewers ran in parallel against commit `6e4afa8`: Blind Hunter (diff only)
 | Diverge cookie attributes (`Path`, `SameSite`, `HttpOnly`, `Secure`) between login/refresh and logout | The browser matches cookies by name + path + domain. Mismatched attributes create a *parallel* cookie instead of overwriting the existing one — leaving the original cookie in place and the user "logged in" forever. |
 | Set `Cache-Control: no-store` only on `/logout` | Deferred from Story 2.2 — single sweep across all `/api/auth/*` planned. Don't ship an inconsistent half-fix. |
 | Add a third rate-limit policy ("auth-logout") | "auth-refresh" (30/min per IP) is the right shape for logout volume too. Don't bloat `Program.cs`. |
-| Increment `RecordRevoked()` in the NoOp branch | The counter measures actual state transitions. Incrementing on NoOp would distort the `formforge.refresh_token.revoked` dashboard. |
+| Increment `RecordRevoked()` in the NoOp branch | The counter measures actual state transitions. Incrementing on NoOp would distort the `appforge.refresh_token.revoked` dashboard. |
 | Add a Bearer security requirement to the `/logout` OpenAPI spec | AC-6 — cookie-only. Per-endpoint `RequireAuthorization()` would force a Bearer requirement and break the spec. |
 | Overwrite `RevokedAt` on a second logout call | Idempotency invariant: a token transitions `unrevoked → revoked` exactly once. Re-setting the timestamp would falsely report a fresh revocation and confuse audit-trail readers. The current code (Task 2) correctly returns NoOp on the already-revoked branch. |
 | Add the logout button inline in the page body | Story 4.7 owns final navbar placement. Keep the placeholder in `<header>` of `AppLayout` — easy to lift out when Story 4.7 builds the real navbar. |
@@ -678,9 +678,9 @@ Recent commits (most recent first):
 
 **Modified files (backend):**
 
-- `src/FormForge.Api/Features/Auth/AuthService.cs`
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs`
-- `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`
+- `src/AppForge.Api/Features/Auth/AuthService.cs`
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs`
+- `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`
 
 **Modified files (frontend):**
 
@@ -709,10 +709,10 @@ Recent commits (most recent first):
 - `_bmad-output/implementation-artifacts/2-1-jwt-login.md`
   - Task 10 — `SetRefreshCookieAndReturn` (the helper this story deliberately does NOT reuse but mirrors cookie attributes from)
 - `_bmad-output/implementation-artifacts/deferred-work.md` — Story 2.2 deferred: `Cache-Control: no-store` sweep (explicitly out of scope for this story)
-- `src/FormForge.Api/Features/Auth/AuthService.cs:228-242` — `HashToken` + `RefreshTokenConcurrencyConflict` LoggerMessage (reused)
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs:113-130` — `SetRefreshCookieAndReturn` (cookie attribute reference)
-- `src/FormForge.Api/Program.cs:155-164` — `"auth-refresh"` rate-limit policy (reused for `/logout`)
-- `src/FormForge.Api/Program.cs:278-280` — `MapGroup("/api/auth").MapAuthEndpoints()` (group is unauthenticated by design)
+- `src/AppForge.Api/Features/Auth/AuthService.cs:228-242` — `HashToken` + `RefreshTokenConcurrencyConflict` LoggerMessage (reused)
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs:113-130` — `SetRefreshCookieAndReturn` (cookie attribute reference)
+- `src/AppForge.Api/Program.cs:155-164` — `"auth-refresh"` rate-limit policy (reused for `/logout`)
+- `src/AppForge.Api/Program.cs:278-280` — `MapGroup("/api/auth").MapAuthEndpoints()` (group is unauthenticated by design)
 
 ---
 
@@ -724,7 +724,7 @@ claude-opus-4-7[1m]
 
 ### Debug Log References
 
-- `launchSettings.json` overrides `ASPNETCORE_URLS` — first attempt at the OpenAPI verification step bound to `http://localhost:5429` instead of the requested `127.0.0.1:55190`. Worked around by reading the actual listening URL from the startup log; in a follow-up run without a valid launch profile name (`--launch-profile FormForge.Api` does not exist), the app bound to `localhost:5000` (Production env). Both URLs returned the OpenAPI doc; the value verified is independent of the bind.
+- `launchSettings.json` overrides `ASPNETCORE_URLS` — first attempt at the OpenAPI verification step bound to `http://localhost:5429` instead of the requested `127.0.0.1:55190`. Worked around by reading the actual listening URL from the startup log; in a follow-up run without a valid launch profile name (`--launch-profile AppForge.Api` does not exist), the app bound to `localhost:5000` (Production env). Both URLs returned the OpenAPI doc; the value verified is independent of the bind.
 - After Task 3, ASP.NET Core OpenAPI emitted `"200": "OK"` as the only response for `/api/auth/logout` (framework default). The handler returns 204. Added `.Produces(StatusCodes.Status204NoContent)` to the route registration so `/openapi/v1.json` honestly advertises the contract (Task 8 explicit verification check). Verified post-change: `responses.204: "No Content"` is the only documented response.
 
 ### Completion Notes List
@@ -741,9 +741,9 @@ claude-opus-4-7[1m]
 
 Modified (backend):
 
-- `src/FormForge.Api/Features/Auth/AuthService.cs`
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs`
-- `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`
+- `src/AppForge.Api/Features/Auth/AuthService.cs`
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs`
+- `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`
 
 Modified (frontend):
 

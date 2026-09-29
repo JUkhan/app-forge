@@ -21,11 +21,11 @@ so that I am not presented with inaccessible options.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Backend: Public navbar DTOs** (AC: 1, 3)
-  - [x] Create `src/FormForge.Api/Features/Menus/Dtos/NavMenuItem.cs` — positional record `NavMenuItem(Guid Id, string Name, int Order, System.Text.Json.JsonElement? Icon, Guid? ParentId, IReadOnlyList<NavMenuItem> Children)`. Tree shape — top-level items contain their sub-menu `Children` inline; sub-menus serialize with `Children: []`. Icon is `JsonElement?` for the same reason `MenuResponse.Icon` is (Menu.Icon stored as JSON string, deserialized to object on response — see `MenuService.cs:390-400`).
+  - [x] Create `src/AppForge.Api/Features/Menus/Dtos/NavMenuItem.cs` — positional record `NavMenuItem(Guid Id, string Name, int Order, System.Text.Json.JsonElement? Icon, Guid? ParentId, IReadOnlyList<NavMenuItem> Children)`. Tree shape — top-level items contain their sub-menu `Children` inline; sub-menus serialize with `Children: []`. Icon is `JsonElement?` for the same reason `MenuResponse.Icon` is (Menu.Icon stored as JSON string, deserialized to object on response — see `MenuService.cs:390-400`).
   - [x] Note: do NOT reuse `MenuListItem` — it's flat, paginated, and lacks `icon` + `allowedRoleIds`. The admin endpoint deliberately returns a paginated flat list (Story 4.1/4.2). The navbar needs the role-filtered tree.
 
 - [x] **Task 2 — Backend: Real `MenuCache` implementation replacing `NoOpMenuCache`** (AC: 2)
-  - [x] Replace the body of `src/FormForge.Api/Features/Menus/MenuCache.cs` (current `NoOpMenuCache`) with a real `MenuCache : IMenuCache` that uses `IMemoryCache` + a single shared `CancellationTokenSource` for total-eviction-on-invalidate:
+  - [x] Replace the body of `src/AppForge.Api/Features/Menus/MenuCache.cs` (current `NoOpMenuCache`) with a real `MenuCache : IMenuCache` that uses `IMemoryCache` + a single shared `CancellationTokenSource` for total-eviction-on-invalidate:
     ```csharp
     internal sealed class MenuCache(IMemoryCache cache) : IMenuCache
     {
@@ -85,7 +85,7 @@ so that I am not presented with inaccessible options.
     Task<IReadOnlyList<NavMenuItem>> GetNavMenusForUserAsync(Guid userId, CancellationToken ct);
     ```
   - [x] Implementation flow in `MenuService.cs`:
-    1. Call `cache.TryGetAsync(userId, ct)` — if hit, return it (records OTel metric `formforge.menu_cache.hits` if metrics wired; bonus only).
+    1. Call `cache.TryGetAsync(userId, ct)` — if hit, return it (records OTel metric `appforge.menu_cache.hits` if metrics wired; bonus only).
     2. Resolve the user's role IDs via `IPermissionService.GetEffectivePermissionsAsync(userId, ct)` — `EffectivePermissions.RoleIds: HashSet<Guid>` is the cached canonical source (30 s TTL, event-bus invalidated — see `PermissionService.cs:73-77`). Do **NOT** query `db.UserRoles` directly — that bypasses the permission cache and duplicates seed-data role logic.
     3. Detect platform-admin: `roleIds.Contains(PlatformAdminRoleId)` where `PlatformAdminRoleId = new("00000000-0000-0000-0000-000000000001")`. Reuse the constant from `PermissionService.cs:13`; do NOT redefine it — extract to `Common/PlatformAdminRole.cs` if neither place exposes it publicly (PermissionService's is `private`; the cleanest move is to add `internal static class WellKnownRoles { public static readonly Guid PlatformAdminId = ...; }` under `Features/Permissions/`).
     4. EF query — single round-trip with `.Include(m => m.RoleAssignments)`:
@@ -105,11 +105,11 @@ so that I am not presented with inaccessible options.
        - Within each level, items are already in `Order, Id` order from the EF query — preserve that during dictionary population.
     6. Call `cache.SetAsync(userId, tree, CancellationToken.None)` — same race-fix rationale as Task 3; cache writes must not be skipped on cancel.
     7. Return the tree.
-  - [x] Inject `IPermissionService` into `MenuService` constructor: `internal sealed class MenuService(FormForgeDbContext db, IMenuCache cache, IPermissionService permissions) : IMenuService`. `IPermissionService` is singleton; `MenuService` is scoped; ASP.NET resolves singleton-into-scoped without issue (singleton has no scoped deps of its own — see `PermissionService.cs:31-46`).
+  - [x] Inject `IPermissionService` into `MenuService` constructor: `internal sealed class MenuService(AppForgeDbContext db, IMenuCache cache, IPermissionService permissions) : IMenuService`. `IPermissionService` is singleton; `MenuService` is scoped; ASP.NET resolves singleton-into-scoped without issue (singleton has no scoped deps of its own — see `PermissionService.cs:31-46`).
   - [x] **Why filter in memory, not in EF:** the `RoleAssignments` collection navigation lets us evaluate role intersection per-menu in-memory after a single Include — total rows in v1 are small (single-digit top-level, low-double-digit per parent per PRD). An EF `.Where(m => m.RoleAssignments.Any(ra => roleIds.Contains(ra.RoleId)))` translates to a correlated subquery per row; the simpler Include + LINQ-to-Objects path is faster at the v1 scale and easier to reason about. Document this in a code comment.
 
 - [x] **Task 5 — Backend: `MenuEndpoints.cs` + `/api/menus` route group** (AC: 1, 2)
-  - [x] Create `src/FormForge.Api/Features/Menus/MenuEndpoints.cs` — separate from `MenuAdminEndpoints.cs` because the public navbar endpoint is unrelated to admin CRUD and lives under a different group:
+  - [x] Create `src/AppForge.Api/Features/Menus/MenuEndpoints.cs` — separate from `MenuAdminEndpoints.cs` because the public navbar endpoint is unrelated to admin CRUD and lives under a different group:
     ```csharp
     internal static class MenuEndpoints
     {
@@ -151,7 +151,7 @@ so that I am not presented with inaccessible options.
   - [x] **Why `/api/menus` and not `/api/users/me/menus`:** architecture line 474 (`#### 3.5 — Endpoint Organization`) explicitly defines `app.MapGroup("/api/menus").RequireAuth().MapMenuEndpoints();`. Stick to the architecture.
 
 - [x] **Task 6 — Backend: Integration tests** (AC: 1, 2)
-  - [x] All tests go in `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` (existing file). Use the established `LoginAsync("admin@example.com", ...)` and `LoginAsync("viewer@example.com", ...)` helpers + `CreateMenuViaApiAsync`. Seed users: admin has `PlatformAdminRoleId`; viewer has `ViewerRoleId = "00000000-0000-0000-0000-000000000002"` (see `DesignerIntegrationTests.cs:22-23`).
+  - [x] All tests go in `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` (existing file). Use the established `LoginAsync("admin@example.com", ...)` and `LoginAsync("viewer@example.com", ...)` helpers + `CreateMenuViaApiAsync`. Seed users: admin has `PlatformAdminRoleId`; viewer has `ViewerRoleId = "00000000-0000-0000-0000-000000000002"` (see `DesignerIntegrationTests.cs:22-23`).
   - [x] `GetNavMenus_Unauthenticated_Returns401` — `GET /api/menus` with no JWT → 401.
   - [x] `GetNavMenus_AsPlatformAdmin_ReturnsAllActiveMenusFiltered` — admin token; seed 3 menus: A (active, no roles assigned), B (active, ViewerRoleId only), C (inactive). Assert response is `[A, B]` (C excluded because inactive; admin sees both regardless of roleAssignments per platform-admin bypass).
   - [x] `GetNavMenus_AsViewer_ReturnsOnlyRoleMatchingMenus` — viewer token; seed A (active, no roles), B (active, ViewerRoleId), C (active, PlatformAdminRoleId only). Assert response is `[B]` only (A has no roles assigned → no intersection → hidden; C is admin-only → hidden).
@@ -165,7 +165,7 @@ so that I am not presented with inaccessible options.
   - [x] Expected count: **+9 tests** (291 baseline from Story 4.6's two added theory rows → was 293, this brings it to **302**). If 4.6 review didn't bump the baseline yet in `_bmad-output`, recount after the dev step lands.
 
 - [x] **Task 7 — Backend: Tests for `MenuCache` unit behavior** (AC: 2)
-  - [x] Create `src/FormForge.Api.Tests/Features/Menus/MenuCacheTests.cs` — pure unit tests against `MenuCache` with a real `MemoryCache` (no PostgresFixture needed):
+  - [x] Create `src/AppForge.Api.Tests/Features/Menus/MenuCacheTests.cs` — pure unit tests against `MenuCache` with a real `MemoryCache` (no PostgresFixture needed):
     - `Set_then_TryGet_ReturnsSameInstance` — store + retrieve.
     - `Set_DifferentUsers_AreIsolated` — store for userA, TryGet for userB returns null.
     - `Invalidate_EvictsAllEntries` — store for userA + userB + userC; invalidate; all three TryGets return null.
@@ -328,10 +328,10 @@ so that I am not presented with inaccessible options.
 
 ### What Already Exists — Do NOT Recreate
 
-- **`Menu` entity with `IsActive`, `Order`, `ParentId`, `Icon`, `RoleAssignments` navigation** — `src/FormForge.Api/Domain/Entities/Menu.cs` (Story 4.1). No DB changes needed.
-- **Admin menu CRUD** — `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` already calls `await cache.InvalidateAsync(ct)` after every mutation. Task 3 fixes the `ct` race; Task 2 makes the invalidation actually do something.
-- **`IMenuCache` interface + `NoOpMenuCache` stub** — `src/FormForge.Api/Features/Menus/MenuCache.cs` (Story 4.1). Task 2 replaces the stub.
-- **`IPermissionService.GetEffectivePermissionsAsync`** — `src/FormForge.Api/Features/Permissions/PermissionService.cs:54` returns `EffectivePermissions.RoleIds: HashSet<Guid>`. Cached 30 s, event-bus invalidated. **Use this; do not query `db.UserRoles` directly.**
+- **`Menu` entity with `IsActive`, `Order`, `ParentId`, `Icon`, `RoleAssignments` navigation** — `src/AppForge.Api/Domain/Entities/Menu.cs` (Story 4.1). No DB changes needed.
+- **Admin menu CRUD** — `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` already calls `await cache.InvalidateAsync(ct)` after every mutation. Task 3 fixes the `ct` race; Task 2 makes the invalidation actually do something.
+- **`IMenuCache` interface + `NoOpMenuCache` stub** — `src/AppForge.Api/Features/Menus/MenuCache.cs` (Story 4.1). Task 2 replaces the stub.
+- **`IPermissionService.GetEffectivePermissionsAsync`** — `src/AppForge.Api/Features/Permissions/PermissionService.cs:54` returns `EffectivePermissions.RoleIds: HashSet<Guid>`. Cached 30 s, event-bus invalidated. **Use this; do not query `db.UserRoles` directly.**
 - **`PlatformAdminRoleId` constant `"00000000-0000-0000-0000-000000000001"`** — defined privately at `PermissionService.cs:13` and in tests at `DesignerIntegrationTests.cs:22`. Promote to `WellKnownRoles` per Task 4 OR re-declare in `MenuService` with a comment "mirrors PermissionService".
 - **`MenuListItem.cs` (admin paginated list DTO)** — keep as-is. `NavMenuItem` is a new DTO; do **not** merge them.
 - **`MenuResponse.Icon` JSON-element handling** — `MenuService.cs:390-400` deserializes `string?` storage → `JsonElement?` response. Reuse the same `ParseIcon` private method for `NavMenuItem.Icon`.
@@ -409,16 +409,16 @@ Patterns to carry forward verbatim:
 ### Project Structure Notes
 
 **Backend new files:**
-- `src/FormForge.Api/Features/Menus/Dtos/NavMenuItem.cs`
-- `src/FormForge.Api/Features/Menus/MenuEndpoints.cs`
-- `src/FormForge.Api/Features/Permissions/WellKnownRoles.cs` (optional helper; can inline if preferred)
-- `src/FormForge.Api.Tests/Features/Menus/MenuCacheTests.cs`
+- `src/AppForge.Api/Features/Menus/Dtos/NavMenuItem.cs`
+- `src/AppForge.Api/Features/Menus/MenuEndpoints.cs`
+- `src/AppForge.Api/Features/Permissions/WellKnownRoles.cs` (optional helper; can inline if preferred)
+- `src/AppForge.Api.Tests/Features/Menus/MenuCacheTests.cs`
 
 **Backend modified files:**
-- `src/FormForge.Api/Features/Menus/MenuCache.cs` — replace `NoOpMenuCache` with real `MenuCache`, extend interface
-- `src/FormForge.Api/Features/Menus/MenuService.cs` — add `GetNavMenusForUserAsync`, inject `IPermissionService`, change 6 `cache.InvalidateAsync(ct)` calls to `CancellationToken.None`
-- `src/FormForge.Api/Program.cs` — register `MenuCache` (replace `NoOpMenuCache`), add `/api/menus` route group
-- `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — +9 tests covering AC-1, AC-2
+- `src/AppForge.Api/Features/Menus/MenuCache.cs` — replace `NoOpMenuCache` with real `MenuCache`, extend interface
+- `src/AppForge.Api/Features/Menus/MenuService.cs` — add `GetNavMenusForUserAsync`, inject `IPermissionService`, change 6 `cache.InvalidateAsync(ct)` calls to `CancellationToken.None`
+- `src/AppForge.Api/Program.cs` — register `MenuCache` (replace `NoOpMenuCache`), add `/api/menus` route group
+- `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — +9 tests covering AC-1, AC-2
 
 **Frontend new files:**
 - `web/src/features/menu/useNavMenusQuery.ts`
@@ -454,7 +454,7 @@ Patterns to carry forward verbatim:
 - **Deferred items left open / re-pointed:**
   - `deferred-work.md:25` — MinIO objectKey existence check (re-pointed to future files-api story per Task 12)
   - **New item added:** `/api/files/refresh-urls` + full MinIO icon image rendering in navbar (Task 15)
-- **PermissionService pattern reference:** `src/FormForge.Api/Features/Permissions/PermissionService.cs:79-93` (token-bust cache write pattern); `:110-113` (platform-admin bypass)
+- **PermissionService pattern reference:** `src/AppForge.Api/Features/Permissions/PermissionService.cs:79-93` (token-bust cache write pattern); `:110-113` (platform-admin bypass)
 - **Existing `_app.tsx`:** `web/src/routes/_app.tsx:67-83` (current layout placeholder being replaced)
 - **Existing icon component:** `web/src/components/icons/LucideIcon.tsx` (admin only; do not modify)
 - **MenuService existing mutations:** `MenuService.cs:119, 147, 179, 271, 350, 370` (six `cache.InvalidateAsync(ct)` callsites that need the `ct → CancellationToken.None` swap)
@@ -503,16 +503,16 @@ Test counts: backend **293 → 306** (+13: 9 integration + 4 unit; story estimat
 ### File List
 
 **Backend new:**
-- `src/FormForge.Api/Features/Menus/Dtos/NavMenuItem.cs`
-- `src/FormForge.Api/Features/Menus/MenuEndpoints.cs`
-- `src/FormForge.Api/Features/Permissions/WellKnownRoles.cs`
-- `src/FormForge.Api.Tests/Features/Menus/MenuCacheTests.cs`
+- `src/AppForge.Api/Features/Menus/Dtos/NavMenuItem.cs`
+- `src/AppForge.Api/Features/Menus/MenuEndpoints.cs`
+- `src/AppForge.Api/Features/Permissions/WellKnownRoles.cs`
+- `src/AppForge.Api.Tests/Features/Menus/MenuCacheTests.cs`
 
 **Backend modified:**
-- `src/FormForge.Api/Features/Menus/MenuCache.cs` — `NoOpMenuCache` replaced with real `MenuCache` (singleton, IMemoryCache + CancellationTokenSource swap); `IMenuCache` extended with `TryGetAsync` + `SetAsync`.
-- `src/FormForge.Api/Features/Menus/MenuService.cs` — added `GetNavMenusForUserAsync`, injected `IPermissionService`, swapped 6 `cache.InvalidateAsync(ct)` calls to `CancellationToken.None`.
-- `src/FormForge.Api/Program.cs` — `AddSingleton<IMenuCache, NoOpMenuCache>` → `AddSingleton<IMenuCache, MenuCache>`; added `/api/menus` route group with `RequireAuth() + RequireRateLimiting("admin") + MapMenuEndpoints()`.
-- `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — added `ViewerRoleId` constant; extended `ReseedSystemRolesAsync` to seed it; extended `SeedTestUsersAsync` to bind viewer to it; +9 navbar integration tests in a new `// ---------- GET /api/menus (Story 4.7 ...) ----------` section; added `NavMenuItemDto` record for response deserialization.
+- `src/AppForge.Api/Features/Menus/MenuCache.cs` — `NoOpMenuCache` replaced with real `MenuCache` (singleton, IMemoryCache + CancellationTokenSource swap); `IMenuCache` extended with `TryGetAsync` + `SetAsync`.
+- `src/AppForge.Api/Features/Menus/MenuService.cs` — added `GetNavMenusForUserAsync`, injected `IPermissionService`, swapped 6 `cache.InvalidateAsync(ct)` calls to `CancellationToken.None`.
+- `src/AppForge.Api/Program.cs` — `AddSingleton<IMenuCache, NoOpMenuCache>` → `AddSingleton<IMenuCache, MenuCache>`; added `/api/menus` route group with `RequireAuth() + RequireRateLimiting("admin") + MapMenuEndpoints()`.
+- `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — added `ViewerRoleId` constant; extended `ReseedSystemRolesAsync` to seed it; extended `SeedTestUsersAsync` to bind viewer to it; +9 navbar integration tests in a new `// ---------- GET /api/menus (Story 4.7 ...) ----------` section; added `NavMenuItemDto` record for response deserialization.
 
 **Frontend new:**
 - `web/src/features/menu/useNavMenusQuery.ts`
@@ -546,10 +546,10 @@ Test counts: backend **293 → 306** (+13: 9 integration + 4 unit; story estimat
 - [x] [Review][Patch] Admin Link missing `min-w-[44px]` — AC-4 ≥ 44×44 px on every interactive control; safe in English (≈53px with px-2) but brittle to i18n [`web/src/routes/_app.tsx:73-78`]
 - [x] [Review][Patch] `renders nothing while loading` test is a weak guard — passes if anything other than emptyMessage renders; doesn't lock the skeleton behavior [`web/src/components/shared/__tests__/Navbar.test.tsx:45-49`]
 - [x] [Review][Defer] Role/permission-change does not invalidate MenuCache — sec-adjacent 5 s stale-menu window for affected user post-revoke; spec accepts 5 s TTL but role mutations should arguably bus-bust [`MenuCache.cs`, `PermissionService.cs:201-237`] — deferred, pre-existing
-- [x] [Review][Defer] MenuCache.SetAsync `_generation.Token` read non-atomic vs concurrent Invalidate's Dispose; narrow window race during shutdown / mutation burst [`src/FormForge.Api/Features/Menus/MenuCache.cs:50, 72`] — deferred, pre-existing
+- [x] [Review][Defer] MenuCache.SetAsync `_generation.Token` read non-atomic vs concurrent Invalidate's Dispose; narrow window race during shutdown / mutation burst [`src/AppForge.Api/Features/Menus/MenuCache.cs:50, 72`] — deferred, pre-existing
 - [x] [Review][Defer] Drawer is not a real WCAG dialog — no focus trap, no Escape key handler, body not inert, duplicate `closeMenu` aria-label on hamburger + backdrop; MinIO icon repeats the same generic placeholder label per row; axe-core scan not actually run [`web/src/components/shared/Navbar.tsx`] — deferred, pre-existing (Story 7.4 boundary)
-- [x] [Review][Defer] Cached `IReadOnlyList<NavMenuItem>` is a real `List<>` that a future caller could cast and mutate, corrupting the cached entry for every reader until TTL [`src/FormForge.Api/Features/Menus/MenuService.cs` Pass 3] — deferred, pre-existing
-- [x] [Review][Defer] Server allows depth-3+ menu nesting silently — `MenuService.GetNavMenusForUserAsync` attaches any sub-menu whose parent is visible regardless of depth; client only renders 2 levels so the depth-3 child is serialized but invisible [`src/FormForge.Api/Features/Menus/MenuService.cs:436-456`, `web/src/components/shared/Navbar.tsx:141-156`] — deferred, pre-existing
+- [x] [Review][Defer] Cached `IReadOnlyList<NavMenuItem>` is a real `List<>` that a future caller could cast and mutate, corrupting the cached entry for every reader until TTL [`src/AppForge.Api/Features/Menus/MenuService.cs` Pass 3] — deferred, pre-existing
+- [x] [Review][Defer] Server allows depth-3+ menu nesting silently — `MenuService.GetNavMenusForUserAsync` attaches any sub-menu whose parent is visible regardless of depth; client only renders 2 levels so the depth-3 child is serialized but invisible [`src/AppForge.Api/Features/Menus/MenuService.cs:436-456`, `web/src/components/shared/Navbar.tsx:141-156`] — deferred, pre-existing
 - [x] [Review][Defer] `openParents` Set unbounded over long-lived sessions — never reconciled against refetched data, ids of deleted/deactivated menus persist forever [`web/src/components/shared/Navbar.tsx:23-32`] — deferred, pre-existing
 - [x] [Review][Defer] `NavLucideIcon` whitelist (12 icons) is narrower than `IconPickerSection`'s full lucide set (~3000); admin-picked valid icons outside the list silently render as `Box` in the navbar with no admin-side warning [`web/src/components/icons/NavLucideIcon.tsx:25-49`, `web/src/components/icons/LucideIcon.tsx`] — deferred, pre-existing
-- [x] [Review][Defer] `GetNavMenus_CacheHit_ReturnsSameTreeAfterDirectDbMutation` is flaky if CI delay between the two fetches exceeds 5 s; needs `FakeTimeProvider` or equivalent clock-injection point [`src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs:1507-1549`] — deferred, pre-existing
+- [x] [Review][Defer] `GetNavMenus_CacheHit_ReturnsSameTreeAfterDirectDbMutation` is flaky if CI delay between the two fetches exceeds 5 s; needs `FakeTimeProvider` or equivalent clock-injection point [`src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs:1507-1549`] — deferred, pre-existing

@@ -37,8 +37,8 @@ so that I can update my credentials without admin involvement.
 ## Tasks / Subtasks
 
 - [x] Task 1: Add `ChangePasswordRequest` DTO and validator (AC-1, AC-2)
-  - [x] Create `src/FormForge.Api/Features/Users/Dtos/ChangePasswordRequest.cs` — record with `string CurrentPassword` and `string NewPassword`
-  - [x] Create `src/FormForge.Api/Features/Users/Validators/ChangePasswordRequestValidator.cs` — CurrentPassword: NotEmpty + MaximumLength(72); NewPassword: NotEmpty + MinimumLength(8) + MaximumLength(72)
+  - [x] Create `src/AppForge.Api/Features/Users/Dtos/ChangePasswordRequest.cs` — record with `string CurrentPassword` and `string NewPassword`
+  - [x] Create `src/AppForge.Api/Features/Users/Validators/ChangePasswordRequestValidator.cs` — CurrentPassword: NotEmpty + MaximumLength(72); NewPassword: NotEmpty + MinimumLength(8) + MaximumLength(72)
   - [x] Register both as `AddScoped` in `Program.cs` after the existing auth validators block
 
 - [x] Task 2: Extend `IAuthService` with `ChangePasswordAsync` (AC-1, AC-2, AC-3)
@@ -92,7 +92,7 @@ so that I can update my credentials without admin involvement.
 
 **`ChangePasswordRequest.cs`:**
 ```csharp
-namespace FormForge.Api.Features.Users.Dtos;
+namespace AppForge.Api.Features.Users.Dtos;
 
 internal sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 ```
@@ -275,9 +275,9 @@ private static async Task<IResult> ChangePasswordHandler(
 ```
 
 **Required `using` additions to `MeEndpoints.cs`:**
-- `using FormForge.Api.Common.Logging;` (for `GetCorrelationId()`) — check if already present; `UpdateMyPreferencesHandler` doesn't use it, so it may not be imported yet.
-- `using FormForge.Api.Features.Auth;` (for `IAuthService`, `ChangePasswordOutcome`) — check if already present.
-- `using FormForge.Api.Features.Users.Dtos;` — already present for `UpdateMyPreferencesRequest`.
+- `using AppForge.Api.Common.Logging;` (for `GetCorrelationId()`) — check if already present; `UpdateMyPreferencesHandler` doesn't use it, so it may not be imported yet.
+- `using AppForge.Api.Features.Auth;` (for `IAuthService`, `ChangePasswordOutcome`) — check if already present.
+- `using AppForge.Api.Features.Users.Dtos;` — already present for `UpdateMyPreferencesRequest`.
 
 ---
 
@@ -591,28 +591,28 @@ Add a new top-level `"settings"` object:
 
 | File | Purpose |
 |---|---|
-| `src/FormForge.Api/Features/Users/Dtos/ChangePasswordRequest.cs` | Request DTO |
-| `src/FormForge.Api/Features/Users/Validators/ChangePasswordRequestValidator.cs` | FluentValidation validator |
+| `src/AppForge.Api/Features/Users/Dtos/ChangePasswordRequest.cs` | Request DTO |
+| `src/AppForge.Api/Features/Users/Validators/ChangePasswordRequestValidator.cs` | FluentValidation validator |
 | `web/src/routes/_app/settings.tsx` | Authenticated user settings route |
 
 ### Files to MODIFY
 
 | File | Change |
 |---|---|
-| `src/FormForge.Api/Features/Auth/AuthService.cs` | Add `ChangePasswordOutcome` enum + `ChangePasswordResult` record + `IAuthService` method signature + implementation |
-| `src/FormForge.Api/Features/Users/MeEndpoints.cs` | Add `MapPut("/me/password", ...)` registration + `ChangePasswordHandler` method |
-| `src/FormForge.Api/Program.cs` | Add `"user-change-password"` rate-limit policy; register `ChangePasswordRequestValidator` |
+| `src/AppForge.Api/Features/Auth/AuthService.cs` | Add `ChangePasswordOutcome` enum + `ChangePasswordResult` record + `IAuthService` method signature + implementation |
+| `src/AppForge.Api/Features/Users/MeEndpoints.cs` | Add `MapPut("/me/password", ...)` registration + `ChangePasswordHandler` method |
+| `src/AppForge.Api/Program.cs` | Add `"user-change-password"` rate-limit policy; register `ChangePasswordRequestValidator` |
 | `web/src/features/auth/authMutations.ts` | Add `useChangePasswordMutation` |
 | `web/src/routes/_app.tsx` | Add `/settings` link in header (all users, not inside PermissionGate) |
 | `web/src/lib/i18n/locales/en.json` | Add `auth.currentPasswordIncorrect` and `settings.*` keys |
 
 ### Files to Leave Untouched
 
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs` — this change goes in `MeEndpoints.cs` (users group), not the auth group
-- `src/FormForge.Api/Features/Auth/EmailService.cs` — no email sent for password change
-- `src/FormForge.Api/Features/Auth/PasswordHasher.cs` — reused as-is; `Verify` and `Hash` already exist
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — no new entity, no migration needed
-- `src/FormForge.Api/Features/Permissions/PermissionsEndpoints.cs` — no changes; `MapUserSelfEndpoints` is already mapped in Program.cs alongside `MapMePreferencesEndpoints`
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs` — this change goes in `MeEndpoints.cs` (users group), not the auth group
+- `src/AppForge.Api/Features/Auth/EmailService.cs` — no email sent for password change
+- `src/AppForge.Api/Features/Auth/PasswordHasher.cs` — reused as-is; `Verify` and `Hash` already exist
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — no new entity, no migration needed
+- `src/AppForge.Api/Features/Permissions/PermissionsEndpoints.cs` — no changes; `MapUserSelfEndpoints` is already mapped in Program.cs alongside `MapMePreferencesEndpoints`
 - All Designer, Menu, CRUD, and Provisioning files — completely unrelated
 
 ---
@@ -652,7 +652,7 @@ Add a new top-level `"settings"` object:
 - **Pre-existing test failures:** `MutationAuditLogIntegrationTests` and `SchemaAuditLogIntegrationTests` have 2 DELETE→405 failures on a clean tree — ignore. Frontend: `i18n-lint.test.ts` fails with 1 pre-existing key (`designer.inspector.placeholders.label`) — ignore.
 - **No EF Core migration needed** — no new tables or columns. `password_reset_tokens` was added in Story 2.11; `users` already has all needed columns.
 - **`AuthService` is `internal sealed partial class`** — it must remain `partial` for the `[LoggerMessage]` source-generation to compile. Do not remove the `partial` keyword.
-- **`ExecuteUpdateAsync` order matters** — call it BEFORE `SaveChangesAsync`. The `ExecuteUpdateAsync` is a direct DB UPDATE that bypasses change tracking; `SaveChangesAsync` then flushes the tracked user entity changes (PasswordHash, UpdatedAt). Both must succeed for the operation to be consistent (they use the same `FormForgeDbContext` and are in the same implicit transaction if wrapped, but they're issued as separate SQL statements here — this is acceptable as the architecture established this pattern in `ResetPasswordAsync`).
+- **`ExecuteUpdateAsync` order matters** — call it BEFORE `SaveChangesAsync`. The `ExecuteUpdateAsync` is a direct DB UPDATE that bypasses change tracking; `SaveChangesAsync` then flushes the tracked user entity changes (PasswordHash, UpdatedAt). Both must succeed for the operation to be consistent (they use the same `AppForgeDbContext` and are in the same implicit transaction if wrapped, but they're issued as separate SQL statements here — this is acceptable as the architecture established this pattern in `ResetPasswordAsync`).
 
 ### Testing
 
@@ -673,12 +673,12 @@ Unit-test recommendation (follow `EmailServiceTests` pattern for isolated servic
 
 - [Source: `_bmad-output/planning-artifacts/epics.md` — Epic 2 overview, Story 2.12, FR-52, AR-55]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` — Decision 2.11, Decision 2.4 (BCrypt), Decision 2.6 (rate limiting), Decision 4.6 (feature folder structure), Decision 4.9 (form composition)]
-- [Source: `src/FormForge.Api/Features/Auth/AuthService.cs` — `HashToken`, `PasswordResetOutcome`/`PasswordResetResult` pattern, `ResetPasswordAsync` implementation, `ExecuteUpdateAsync` bulk-revoke pattern]
-- [Source: `src/FormForge.Api/Features/Auth/AuthEndpoints.cs` — ProblemDetails extension dict pattern, handler signature pattern]
-- [Source: `src/FormForge.Api/Features/Users/MeEndpoints.cs` — current file to extend with new endpoint; `UpdateMyPreferencesHandler` pattern for `userId` claim extraction]
-- [Source: `src/FormForge.Api/Features/Users/UserEndpoints.cs` — admin-facing user update for comparison; confirm `MeEndpoints` is the right place (not `UserEndpoints`)]
-- [Source: `src/FormForge.Api/Program.cs` — `AddRateLimiter` block (lines ~287–386), "admin" sliding-window policy pattern to mirror, validator registration pattern, `/api/users` route group mapping (line ~572)]
-- [Source: `src/FormForge.Api/Features/Permissions/PermissionsEndpoints.cs` — `MapUserSelfEndpoints` already lives in `/api/users` group alongside `MapMePreferencesEndpoints`]
+- [Source: `src/AppForge.Api/Features/Auth/AuthService.cs` — `HashToken`, `PasswordResetOutcome`/`PasswordResetResult` pattern, `ResetPasswordAsync` implementation, `ExecuteUpdateAsync` bulk-revoke pattern]
+- [Source: `src/AppForge.Api/Features/Auth/AuthEndpoints.cs` — ProblemDetails extension dict pattern, handler signature pattern]
+- [Source: `src/AppForge.Api/Features/Users/MeEndpoints.cs` — current file to extend with new endpoint; `UpdateMyPreferencesHandler` pattern for `userId` claim extraction]
+- [Source: `src/AppForge.Api/Features/Users/UserEndpoints.cs` — admin-facing user update for comparison; confirm `MeEndpoints` is the right place (not `UserEndpoints`)]
+- [Source: `src/AppForge.Api/Program.cs` — `AddRateLimiter` block (lines ~287–386), "admin" sliding-window policy pattern to mirror, validator registration pattern, `/api/users` route group mapping (line ~572)]
+- [Source: `src/AppForge.Api/Features/Permissions/PermissionsEndpoints.cs` — `MapUserSelfEndpoints` already lives in `/api/users` group alongside `MapMePreferencesEndpoints`]
 - [Source: `web/src/features/auth/authMutations.ts` — `useResetPasswordMutation` pattern for PUT void mutation]
 - [Source: `web/src/features/auth/httpClient.ts` — lines 93–104: 401 retry behavior that will fire on wrong currentPassword; `httpClient.put` available]
 - [Source: `web/src/routes/_app.tsx` — header layout, existing imports, `PermissionGate` and `SettingsIcon` usage; where to insert the new `/settings` nav link]
@@ -715,26 +715,26 @@ claude-sonnet-4-6 (story authoring); claude-opus-4-8 (implementation)
 ### File List
 
 **Created:**
-- `src/FormForge.Api/Features/Users/Dtos/ChangePasswordRequest.cs`
-- `src/FormForge.Api/Features/Users/Validators/ChangePasswordRequestValidator.cs`
+- `src/AppForge.Api/Features/Users/Dtos/ChangePasswordRequest.cs`
+- `src/AppForge.Api/Features/Users/Validators/ChangePasswordRequestValidator.cs`
 - `web/src/routes/_app/settings.tsx`
 
 **Modified:**
-- `src/FormForge.Api/Features/Auth/AuthService.cs` — `ChangePasswordOutcome` enum, `ChangePasswordResult` record, `IAuthService.ChangePasswordAsync` signature + implementation
-- `src/FormForge.Api/Features/Users/MeEndpoints.cs` — `PUT /me/password` registration + `ChangePasswordHandler`; added `using FormForge.Api.Common.Logging;` and `using FormForge.Api.Features.Auth;`
-- `src/FormForge.Api/Program.cs` — `"user-change-password"` rate-limit policy; `ChangePasswordRequestValidator` DI registration
+- `src/AppForge.Api/Features/Auth/AuthService.cs` — `ChangePasswordOutcome` enum, `ChangePasswordResult` record, `IAuthService.ChangePasswordAsync` signature + implementation
+- `src/AppForge.Api/Features/Users/MeEndpoints.cs` — `PUT /me/password` registration + `ChangePasswordHandler`; added `using AppForge.Api.Common.Logging;` and `using AppForge.Api.Features.Auth;`
+- `src/AppForge.Api/Program.cs` — `"user-change-password"` rate-limit policy; `ChangePasswordRequestValidator` DI registration
 - `web/src/features/auth/authMutations.ts` — `useChangePasswordMutation`
 - `web/src/routes/_app.tsx` — `/settings` header nav link (all users, outside `PermissionGate`); `KeyRound` import
 - `web/src/lib/i18n/locales/en.json` — `auth.currentPasswordIncorrect` + top-level `settings.*` keys
-- `src/FormForge.Api.Tests/Features/Users/MeIntegrationTests.cs` — 6 new integration tests + `LoginFullAsync` helper; `using System.Text.Json;`
+- `src/AppForge.Api.Tests/Features/Users/MeIntegrationTests.cs` — 6 new integration tests + `LoginFullAsync` helper; `using System.Text.Json;`
 - `web/src/routeTree.gen.ts` — regenerated by the TanStack Router plugin to include `/settings`
 
 ### Review Findings
 
-- [x] [Review][Decision→Patch] Null `refresh_token` cookie silently revokes ALL sessions — refactored predicate to explicit `if/else`; null-cookie path explicitly revokes all (same as `ResetPasswordAsync`); non-null path revokes all except the identified session [src/FormForge.Api/Features/Auth/AuthService.cs]
-- [x] [Review][Patch] `ChangePasswordAsync` does not check `user.IsActive` — added `IsActive` guard after the user-null check; deactivated users with valid JWTs now get `CurrentPasswordIncorrect` [src/FormForge.Api/Features/Auth/AuthService.cs]
-- [x] [Review][Patch] `ValidationProblem` for `NewPasswordSameAsCurrent` has no `code` extension key — added `["code"] = "PASSWORD_SAME_AS_CURRENT"` to the 422 extensions [src/FormForge.Api/Features/Users/MeEndpoints.cs]
-- [x] [Review][Defer] `ExecuteUpdateAsync` + `SaveChangesAsync` not in explicit transaction — if `SaveChangesAsync` fails, tokens are revoked but password unchanged; spec explicitly accepts this pattern ("same as ResetPasswordAsync, acceptable") [src/FormForge.Api/Features/Auth/AuthService.cs] — deferred, pre-existing architecture
+- [x] [Review][Decision→Patch] Null `refresh_token` cookie silently revokes ALL sessions — refactored predicate to explicit `if/else`; null-cookie path explicitly revokes all (same as `ResetPasswordAsync`); non-null path revokes all except the identified session [src/AppForge.Api/Features/Auth/AuthService.cs]
+- [x] [Review][Patch] `ChangePasswordAsync` does not check `user.IsActive` — added `IsActive` guard after the user-null check; deactivated users with valid JWTs now get `CurrentPasswordIncorrect` [src/AppForge.Api/Features/Auth/AuthService.cs]
+- [x] [Review][Patch] `ValidationProblem` for `NewPasswordSameAsCurrent` has no `code` extension key — added `["code"] = "PASSWORD_SAME_AS_CURRENT"` to the 422 extensions [src/AppForge.Api/Features/Users/MeEndpoints.cs]
+- [x] [Review][Defer] `ExecuteUpdateAsync` + `SaveChangesAsync` not in explicit transaction — if `SaveChangesAsync` fails, tokens are revoked but password unchanged; spec explicitly accepts this pattern ("same as ResetPasswordAsync, acceptable") [src/AppForge.Api/Features/Auth/AuthService.cs] — deferred, pre-existing architecture
 - [x] [Review][Defer] 401 from wrong-current-password triggers `httpClient` retry, consuming 2 rate-limit slots per attempt (only ~2–3 visible tries/min, not 5) — spec dev notes explicitly say "Tolerable in v1" [web/src/lib/api/httpClient.ts] — deferred, documented known trade-off
 
 ## Change Log

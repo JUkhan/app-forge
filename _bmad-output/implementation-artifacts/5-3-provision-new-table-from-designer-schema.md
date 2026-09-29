@@ -44,15 +44,15 @@ So that a real PostgreSQL table backs the data module.
 
 - [x] **Task 1 — Add Dapper NuGet package** (AC: 1, 3)
   - [x] In `Directory.Packages.props`, add: `<PackageVersion Include="Dapper" Version="2.1.66" />` (add after the existing Npgsql line)
-  - [x] In `src/FormForge.Api/FormForge.Api.csproj`, add: `<PackageReference Include="Dapper" />` (in the same `<ItemGroup>` as other references)
+  - [x] In `src/AppForge.Api/AppForge.Api.csproj`, add: `<PackageReference Include="Dapper" />` (in the same `<ItemGroup>` as other references)
   - [x] The Npgsql driver is already present via `Npgsql.EntityFrameworkCore.PostgreSQL` — no additional Npgsql package needed
-  - [x] Also add Dapper to the test project `src/FormForge.Api.Tests/FormForge.Api.Tests.csproj` so tests can query dynamic tables directly
+  - [x] Also add Dapper to the test project `src/AppForge.Api.Tests/AppForge.Api.Tests.csproj` so tests can query dynamic tables directly
 
 - [x] **Task 2 — Create `DbConnectionFactory`** (AC: 1, 3)
-  - [ ] Create `src/FormForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs`:
+  - [ ] Create `src/AppForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs`:
     ```csharp
     using Npgsql;
-    namespace FormForge.Api.Infrastructure.Persistence;
+    namespace AppForge.Api.Infrastructure.Persistence;
 
     // Wraps raw NpgsqlConnection for Dapper DDL execution (Decision 1.6).
     // DDL paths use CommandTimeout = 60; the EF-managed static schema uses the
@@ -60,8 +60,8 @@ So that a real PostgreSQL table backs the data module.
     internal sealed class DbConnectionFactory(IConfiguration configuration)
     {
         private string ConnectionString =>
-            configuration.GetConnectionString("formforge")
-            ?? throw new InvalidOperationException("Connection string 'formforge' not configured.");
+            configuration.GetConnectionString("appforge")
+            ?? throw new InvalidOperationException("Connection string 'appforge' not configured.");
 
         public async Task<NpgsqlConnection> CreateOpenConnectionAsync(CancellationToken ct = default)
         {
@@ -76,9 +76,9 @@ So that a real PostgreSQL table backs the data module.
   - [ ] Register as singleton in `Program.cs` (step in Task 9)
 
 - [x] **Task 3 — Create `SchemaAuditLogEntry` entity** (AC: 5)
-  - [ ] Create `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`:
+  - [ ] Create `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`:
     ```csharp
-    namespace FormForge.Api.Domain.Entities;
+    namespace AppForge.Api.Domain.Entities;
 
     internal sealed class SchemaAuditLogEntry
     {
@@ -94,7 +94,7 @@ So that a real PostgreSQL table backs the data module.
     }
     ```
 
-- [x] **Task 4 — Update `FormForgeDbContext` with SchemaAuditLog** (AC: 5)
+- [x] **Task 4 — Update `AppForgeDbContext` with SchemaAuditLog** (AC: 5)
   - [ ] Add `public DbSet<SchemaAuditLogEntry> SchemaAuditLog => Set<SchemaAuditLogEntry>();` to the DbSet section (after `MenuRoleAssignments`)
   - [ ] Add entity config in `OnModelCreating`:
     ```csharp
@@ -121,7 +121,7 @@ So that a real PostgreSQL table backs the data module.
   - [ ] **Array column**: EF Core + Npgsql handles `string[]` ↔ `text[]` transparently. No extra config needed beyond `HasColumnType("text[]")`.
 
 - [x] **Task 5 — Add EF migration: `CreateSchemaAuditLog`** (AC: 5)
-  - [ ] Run: `dotnet ef migrations add CreateSchemaAuditLog --project src/FormForge.Api --startup-project src/FormForge.Api`
+  - [ ] Run: `dotnet ef migrations add CreateSchemaAuditLog --project src/AppForge.Api --startup-project src/AppForge.Api`
   - [ ] Verify the generated migration creates:
     - Table `schema_audit_log` with all 9 columns
     - Index `idx_schema_audit_log_designer_id_created_at` on `(designer_id, created_at DESC)`
@@ -132,9 +132,9 @@ So that a real PostgreSQL table backs the data module.
 
 - [x] **Task 6 — Create SchemaRegistry infrastructure** (AC: 5)
 
-  **6a — `ColumnDefinition.cs`** (`src/FormForge.Api/Features/SchemaRegistry/ColumnDefinition.cs`):
+  **6a — `ColumnDefinition.cs`** (`src/AppForge.Api/Features/SchemaRegistry/ColumnDefinition.cs`):
   ```csharp
-  namespace FormForge.Api.Features.SchemaRegistry;
+  namespace AppForge.Api.Features.SchemaRegistry;
 
   internal sealed record ColumnDefinition(
       string ColumnName,      // validated fieldKey — becomes the PG column name
@@ -143,9 +143,9 @@ So that a real PostgreSQL table backs the data module.
       bool IsImage);          // drives presigned URL serialization in Epic 6
   ```
 
-  **6b — `SchemaRegistryEntry.cs`** (`src/FormForge.Api/Features/SchemaRegistry/SchemaRegistryEntry.cs`):
+  **6b — `SchemaRegistryEntry.cs`** (`src/AppForge.Api/Features/SchemaRegistry/SchemaRegistryEntry.cs`):
   ```csharp
-  namespace FormForge.Api.Features.SchemaRegistry;
+  namespace AppForge.Api.Features.SchemaRegistry;
 
   internal sealed record SchemaRegistryEntry(
       string DesignerId,
@@ -155,9 +155,9 @@ So that a real PostgreSQL table backs the data module.
       DateTimeOffset CachedAt);
   ```
 
-  **6c — `ComponentTypeMapper.cs`** (`src/FormForge.Api/Features/SchemaRegistry/ComponentTypeMapper.cs`):
+  **6c — `ComponentTypeMapper.cs`** (`src/AppForge.Api/Features/SchemaRegistry/ComponentTypeMapper.cs`):
   ```csharp
-  namespace FormForge.Api.Features.SchemaRegistry;
+  namespace AppForge.Api.Features.SchemaRegistry;
 
   // Decision 1.2 — complete 14-component PG type mapping.
   // Returns null when the component type produces no column (structural / UI-only).
@@ -189,10 +189,10 @@ So that a real PostgreSQL table backs the data module.
   }
   ```
 
-  **6d — `RootElementParser.cs`** (`src/FormForge.Api/Features/SchemaRegistry/RootElementParser.cs`):
+  **6d — `RootElementParser.cs`** (`src/AppForge.Api/Features/SchemaRegistry/RootElementParser.cs`):
   ```csharp
   using System.Text.Json;
-  namespace FormForge.Api.Features.SchemaRegistry;
+  namespace AppForge.Api.Features.SchemaRegistry;
 
   // Walks the Designer's RootElement JSON tree and extracts the column definitions.
   // DFS traversal; structural containers (Stack, Row, Tabs) are entered but not
@@ -286,11 +286,11 @@ So that a real PostgreSQL table backs the data module.
       }
   }
   ```
-  **NOTE**: `RootElementParser` is in the `SchemaRegistry` namespace but references `SafeIdentifier` from `FormForge.Api.Features.Designer`. Add a `using FormForge.Api.Features.Designer;` at the top.
+  **NOTE**: `RootElementParser` is in the `SchemaRegistry` namespace but references `SafeIdentifier` from `AppForge.Api.Features.Designer`. Add a `using AppForge.Api.Features.Designer;` at the top.
 
-  **6e — `ISchemaRegistry.cs`** (`src/FormForge.Api/Features/SchemaRegistry/ISchemaRegistry.cs`):
+  **6e — `ISchemaRegistry.cs`** (`src/AppForge.Api/Features/SchemaRegistry/ISchemaRegistry.cs`):
   ```csharp
-  namespace FormForge.Api.Features.SchemaRegistry;
+  namespace AppForge.Api.Features.SchemaRegistry;
 
   internal interface ISchemaRegistry
   {
@@ -299,10 +299,10 @@ So that a real PostgreSQL table backs the data module.
   }
   ```
 
-  **6f — `SchemaRegistry.cs`** (`src/FormForge.Api/Features/SchemaRegistry/SchemaRegistry.cs`):
+  **6f — `SchemaRegistry.cs`** (`src/AppForge.Api/Features/SchemaRegistry/SchemaRegistry.cs`):
   ```csharp
   using Microsoft.Extensions.Caching.Memory;
-  namespace FormForge.Api.Features.SchemaRegistry;
+  namespace AppForge.Api.Features.SchemaRegistry;
 
   [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "DI registered.")]
   internal sealed class SchemaRegistry(IMemoryCache cache) : ISchemaRegistry
@@ -332,29 +332,29 @@ So that a real PostgreSQL table backs the data module.
   ```
 
 - [x] **Task 7 — Create `DdlEmitter.cs`** (AC: 1, 2, 3, 4, 5)
-  - [ ] Create `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`:
+  - [ ] Create `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`:
     ```csharp
     using System.Text;
     using Dapper;
-    using FormForge.Api.Domain.Entities;
-    using FormForge.Api.Features.Designer;
-    using FormForge.Api.Features.SchemaRegistry;
-    using FormForge.Api.Infrastructure.Persistence;
+    using AppForge.Api.Domain.Entities;
+    using AppForge.Api.Features.Designer;
+    using AppForge.Api.Features.SchemaRegistry;
+    using AppForge.Api.Infrastructure.Persistence;
     using Microsoft.EntityFrameworkCore;
     using Npgsql;
     using Ulid;
 
-    namespace FormForge.Api.Features.Provisioning;
+    namespace AppForge.Api.Features.Provisioning;
 
     // Emits CREATE TABLE (new binding) or ALTER TABLE ... ADD COLUMN (idempotent re-run).
     // Uses Dapper + raw NpgsqlConnection for DDL (Decision 1.6: EF owns static schema;
-    // Dapper owns dynamic-schema DDL). The FormForgeDbContext is used ONLY for:
+    // Dapper owns dynamic-schema DDL). The AppForgeDbContext is used ONLY for:
     //   1. Reading ComponentSchemaVersion.RootElement (the schema source of truth)
     //   2. Appending a SchemaAuditLogEntry (EF entity — NOT saved here; caller SaveChanges)
     // Both operations go through the same scoped DbContext as the BackgroundService.
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "DI registered.")]
     internal sealed class DdlEmitter(
-        FormForgeDbContext db,
+        AppForgeDbContext db,
         DbConnectionFactory connectionFactory,
         ISchemaRegistry schemaRegistry,
         ILogger<DdlEmitter> logger)
@@ -560,7 +560,7 @@ So that a real PostgreSQL table backs the data module.
     private async Task ProcessJobAsync(ProvisioningJob job, CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
 
         var menu = await db.Menus
             .FirstOrDefaultAsync(m => m.Id == job.MenuId, CancellationToken.None)
@@ -630,12 +630,12 @@ So that a real PostgreSQL table backs the data module.
     // Story 5.3 — SchemaRegistry (singleton: in-memory cache keyed by (designerId, version))
     builder.Services.AddSingleton<ISchemaRegistry, SchemaRegistry>();
 
-    // Story 5.3 — DdlEmitter (scoped: injects FormForgeDbContext which is scoped)
+    // Story 5.3 — DdlEmitter (scoped: injects AppForgeDbContext which is scoped)
     builder.Services.AddScoped<DdlEmitter>();
     ```
   - [ ] Add necessary `using` directives:
-    - `using FormForge.Api.Features.SchemaRegistry;`
-    - `DbConnectionFactory` is in `FormForge.Api.Infrastructure.Persistence` — already imported or add the using
+    - `using AppForge.Api.Features.SchemaRegistry;`
+    - `DbConnectionFactory` is in `AppForge.Api.Infrastructure.Persistence` — already imported or add the using
   - [ ] `IMemoryCache` is registered by `builder.Services.AddMemoryCache()` — verify this is already called in Program.cs (it is, from earlier stories' IMenuCache / PermissionService setup). If not, add `builder.Services.AddMemoryCache()`.
 
 - [x] **Task 10 — Update `ProvisioningIntegrationTests.cs`** (AC: 1–5)
@@ -959,7 +959,7 @@ So that a real PostgreSQL table backs the data module.
   }
   ```
 
-  - [ ] **Test class** needs `using FormForge.Api.Features.SchemaRegistry;` for the `ISchemaRegistry` test (#7 above)
+  - [ ] **Test class** needs `using AppForge.Api.Features.SchemaRegistry;` for the `ISchemaRegistry` test (#7 above)
   - [ ] **Test baseline: 331** (end of Story 5.2 code review). Estimated additions: **+7 integration tests**. Target: **338**.
   - [ ] All 331 existing tests must still pass. The existing `BindDesigner_ValidPublishedVersion_Returns202AndProvisionsAsync` test continues to work — it now exercises the REAL DDL path (empty Stack → 7 system columns only). No changes needed to that test.
 
@@ -968,25 +968,25 @@ So that a real PostgreSQL table backs the data module.
 ### What Already Exists — Read Before Writing Any Code
 
 **Provisioning infrastructure (Story 5.2):**
-- `src/FormForge.Api/Features/Provisioning/ProvisioningJob.cs` — positional record `(Guid MenuId, string DesignerId, int Version, Guid? ActorId)`
-- `src/FormForge.Api/Features/Provisioning/IProvisioningService.cs` — `ValueTask EnqueueAsync(ProvisioningJob job, CancellationToken ct)`
-- `src/FormForge.Api/Features/Provisioning/ProvisioningService.cs` — ChannelWriter wrapper
-- `src/FormForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs` — **MUST BE MODIFIED** (Task 8) — replace stub with DdlEmitter call + fix OCE catch
-- `src/FormForge.Api/Features/Provisioning/BindingDiffService.cs` — stub, untouched by Story 5.3
+- `src/AppForge.Api/Features/Provisioning/ProvisioningJob.cs` — positional record `(Guid MenuId, string DesignerId, int Version, Guid? ActorId)`
+- `src/AppForge.Api/Features/Provisioning/IProvisioningService.cs` — `ValueTask EnqueueAsync(ProvisioningJob job, CancellationToken ct)`
+- `src/AppForge.Api/Features/Provisioning/ProvisioningService.cs` — ChannelWriter wrapper
+- `src/AppForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs` — **MUST BE MODIFIED** (Task 8) — replace stub with DdlEmitter call + fix OCE catch
+- `src/AppForge.Api/Features/Provisioning/BindingDiffService.cs` — stub, untouched by Story 5.3
 
 **Domain entities:**
-- `src/FormForge.Api/Domain/Entities/ComponentSchemaVersion.cs` — has `DesignerId`, `Version`, `Status`, `RootElement` (JSON string as TEXT, not JSONB-parsed by EF)
-- `src/FormForge.Api/Domain/Entities/ComponentSchema.cs` — PK is `DesignerId: string`
+- `src/AppForge.Api/Domain/Entities/ComponentSchemaVersion.cs` — has `DesignerId`, `Version`, `Status`, `RootElement` (JSON string as TEXT, not JSONB-parsed by EF)
+- `src/AppForge.Api/Domain/Entities/ComponentSchema.cs` — PK is `DesignerId: string`
 
-**SafeIdentifier** (`src/FormForge.Api/Features/Designer/SafeIdentifier.cs`):
+**SafeIdentifier** (`src/AppForge.Api/Features/Designer/SafeIdentifier.cs`):
 - Already validates `^[a-z_][a-z0-9_]{0,62}$` + reserved keyword check
 - `TryCreate(raw, out result, out errorCode, out error)` — use this in DdlEmitter
 - `Value` property gives the validated string safe to interpolate into SQL
 
 **Database:**
-- `FormForgeDbContext` has `ComponentSchemaVersions` and `Menus` DbSets
+- `AppForgeDbContext` has `ComponentSchemaVersions` and `Menus` DbSets
 - Last migration: `20260525051450_AddMenuBindingColumns`
-- The `formforge` connection string is used by EF and also by `DbConnectionFactory`
+- The `appforge` connection string is used by EF and also by `DbConnectionFactory`
 
 **Program.cs provisioning block** (around line 131):
 ```csharp
@@ -1140,12 +1140,12 @@ The dynamically-created PostgreSQL tables (`CREATE TABLE {designerId}`) persist 
 ### File Locations
 
 New files to create (following architecture dir tree):
-- `src/FormForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs` — NOT in `Features/`
-- `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs` — alongside other entities
-- `src/FormForge.Api/Features/SchemaRegistry/` — new folder matching the architecture spec
+- `src/AppForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs` — NOT in `Features/`
+- `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs` — alongside other entities
+- `src/AppForge.Api/Features/SchemaRegistry/` — new folder matching the architecture spec
   - `ColumnDefinition.cs`, `SchemaRegistryEntry.cs`, `ComponentTypeMapper.cs`
   - `RootElementParser.cs`, `ISchemaRegistry.cs`, `SchemaRegistry.cs`
-- `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs` — alongside existing provisioning files
+- `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs` — alongside existing provisioning files
 
 **Architecture doc mismatch**: `Features/Designer/` (actual) vs `Features/Designers/` (doc). For `SchemaRegistry` and `Provisioning`, the doc says `Features/SchemaRegistry/` and `Features/Provisioning/` — these are new folders, so follow the doc exactly.
 
@@ -1171,10 +1171,10 @@ New files to create (following architecture dir tree):
 
 ### Project Structure Notes
 
-- `DbConnectionFactory` lives in `Infrastructure/Persistence/` alongside `FormForgeDbContext.cs` — not in `Features/` (it is infrastructure, not a domain feature)
+- `DbConnectionFactory` lives in `Infrastructure/Persistence/` alongside `AppForgeDbContext.cs` — not in `Features/` (it is infrastructure, not a domain feature)
 - `SchemaAuditLogEntry` lives in `Domain/Entities/` — not in `Features/Provisioning/` (it is a domain entity managed by EF, per Decision 1.5)
 - `SchemaRegistry` folder contains 6 files — create them all in one commit pass
-- The `using FormForge.Api.Features.Designer;` import is needed in `RootElementParser.cs` to reference `SafeIdentifier`
+- The `using AppForge.Api.Features.Designer;` import is needed in `RootElementParser.cs` to reference `SafeIdentifier`
 
 ### References
 
@@ -1184,18 +1184,18 @@ New files to create (following architecture dir tree):
 - **Decision 1.4** (SchemaRegistry cache): `architecture.md`
 - **Decision 1.5** (audit log indexes): `architecture.md`
 - **Decision 1.6** (EF/Dapper boundary + recovery): `architecture.md`
-- **NFR-6** (SQL injection defense): via `SafeIdentifier` — `src/FormForge.Api/Features/Designer/SafeIdentifier.cs`
+- **NFR-6** (SQL injection defense): via `SafeIdentifier` — `src/AppForge.Api/Features/Designer/SafeIdentifier.cs`
 - **NFR-11** (transactional DDL with rollback): explicit Dapper transaction with try/catch/rollback
 - **Story 5.3 epics spec**: `_bmad-output/planning-artifacts/epics.md` (Epic 5, Story 5.3 section)
 - **Previous story**: `_bmad-output/implementation-artifacts/5-2-bind-designer-version-to-menu-item.md`
 - **Deferred work (OCE fix applied in Task 8)**: `_bmad-output/implementation-artifacts/deferred-work.md` line 8
-- **Existing ProvisioningBackgroundService** (stub to replace): `src/FormForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs`
-- **Existing SafeIdentifier**: `src/FormForge.Api/Features/Designer/SafeIdentifier.cs`
-- **Existing ComponentSchemaVersion entity**: `src/FormForge.Api/Domain/Entities/ComponentSchemaVersion.cs`
-- **Existing FormForgeDbContext**: `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs`
-- **Existing ProvisioningIntegrationTests**: `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`
+- **Existing ProvisioningBackgroundService** (stub to replace): `src/AppForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs`
+- **Existing SafeIdentifier**: `src/AppForge.Api/Features/Designer/SafeIdentifier.cs`
+- **Existing ComponentSchemaVersion entity**: `src/AppForge.Api/Domain/Entities/ComponentSchemaVersion.cs`
+- **Existing AppForgeDbContext**: `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs`
+- **Existing ProvisioningIntegrationTests**: `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`
 - **Directory.Packages.props** (Central Package Management): `Directory.Packages.props`
-- **Program.cs** (provisioning block at ~line 131): `src/FormForge.Api/Program.cs`
+- **Program.cs** (provisioning block at ~line 131): `src/AppForge.Api/Program.cs`
 
 ## Dev Agent Record
 
@@ -1241,32 +1241,32 @@ claude-opus-4-7 (Opus 4.7, 1M context)
 ### File List
 
 **New files (backend):**
-- `src/FormForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs`
-- `src/FormForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260525073718_CreateSchemaAuditLog.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260525073718_CreateSchemaAuditLog.Designer.cs`
-- `src/FormForge.Api/Features/SchemaRegistry/ColumnDefinition.cs`
-- `src/FormForge.Api/Features/SchemaRegistry/SchemaRegistryEntry.cs`
-- `src/FormForge.Api/Features/SchemaRegistry/ComponentTypeMapper.cs`
-- `src/FormForge.Api/Features/SchemaRegistry/RootElementParser.cs`
-- `src/FormForge.Api/Features/SchemaRegistry/ISchemaRegistry.cs`
-- `src/FormForge.Api/Features/SchemaRegistry/SchemaRegistry.cs`
-- `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs`
+- `src/AppForge.Api/Domain/Entities/SchemaAuditLogEntry.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260525073718_CreateSchemaAuditLog.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260525073718_CreateSchemaAuditLog.Designer.cs`
+- `src/AppForge.Api/Features/SchemaRegistry/ColumnDefinition.cs`
+- `src/AppForge.Api/Features/SchemaRegistry/SchemaRegistryEntry.cs`
+- `src/AppForge.Api/Features/SchemaRegistry/ComponentTypeMapper.cs`
+- `src/AppForge.Api/Features/SchemaRegistry/RootElementParser.cs`
+- `src/AppForge.Api/Features/SchemaRegistry/ISchemaRegistry.cs`
+- `src/AppForge.Api/Features/SchemaRegistry/SchemaRegistry.cs`
+- `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`
 
 **Modified files (backend):**
 - `Directory.Packages.props` — added `<PackageVersion Include="Dapper" Version="2.1.66" />`
-- `src/FormForge.Api/FormForge.Api.csproj` — added `<PackageReference Include="Dapper" />`
-- `src/FormForge.Api.Tests/FormForge.Api.Tests.csproj` — added `<PackageReference Include="Dapper" />`
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — added `SchemaAuditLog` DbSet + entity config + indexes
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` — auto-regenerated by `dotnet ef migrations add`
-- `src/FormForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs` — replaced stub body with `DdlEmitter.EmitAsync` call + added OCE re-throw + replaced `LogProvisioningStub` with `LogProvisioningSucceeded`
-- `src/FormForge.Api/Program.cs` — added `using FormForge.Api.Features.SchemaRegistry;` + registered `DbConnectionFactory`, `ISchemaRegistry`, `DdlEmitter`
+- `src/AppForge.Api/AppForge.Api.csproj` — added `<PackageReference Include="Dapper" />`
+- `src/AppForge.Api.Tests/AppForge.Api.Tests.csproj` — added `<PackageReference Include="Dapper" />`
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — added `SchemaAuditLog` DbSet + entity config + indexes
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` — auto-regenerated by `dotnet ef migrations add`
+- `src/AppForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs` — replaced stub body with `DdlEmitter.EmitAsync` call + added OCE re-throw + replaced `LogProvisioningStub` with `LogProvisioningSucceeded`
+- `src/AppForge.Api/Program.cs` — added `using AppForge.Api.Features.SchemaRegistry;` + registered `DbConnectionFactory`, `ISchemaRegistry`, `DdlEmitter`
 
 **New files (tests):**
-- `src/FormForge.Api.Tests/Features/SchemaRegistry/RootElementParserTests.cs` (+9 unit tests covering empty / field-type mapping / duplicate handling / Repeater isolation / unknown-type JSONB fallback / SafeIdentifier rejection)
+- `src/AppForge.Api.Tests/Features/SchemaRegistry/RootElementParserTests.cs` (+9 unit tests covering empty / field-type mapping / duplicate handling / Repeater isolation / unknown-type JSONB fallback / SafeIdentifier rejection)
 
 **Modified files (tests):**
-- `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs` — added `using FormForge.Api.Features.SchemaRegistry;` + `using Npgsql;` + `WebJsonOptions` static + `schema_audit_log` to TRUNCATE list + DROP-loop for dynamic tables + 3 helpers (`CreateAndPublishDesignerWithFieldsAsync<TRoot>`, `TableExistsInPostgresAsync`, `GetTableColumnsAsync`) + 7 new integration tests
+- `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs` — added `using AppForge.Api.Features.SchemaRegistry;` + `using Npgsql;` + `WebJsonOptions` static + `schema_audit_log` to TRUNCATE list + DROP-loop for dynamic tables + 3 helpers (`CreateAndPublishDesignerWithFieldsAsync<TRoot>`, `TableExistsInPostgresAsync`, `GetTableColumnsAsync`) + 7 new integration tests
 
 ### Change Log
 
@@ -1276,20 +1276,20 @@ claude-opus-4-7 (Opus 4.7, 1M context)
 
 ### Review Findings
 
-- [x] [Review][Decision] TOCTOU race — `TableExistsAsync` + `CreateTableAsync` are not atomic; two concurrent jobs for the same `designerId` would both see the table absent and both attempt `CREATE TABLE`; the second fails with a PG error and records `"Error"` status even though the DDL succeeded on the first job — resolved: applied `CREATE TABLE IF NOT EXISTS` [`src/FormForge.Api/Features/Provisioning/DdlEmitter.cs`]
+- [x] [Review][Decision] TOCTOU race — `TableExistsAsync` + `CreateTableAsync` are not atomic; two concurrent jobs for the same `designerId` would both see the table absent and both attempt `CREATE TABLE`; the second fails with a PG error and records `"Error"` status even though the DDL succeeded on the first job — resolved: applied `CREATE TABLE IF NOT EXISTS` [`src/AppForge.Api/Features/Provisioning/DdlEmitter.cs`]
 
-- [x] [Review][Patch] `DbConnectionFactory.CreateOpenConnectionAsync` leaks `NpgsqlConnection` if `OpenAsync` throws — no dispose-on-exception guard around the connection before it is returned to the caller [`src/FormForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs:20-24`]
-- [x] [Review][Patch] `RollbackAsync(ct)` in catch blocks uses the user-supplied token — if `ct` is already cancelled the rollback throws immediately and never executes, leaving the transaction unfinished; use `CancellationToken.None` for rollback calls [`src/FormForge.Api/Features/Provisioning/DdlEmitter.cs` CreateTableAsync + AddMissingColumnsAsync catch blocks]
-- [x] [Review][Patch] `FromVersion = null` hardcoded on all audit log entries — ALTER path also records `FromVersion = null` which is semantically incorrect (spec AC-5 defines `fromVersion: null` only for CREATE); set `FromVersion = job.Version` on the ALTER path [`src/FormForge.Api/Features/Provisioning/DdlEmitter.cs:112`]
-- [x] [Review][Patch] `schemaRegistry.Populate` is unguarded between `connection.DisposeAsync()` and `db.SchemaAuditLog.Add` — if `Populate` throws, the Dapper DDL has committed but no audit entry is added; the BackgroundService catch-all records `"Error"` on the menu even though the table was created successfully [`src/FormForge.Api/Features/Provisioning/DdlEmitter.cs:99-119`]
-- [x] [Review][Patch] `"properties": null` in designer JSON causes `InvalidOperationException` in `RootElementParser` — `TryGetProperty` on a Null-kind `JsonElement` throws; add `properties.ValueKind == JsonValueKind.Object` guard after `TryGetProperty("properties", ...)` [`src/FormForge.Api/Features/SchemaRegistry/RootElementParser.cs:52-56, 76-78`]
-- [x] [Review][Patch] No recursion depth guard in `RootElementParser.WalkElement` — `FieldKeyValidator` has `MaxDepth = 64` but `RootElementParser` has no limit; adversarially deep JSON causes unrecoverable `StackOverflowException` [`src/FormForge.Api/Features/SchemaRegistry/RootElementParser.cs`]
-- [x] [Review][Patch] Dead OCE catch block — `emitter.EmitAsync(job, CancellationToken.None)` makes `OperationCanceledException` unreachable via token cancellation; the comment claiming the Story 5.2 deferred fix is applied is inaccurate; remove or update the comment to reflect the `CancellationToken.None` design intent [`src/FormForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs:67-73`]
-- [x] [Review][Patch] Stale comment — "Story 5.3 will replace the body of ProcessJobAsync with real DDL via DdlEmitter" — this replacement has already been done [`src/FormForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs`]
+- [x] [Review][Patch] `DbConnectionFactory.CreateOpenConnectionAsync` leaks `NpgsqlConnection` if `OpenAsync` throws — no dispose-on-exception guard around the connection before it is returned to the caller [`src/AppForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs:20-24`]
+- [x] [Review][Patch] `RollbackAsync(ct)` in catch blocks uses the user-supplied token — if `ct` is already cancelled the rollback throws immediately and never executes, leaving the transaction unfinished; use `CancellationToken.None` for rollback calls [`src/AppForge.Api/Features/Provisioning/DdlEmitter.cs` CreateTableAsync + AddMissingColumnsAsync catch blocks]
+- [x] [Review][Patch] `FromVersion = null` hardcoded on all audit log entries — ALTER path also records `FromVersion = null` which is semantically incorrect (spec AC-5 defines `fromVersion: null` only for CREATE); set `FromVersion = job.Version` on the ALTER path [`src/AppForge.Api/Features/Provisioning/DdlEmitter.cs:112`]
+- [x] [Review][Patch] `schemaRegistry.Populate` is unguarded between `connection.DisposeAsync()` and `db.SchemaAuditLog.Add` — if `Populate` throws, the Dapper DDL has committed but no audit entry is added; the BackgroundService catch-all records `"Error"` on the menu even though the table was created successfully [`src/AppForge.Api/Features/Provisioning/DdlEmitter.cs:99-119`]
+- [x] [Review][Patch] `"properties": null` in designer JSON causes `InvalidOperationException` in `RootElementParser` — `TryGetProperty` on a Null-kind `JsonElement` throws; add `properties.ValueKind == JsonValueKind.Object` guard after `TryGetProperty("properties", ...)` [`src/AppForge.Api/Features/SchemaRegistry/RootElementParser.cs:52-56, 76-78`]
+- [x] [Review][Patch] No recursion depth guard in `RootElementParser.WalkElement` — `FieldKeyValidator` has `MaxDepth = 64` but `RootElementParser` has no limit; adversarially deep JSON causes unrecoverable `StackOverflowException` [`src/AppForge.Api/Features/SchemaRegistry/RootElementParser.cs`]
+- [x] [Review][Patch] Dead OCE catch block — `emitter.EmitAsync(job, CancellationToken.None)` makes `OperationCanceledException` unreachable via token cancellation; the comment claiming the Story 5.2 deferred fix is applied is inaccurate; remove or update the comment to reflect the `CancellationToken.None` design intent [`src/AppForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs:67-73`]
+- [x] [Review][Patch] Stale comment — "Story 5.3 will replace the body of ProcessJobAsync with real DDL via DdlEmitter" — this replacement has already been done [`src/AppForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs`]
 
 - [x] [Review][Defer] ComponentTypeMapper shorthand vs SPA-name mismatch — `FieldKeyValidator.InputBearingTypes` uses spaced strings (`"Text Input"`, `"Number Input"`) but `ComponentTypeMapper` uses shorthand (`"TextInput"`, `"NumberInput"`); real SPA data falls through to JSONB for all typed fields — deferred, pre-existing spec-acknowledged gap (production blocker before Epic 6 CRUD)
 - [x] [Review][Defer] `CancellationToken` silently discarded in `TableExistsAsync` and `AddMissingColumnsAsync` (`_ = ct;`) — Dapper calls cannot be cancelled — deferred, pre-existing design choice with no runtime impact since caller passes `CancellationToken.None`
-- [x] [Review][Defer] Test helper hardcodes `publishedVersion = 2` — fragile if designer API changes auto-versioning — deferred, pre-existing low-severity test quality item [`src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`]
+- [x] [Review][Defer] Test helper hardcodes `publishedVersion = 2` — fragile if designer API changes auto-versioning — deferred, pre-existing low-severity test quality item [`src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`]
 - [x] [Review][Defer] `DbConnectionFactory` reads connection string on every `CreateOpenConnectionAsync` call — missing connection string fails at first use, not startup — deferred, pre-existing low-severity
 - [x] [Review][Defer] `JsonDocument.Parse` in `RootElementParser` has no `try/catch` for malformed JSON — `JsonException` propagates up and is recorded as `"Error"` status on the menu — deferred, acceptable error-recording behaviour
 - [x] [Review][Defer] Idempotent no-op still produces an `"ALTER"` audit row with `ColumnsAdded = []` — could confuse Story 5.7 audit-log view — deferred, spec gap (AC-5 specifies audit log on CREATE only)

@@ -6,7 +6,7 @@ Status: done
 
 As a Platform Admin using only a keyboard,
 I want to interact with the designer canvas via keyboard,
-so that the designer is usable without a pointing device and FormForge meets WCAG 2.1 AA (FR-42 AC-4).
+so that the designer is usable without a pointing device and AppForge meets WCAG 2.1 AA (FR-42 AC-4).
 
 ## Acceptance Criteria
 

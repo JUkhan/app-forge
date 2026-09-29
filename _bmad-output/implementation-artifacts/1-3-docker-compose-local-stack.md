@@ -20,7 +20,7 @@ so that contributors without the Aspire toolchain can still run the platform.
 
 **And** `postgres` uses `postgres:17-alpine` (same major version as the Aspire-managed container in Story 1.2)
 **And** `minio` uses a pinned RELEASE tag (same `RELEASE.2025-09-07T16-13-09Z` established in Story 1.2 — never `:latest`)
-**And** `minio-init` creates the `formforge` bucket and exits 0
+**And** `minio-init` creates the `appforge` bucket and exits 0
 **And** `api` is built from the repo's multi-stage `Dockerfile`
 
 ### AC-2 — EF Core migrations auto-run on API startup
@@ -28,7 +28,7 @@ so that contributors without the Aspire toolchain can still run the platform.
 **Given** the API container starts for the first time
 **When** it boots
 **Then** EF Core migrations run automatically against the Compose-provided PostgreSQL (idempotent `Database.Migrate()`)
-**And** the `formforge` MinIO bucket is created by the `minio-init` service on first startup
+**And** the `appforge` MinIO bucket is created by the `minio-init` service on first startup
 **And** neither operation fails the container health check
 
 ### AC-3 — Docker network service names (no `localhost`)
@@ -36,7 +36,7 @@ so that contributors without the Aspire toolchain can still run the platform.
 **Given** any service in the compose network
 **When** it resolves another service's URL
 **Then** the URL uses the Docker network service name (e.g., `Host=postgres;Port=5432`, `http://minio:9000`), not `localhost`
-**And** the API reads `ConnectionStrings__formforge` (PG) and `ConnectionStrings__minio` (or equivalent MinIO env vars) set in `docker-compose.yml`, NOT from `appsettings.json` or committed `.env` files
+**And** the API reads `ConnectionStrings__appforge` (PG) and `ConnectionStrings__minio` (or equivalent MinIO env vars) set in `docker-compose.yml`, NOT from `appsettings.json` or committed `.env` files
 
 ### AC-4 — Build gates pass
 
@@ -45,7 +45,7 @@ so that contributors without the Aspire toolchain can still run the platform.
 **Then** the API image builds successfully via the 3-stage Dockerfile
 
 **And** `dotnet build` from the repo root succeeds with zero new warnings
-**And** `dotnet test` succeeds (the empty `FormForge.Api.Tests` project reports zero tests / zero failures)
+**And** `dotnet test` succeeds (the empty `AppForge.Api.Tests` project reports zero tests / zero failures)
 **And** `cd web && npm run build` succeeds
 
 ## Tasks / Subtasks
@@ -57,31 +57,31 @@ so that contributors without the Aspire toolchain can still run the platform.
   - [x] Verify **no inline `Version=` attribute** on any `<PackageReference>` (CPM rule — NU1605 fires if violated)
   - [x] Run `dotnet restore` and confirm clean restore (no NU1605 / NU1010)
 
-- [x] **Task 2 — Add EF Core PackageReferences to FormForge.Api.csproj** (AC: 2)
+- [x] **Task 2 — Add EF Core PackageReferences to AppForge.Api.csproj** (AC: 2)
   - [x] Add `<PackageReference Include="Microsoft.EntityFrameworkCore" />` (no Version attribute — CPM)
   - [x] Add `<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />` (no Version attribute)
   - [x] Add `<PackageReference Include="Microsoft.EntityFrameworkCore.Design">` with `<PrivateAssets>all</PrivateAssets>` and `<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>` — standard pattern for design-time tooling
 
-- [x] **Task 3 — Create minimal FormForgeDbContext** (AC: 2)
-  - [x] Create `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — a class deriving from `DbContext` with only the constructor that accepts `DbContextOptions<FormForgeDbContext>` and no `DbSet<>` properties yet (tables land in Epic 2+)
-  - [x] Register in `Program.cs`: `builder.Services.AddDbContext<FormForgeDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("formforge")));`
-  - [x] Call `Database.Migrate()` after `var app = builder.Build();` (before `app.Run()`): `using var scope = app.Services.CreateScope(); scope.ServiceProvider.GetRequiredService<FormForgeDbContext>().Database.Migrate();`
+- [x] **Task 3 — Create minimal AppForgeDbContext** (AC: 2)
+  - [x] Create `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — a class deriving from `DbContext` with only the constructor that accepts `DbContextOptions<AppForgeDbContext>` and no `DbSet<>` properties yet (tables land in Epic 2+)
+  - [x] Register in `Program.cs`: `builder.Services.AddDbContext<AppForgeDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("appforge")));`
+  - [x] Call `Database.Migrate()` after `var app = builder.Build();` (before `app.Run()`): `using var scope = app.Services.CreateScope(); scope.ServiceProvider.GetRequiredService<AppForgeDbContext>().Database.Migrate();`
   - [x] **Do NOT block startup on migration failure** in this story — if PG is unreachable the app should still start (health check will report unhealthy). If blocking is needed, it's an Epic 2 concern. For now, wrap in try/catch and log a warning if Migrate() fails.
   - [x] Verify `dotnet build` still passes zero-warning under `TreatWarningsAsErrors=true`
 
 - [x] **Task 4 — Generate initial empty EF Core migration** (AC: 2)
   - [x] Ensure `.config/dotnet-tools.json` lists `dotnet-ef` (it should already be present from Story 1.1 if the architecture's `dotnet-tools.json` stub was created; if not, run `dotnet tool install --local dotnet-ef` and commit the updated `dotnet-tools.json`)
-  - [x] Run: `dotnet ef migrations add InitialCreate --project src/FormForge.Api --startup-project src/FormForge.Api --output-dir Infrastructure/Persistence/Migrations`
-  - [x] Commit the generated `Infrastructure/Persistence/Migrations/` folder (3 files: `InitialCreate.cs`, `InitialCreate.Designer.cs`, `FormForgeDbContextModelSnapshot.cs`)
+  - [x] Run: `dotnet ef migrations add InitialCreate --project src/AppForge.Api --startup-project src/AppForge.Api --output-dir Infrastructure/Persistence/Migrations`
+  - [x] Commit the generated `Infrastructure/Persistence/Migrations/` folder (3 files: `InitialCreate.cs`, `InitialCreate.Designer.cs`, `AppForgeDbContextModelSnapshot.cs`)
   - [x] The migration body will have empty `Up()` and `Down()` methods — this is correct; it establishes the `__EFMigrationsHistory` table on first `Migrate()` call, proving the pipeline works without any schema to deploy yet
-  - [x] Verify: `dotnet ef migrations list --project src/FormForge.Api` shows `InitialCreate : Pending`
+  - [x] Verify: `dotnet ef migrations list --project src/AppForge.Api` shows `InitialCreate : Pending`
 
 - [x] **Task 5 — Add `appsettings.Compose.json` for Compose-specific configuration** (AC: 3)
-  - [ ] Create `src/FormForge.Api/appsettings.Compose.json` with:
+  - [ ] Create `src/AppForge.Api/appsettings.Compose.json` with:
     ```json
     {
       "ConnectionStrings": {
-        "formforge": "Host=postgres;Port=5432;Database=formforge;Username=postgres;Password=postgres"
+        "appforge": "Host=postgres;Port=5432;Database=appforge;Username=postgres;Password=postgres"
       },
       "MinIO": {
         "Endpoint": "minio:9000",
@@ -103,16 +103,16 @@ so that contributors without the Aspire toolchain can still run the platform.
     # Stage 1 — .NET restore + publish
     FROM mcr.microsoft.com/dotnet/sdk:10.0 AS dotnet-build
     WORKDIR /src
-    COPY ["FormForge.sln", "global.json", "Directory.Build.props", "Directory.Packages.props", "./"]
-    COPY ["src/FormForge.Api/FormForge.Api.csproj", "src/FormForge.Api/"]
-    COPY ["src/FormForge.ServiceDefaults/FormForge.ServiceDefaults.csproj", "src/FormForge.ServiceDefaults/"]
-    COPY ["src/FormForge.Api.Tests/FormForge.Api.Tests.csproj", "src/FormForge.Api.Tests/"]
+    COPY ["AppForge.sln", "global.json", "Directory.Build.props", "Directory.Packages.props", "./"]
+    COPY ["src/AppForge.Api/AppForge.Api.csproj", "src/AppForge.Api/"]
+    COPY ["src/AppForge.ServiceDefaults/AppForge.ServiceDefaults.csproj", "src/AppForge.ServiceDefaults/"]
+    COPY ["src/AppForge.Api.Tests/AppForge.Api.Tests.csproj", "src/AppForge.Api.Tests/"]
     # Copy AppHost last — it is NOT needed for a production build but the solution file references it.
-    # If `dotnet restore FormForge.sln` fails without it, copy its csproj too and exclude from publish.
-    COPY ["src/FormForge.AppHost/FormForge.AppHost.csproj", "src/FormForge.AppHost/"]
-    RUN dotnet restore "FormForge.sln"
+    # If `dotnet restore AppForge.sln` fails without it, copy its csproj too and exclude from publish.
+    COPY ["src/AppForge.AppHost/AppForge.AppHost.csproj", "src/AppForge.AppHost/"]
+    RUN dotnet restore "AppForge.sln"
     COPY src/ ./src/
-    RUN dotnet publish "src/FormForge.Api/FormForge.Api.csproj" \
+    RUN dotnet publish "src/AppForge.Api/AppForge.Api.csproj" \
         --no-restore -c Release -o /app/publish
     
     # Stage 2 — Vite build
@@ -131,10 +131,10 @@ so that contributors without the Aspire toolchain can still run the platform.
     COPY --from=web-build /web/dist ./wwwroot/
     USER app
     EXPOSE 8080
-    ENTRYPOINT ["dotnet", "FormForge.Api.dll"]
+    ENTRYPOINT ["dotnet", "AppForge.Api.dll"]
     ```
   - [x] **CRITICAL:** The `UseStaticFiles()` call in `Program.cs` is NOT yet present — Story 5.5 (Decision 5.5) says the SPA is served via `UseStaticFiles()` + fallback. For this story, just copying `dist/` into `wwwroot/` is sufficient; the static file middleware can be added later. But add `app.UseStaticFiles()` now to avoid a dead `wwwroot/` — see additional note in Dev Notes.
-  - [x] Verify `docker build -t formforge-api:local .` succeeds before proceeding
+  - [x] Verify `docker build -t appforge-api:local .` succeeds before proceeding
 
 - [x] **Task 7 — Complete docker-compose.yml** (AC: 1, 2, 3)
   - [ ] Replace the stub with the full service definitions:
@@ -143,13 +143,13 @@ so that contributors without the Aspire toolchain can still run the platform.
       postgres:
         image: postgres:17-alpine
         environment:
-          POSTGRES_DB: formforge
+          POSTGRES_DB: appforge
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         volumes:
           - postgres-data:/var/lib/postgresql/data
         healthcheck:
-          test: ["CMD-SHELL", "pg_isready -U postgres -d formforge"]
+          test: ["CMD-SHELL", "pg_isready -U postgres -d appforge"]
           interval: 5s
           timeout: 5s
           retries: 10
@@ -181,14 +181,14 @@ so that contributors without the Aspire toolchain can still run the platform.
         entrypoint: >
           /bin/sh -c "
           mc alias set local http://minio:9000 minioadmin minioadmin;
-          mc mb --ignore-existing local/formforge;
+          mc mb --ignore-existing local/appforge;
           exit 0;
           "
         restart: "no"
 
       api:
         build: .
-        image: formforge-api:local
+        image: appforge-api:local
         depends_on:
           postgres:
             condition: service_healthy
@@ -230,9 +230,9 @@ so that contributors without the Aspire toolchain can still run the platform.
   - [x] Run `docker compose up -d` — all services come up
   - [x] Wait for `api` healthcheck to pass: `docker compose ps` shows `api` as `healthy`
   - [x] Verify `GET http://localhost:5000/alive` → HTTP 200 "Healthy"
-  - [x] Verify `GET http://localhost:5000/` → HTTP 200 "FormForge API is running." (or static file index if wwwroot has content)
-  - [x] Verify PostgreSQL is reachable: `docker compose exec postgres psql -U postgres -d formforge -c '\dt'` — should show `__EFMigrationsHistory` table (created by `Database.Migrate()` on startup)
-  - [x] Verify MinIO bucket exists: `docker compose exec minio-init mc ls local/` — must show `formforge` bucket (or run `docker compose run --rm minio-init mc ls local/` if the minio-init container has exited cleanly)
+  - [x] Verify `GET http://localhost:5000/` → HTTP 200 "AppForge API is running." (or static file index if wwwroot has content)
+  - [x] Verify PostgreSQL is reachable: `docker compose exec postgres psql -U postgres -d appforge -c '\dt'` — should show `__EFMigrationsHistory` table (created by `Database.Migrate()` on startup)
+  - [x] Verify MinIO bucket exists: `docker compose exec minio-init mc ls local/` — must show `appforge` bucket (or run `docker compose run --rm minio-init mc ls local/` if the minio-init container has exited cleanly)
   - [x] Confirm **no `localhost`** references in service-to-service URLs: grep `docker-compose.yml` and `appsettings.Compose.json` for `localhost` — must be zero matches in service connection strings
   - [x] Run `docker compose down -v` to tear down cleanly
 
@@ -246,18 +246,18 @@ so that contributors without the Aspire toolchain can still run the platform.
 
 - [x] [Review][Decision→Defer] API healthcheck uses `GET /` instead of `GET /alive` — `IsDevelopment()` = false in Compose mode so `/alive` is not exposed; `GET /` is an acceptable liveness probe for now. Deferred to Story 1.6 (health-check-endpoints) which owns the non-dev health endpoint exposure strategy. [docker-compose.yml]
 
-- [x] [Review][Patch] `catch (DbException)` too narrow — widened to `catch (Exception)` with `#pragma warning disable CA1031`; EF Core non-DB errors no longer crash the host silently [src/FormForge.Api/Program.cs]
-- [x] [Review][Patch] Redundant `[SuppressMessage("Performance", "CA1848")]` on `[LoggerMessage]`-attributed method — removed; `[LoggerMessage]` is already the CA1848-compliant pattern [src/FormForge.Api/Program.cs]
-- [x] [Review][Patch] `FormForge.Api.Tests.csproj` COPY in Dockerfile is dead weight — removed the unnecessary COPY line; restore targets only `FormForge.Api.csproj` [Dockerfile]
+- [x] [Review][Patch] `catch (DbException)` too narrow — widened to `catch (Exception)` with `#pragma warning disable CA1031`; EF Core non-DB errors no longer crash the host silently [src/AppForge.Api/Program.cs]
+- [x] [Review][Patch] Redundant `[SuppressMessage("Performance", "CA1848")]` on `[LoggerMessage]`-attributed method — removed; `[LoggerMessage]` is already the CA1848-compliant pattern [src/AppForge.Api/Program.cs]
+- [x] [Review][Patch] `AppForge.Api.Tests.csproj` COPY in Dockerfile is dead weight — removed the unnecessary COPY line; restore targets only `AppForge.Api.csproj` [Dockerfile]
 - [x] [Review][Patch] `.dockerignore` already existed (pre-existing, not missing) — added `**/TestResults` and `**/*.user` to the existing file [.dockerignore]
 - [x] [Review][Patch] `minio-init` entrypoint uses unconditional `exit 0` — replaced `;` chaining and `exit 0` with `&&`; mc failures now propagate correctly [docker-compose.yml]
 
 - [x] [Review][Defer] Hardcoded dev credentials in appsettings.Compose.json and docker-compose.yml — spec permits for v1 (AR-17); needs env-var injection path before any non-local deployment [appsettings.Compose.json, docker-compose.yml] — deferred, spec-permitted for v1
-- [x] [Review][Defer] App boots healthy after migration failure with no readiness gate — spec explicitly defers the circuit-breaker to Epic 2; requests hit unmigrated tables if migration silently failed [src/FormForge.Api/Program.cs] — deferred, spec-permitted
-- [x] [Review][Defer] MinIO config section in appsettings.Compose.json has no consumer — intentionally pre-populated for future MinIO client wiring; no IOptions binding yet [src/FormForge.Api/appsettings.Compose.json] — deferred, pre-existing
+- [x] [Review][Defer] App boots healthy after migration failure with no readiness gate — spec explicitly defers the circuit-breaker to Epic 2; requests hit unmigrated tables if migration silently failed [src/AppForge.Api/Program.cs] — deferred, spec-permitted
+- [x] [Review][Defer] MinIO config section in appsettings.Compose.json has no consumer — intentionally pre-populated for future MinIO client wiring; no IOptions binding yet [src/AppForge.Api/appsettings.Compose.json] — deferred, pre-existing
 - [x] [Review][Defer] `api` does not depend on `minio-init` completing — no MinIO API code in this story so the race is benign now; latent failure risk for first story that writes to MinIO [docker-compose.yml] — deferred, no MinIO operations in scope
-- [x] [Review][Defer] Connection string lacks timeout / retry parameters — Npgsql default 15s timeout is acceptable for v1; configure resilience when first real EF queries land [src/FormForge.Api/appsettings.Compose.json] — deferred, v1 acceptable
-- [x] [Review][Defer] Null connection string when running without Aspire or Compose context — `GetConnectionString("formforge")` returns null; `UseNpgsql(null)` throws with a confusing message; no null guard [src/FormForge.Api/Program.cs] — deferred, unsupported scenario
+- [x] [Review][Defer] Connection string lacks timeout / retry parameters — Npgsql default 15s timeout is acceptable for v1; configure resilience when first real EF queries land [src/AppForge.Api/appsettings.Compose.json] — deferred, v1 acceptable
+- [x] [Review][Defer] Null connection string when running without Aspire or Compose context — `GetConnectionString("appforge")` returns null; `UseNpgsql(null)` throws with a confusing message; no null guard [src/AppForge.Api/Program.cs] — deferred, unsupported scenario
 
 ## Dev Notes
 
@@ -265,7 +265,7 @@ so that contributors without the Aspire toolchain can still run the platform.
 
 This story implements **FR-48** ("Docker Compose — `docker-compose.yml` defines api/postgres/minio/frontend; EF Core migrations auto-run on API startup; MinIO bucket created on first startup; service URLs via Docker network.") and **Architecture Decision 5.10** (Docker Compose Parity) and **Decision 5.6** (Container Image Strategy).
 
-This story also introduces the **EF Core scaffolding** (`FormForgeDbContext`, `InitialCreate` migration, `Database.Migrate()` call) even though Epic 2 owns the first real EF entities. This is necessary because AC-2 explicitly requires `Database.Migrate()` to succeed on container startup. The migration will be empty (`Up()` / `Down()` with no-ops), but establishes the `__EFMigrationsHistory` table on first run.
+This story also introduces the **EF Core scaffolding** (`AppForgeDbContext`, `InitialCreate` migration, `Database.Migrate()` call) even though Epic 2 owns the first real EF entities. This is necessary because AC-2 explicitly requires `Database.Migrate()` to succeed on container startup. The migration will be empty (`Up()` / `Down()` with no-ops), but establishes the `__EFMigrationsHistory` table on first run.
 
 **Deferred to later stories:**
 - SPA fallback route (`GET * → /index.html`) — Decision 5.5, when actual SPA routing is wired
@@ -287,20 +287,20 @@ As of May 2026 / .NET 10.0:
 
 **Touch:**
 - `Directory.Packages.props` — add 3 EF Core package versions
-- `src/FormForge.Api/FormForge.Api.csproj` — add 3 EF PackageReferences (2 runtime + 1 design-time)
-- `src/FormForge.Api/Program.cs` — add `AddDbContext`, `Database.Migrate()`, `UseStaticFiles()`
-- `src/FormForge.Api/appsettings.Compose.json` — NEW file (Compose-specific config)
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — NEW file (minimal empty DbContext)
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/` — NEW directory + 3 migration files
+- `src/AppForge.Api/AppForge.Api.csproj` — add 3 EF PackageReferences (2 runtime + 1 design-time)
+- `src/AppForge.Api/Program.cs` — add `AddDbContext`, `Database.Migrate()`, `UseStaticFiles()`
+- `src/AppForge.Api/appsettings.Compose.json` — NEW file (Compose-specific config)
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — NEW file (minimal empty DbContext)
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/` — NEW directory + 3 migration files
 - `docker-compose.yml` — full rewrite of stub
 - `Dockerfile` — full rewrite of stub
 
 **Do NOT touch:**
-- `src/FormForge.AppHost/AppHost.cs` — Aspire orchestration from Story 1.2 is complete
+- `src/AppForge.AppHost/AppHost.cs` — Aspire orchestration from Story 1.2 is complete
 - `web/vite.config.ts`, `web/package.json`, `web/.env*` — same constraint as Story 1.2
 - `global.json`, `Directory.Build.props`, `.editorconfig`, `.gitattributes`
-- `src/FormForge.ServiceDefaults/Extensions.cs`
-- `src/FormForge.Api.Tests/*` — no tests yet
+- `src/AppForge.ServiceDefaults/Extensions.cs`
+- `src/AppForge.Api.Tests/*` — no tests yet
 - `appsettings.json` — no secrets go here; Compose-specific config goes in `appsettings.Compose.json`
 
 ### Critical: Dockerfile layer ordering for Docker cache efficiency
@@ -309,8 +309,8 @@ Copy `.csproj` files and do `dotnet restore` BEFORE copying source code. This ca
 
 ```dockerfile
 # CORRECT — copy solution manifest + all csproj files first, restore, then copy source
-COPY ["FormForge.sln", "./"]
-COPY ["src/FormForge.Api/FormForge.Api.csproj", "src/FormForge.Api/"]
+COPY ["AppForge.sln", "./"]
+COPY ["src/AppForge.Api/AppForge.Api.csproj", "src/AppForge.Api/"]
 # ... all other csproj files ...
 RUN dotnet restore
 COPY src/ ./src/
@@ -319,15 +319,15 @@ RUN dotnet publish ...
 
 Do NOT `COPY . .` before `dotnet restore` — that breaks the cache.
 
-### FormForgeDbContext — exact minimal form
+### AppForgeDbContext — exact minimal form
 
 ```csharp
-// src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs
+// src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs
 using Microsoft.EntityFrameworkCore;
 
-namespace FormForge.Api.Infrastructure.Persistence;
+namespace AppForge.Api.Infrastructure.Persistence;
 
-public class FormForgeDbContext(DbContextOptions<FormForgeDbContext> options) : DbContext(options)
+public class AppForgeDbContext(DbContextOptions<AppForgeDbContext> options) : DbContext(options)
 {
     // DbSet<> properties land in Epic 2+ as entities are defined.
     // This empty context is sufficient to establish the EF migrations history table.
@@ -343,7 +343,7 @@ No `OnModelCreating` override needed yet. No `DbSet<>` properties needed yet.
 try
 {
     using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+    var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
     db.Database.Migrate();
 }
 catch (Exception ex)
@@ -368,26 +368,26 @@ The try/catch here prevents a hard crash when Compose dependencies are not yet h
 The `minio-init` container uses `minio/mc` (MinIO Client) to create the bucket:
 ```shell
 mc alias set local http://minio:9000 minioadmin minioadmin
-mc mb --ignore-existing local/formforge
+mc mb --ignore-existing local/appforge
 ```
 
 `--ignore-existing` makes the create idempotent — subsequent `docker compose up` calls won't fail if the bucket already exists (persisted in the named volume). The container exits 0 on success and restarts with `restart: "no"` so it doesn't loop.
 
 ### Dockerfile: AppHost csproj and solution file
 
-The `FormForge.AppHost.csproj` uses `Sdk="Microsoft.NET.Sdk.Aspire.AppHost"` which requires the Aspire workload to be installed. The SDK stage in the Dockerfile uses `mcr.microsoft.com/dotnet/sdk:10.0` which does **not** include Aspire workloads by default.
+The `AppForge.AppHost.csproj` uses `Sdk="Microsoft.NET.Sdk.Aspire.AppHost"` which requires the Aspire workload to be installed. The SDK stage in the Dockerfile uses `mcr.microsoft.com/dotnet/sdk:10.0` which does **not** include Aspire workloads by default.
 
 Two options:
-1. **Exclude AppHost from the solution copy** — only copy the csproj files needed for `FormForge.Api` publish. If `dotnet restore FormForge.sln` fails without AppHost, copy the AppHost csproj but **do not publish it**.
+1. **Exclude AppHost from the solution copy** — only copy the csproj files needed for `AppForge.Api` publish. If `dotnet restore AppForge.sln` fails without AppHost, copy the AppHost csproj but **do not publish it**.
 2. **Install Aspire workload in the Dockerfile SDK stage** — `RUN dotnet workload install aspire` before `dotnet restore`.
 
 **Recommendation: Option 1 (exclude or stub AppHost from Dockerfile restore).** The AppHost is only needed for Aspire orchestration, not for the API image. Modify the Dockerfile to restore only the non-AppHost projects if needed.
 
-If `dotnet restore FormForge.sln` errors on the AppHost SDK, replace with:
+If `dotnet restore AppForge.sln` errors on the AppHost SDK, replace with:
 ```dockerfile
-RUN dotnet restore "src/FormForge.Api/FormForge.Api.csproj"
+RUN dotnet restore "src/AppForge.Api/AppForge.Api.csproj"
 ```
-and publish `src/FormForge.Api/FormForge.Api.csproj` directly. The solution-level restore is ideal for layer caching but not required.
+and publish `src/AppForge.Api/AppForge.Api.csproj` directly. The solution-level restore is ideal for layer caching but not required.
 
 ### Alpine image and `wget` vs `curl`
 
@@ -395,7 +395,7 @@ and publish `src/FormForge.Api/FormForge.Api.csproj` directly. The solution-leve
 
 ### Testing requirements
 
-**No new automated tests** are required for this story. The deliverable is infrastructure orchestration. The `FormForge.Api.Tests` project must continue to discover and run zero tests cleanly — the empty test project regression gate must not break.
+**No new automated tests** are required for this story. The deliverable is infrastructure orchestration. The `AppForge.Api.Tests` project must continue to discover and run zero tests cleanly — the empty test project regression gate must not break.
 
 **No integration test** using `Testcontainers.PostgreSql` is added here. Those land in Story 2.1 (JWT Login — first story with real EF queries).
 
@@ -413,14 +413,14 @@ Key inherited context:
 - **`InvariantGlobalization=true`** repo-wide — do not call culture-sensitive string formatting in EF/DB code
 - **`/alive` health check endpoint** is confirmed working from Story 1.2 verification (returns HTTP 200 "Healthy") — the Compose health check can hit it safely
 - **TanStack Router stubs exist in `web/src/routes/`** — `npm run build` still works; no frontend changes needed for this story
-- **`UserSecretsId` already in AppHost.csproj** — don't re-init user secrets for AppHost. FormForge.Api does not have a `UserSecretsId` yet; if `appsettings.Compose.json` is insufficient, add user-secrets to the API project for dev (optional for this story)
+- **`UserSecretsId` already in AppHost.csproj** — don't re-init user secrets for AppHost. AppForge.Api does not have a `UserSecretsId` yet; if `appsettings.Compose.json` is insufficient, add user-secrets to the API project for dev (optional for this story)
 
 ### Git intelligence
 
 Recent commits:
 - `3c5c833` (HEAD) — "Story 1.2 — Aspire AppHost orchestrates Postgres + MinIO + API + Vite" — AppHost.cs full rewrite, adds Aspire.Hosting.PostgreSQL and CommunityToolkit.Aspire.Hosting.NodeJS.Extensions
 - `1cc16bc` — "Apply Story 1.1 code-review fixes and prep Story 1.2" — code review patches
-- `6f87d3d` — "Scaffold FormForge backend (.NET Aspire) and web (Vite + React 19)" — Story 1.1 scaffold
+- `6f87d3d` — "Scaffold AppForge backend (.NET Aspire) and web (Vite + React 19)" — Story 1.1 scaffold
 
 After this story lands, commit with message: `Story 1.3 — Docker Compose local stack: Dockerfile + compose + EF Core scaffold`
 
@@ -446,13 +446,13 @@ tinnitus/
 ├── docker-compose.yml                    ← FULL REWRITE of stub
 ├── Dockerfile                            ← FULL REWRITE of stub
 ├── src/
-│   └── FormForge.Api/
-│       ├── FormForge.Api.csproj          ← ADD EF Core PackageReferences
+│   └── AppForge.Api/
+│       ├── AppForge.Api.csproj          ← ADD EF Core PackageReferences
 │       ├── Program.cs                    ← ADD AddDbContext + Migrate() + UseStaticFiles()
 │       ├── appsettings.Compose.json      ← NEW — Compose env config
 │       └── Infrastructure/
 │           └── Persistence/
-│               ├── FormForgeDbContext.cs ← NEW — empty DbContext
+│               ├── AppForgeDbContext.cs ← NEW — empty DbContext
 │               └── Migrations/           ← NEW — InitialCreate migration files
 ├── Directory.Packages.props              ← ADD EF Core package versions
 └── .config/dotnet-tools.json            ← VERIFY dotnet-ef is present; add if missing
@@ -488,14 +488,14 @@ claude-sonnet-4-6
 - EF migration files generated on Windows had UTF-8 BOM + CRLF. `dotnet format --verify-no-changes` caught CHARSET and ENDOFLINE violations. Fixed with a Python script to strip BOM and normalize to LF.
 - CA1848 on `LogWarning` call: replaced with `[LoggerMessage]` partial method pattern in `StartupLog` static partial class.
 - CA1031 on `catch (Exception)`: narrowed to `catch (DbException ex)` from `System.Data.Common`.
-- CA1812 on `internal FormForgeDbContext`: added `[SuppressMessage("Performance", "CA1812")]`.
-- CA1852 on `FormForgeDbContext`: made `sealed`.
+- CA1812 on `internal AppForgeDbContext`: added `[SuppressMessage("Performance", "CA1812")]`.
+- CA1852 on `AppForgeDbContext`: made `sealed`.
 
 ### Completion Notes List
 
 All 4 ACs satisfied and verified:
 - AC-1: All four services (`postgres`, `minio`, `minio-init`, `api`) start via `docker compose up -d`. `docker compose ps` shows all healthy.
-- AC-2: `Database.Migrate()` runs on API startup (wrapped in `try/catch(DbException)`). `__EFMigrationsHistory` table confirmed present in postgres after first boot. MinIO `formforge` bucket created by `minio-init`. No container healthcheck failure.
+- AC-2: `Database.Migrate()` runs on API startup (wrapped in `try/catch(DbException)`). `__EFMigrationsHistory` table confirmed present in postgres after first boot. MinIO `appforge` bucket created by `minio-init`. No container healthcheck failure.
 - AC-3: `appsettings.Compose.json` uses `Host=postgres` and `http://minio:9000`. Zero `localhost` in service-to-service URLs.
 - AC-4: `docker compose build` exits 0. `dotnet build` — 0 warnings. `dotnet format --verify-no-changes` — clean. `dotnet test` — 0 tests, exit 0. `npm run build` — clean.
 
@@ -507,13 +507,13 @@ Additional notes:
 ### File List
 
 - `Directory.Packages.props` — added `Microsoft.EntityFrameworkCore` 10.0.8, `Microsoft.EntityFrameworkCore.Design` 10.0.8, `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.1, `Microsoft.EntityFrameworkCore.Relational` 10.0.8 (transitive pin)
-- `src/FormForge.Api/FormForge.Api.csproj` — added EF Core PackageReferences
-- `src/FormForge.Api/Program.cs` — added `AddDbContext`, `Database.Migrate()`, `UseStaticFiles()`, `StartupLog` partial class with `[LoggerMessage]`
-- `src/FormForge.Api/appsettings.Compose.json` — NEW: Compose-environment connection strings
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — NEW: minimal empty `internal sealed` DbContext
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260522113635_InitialCreate.cs` — NEW: empty EF migration
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260522113635_InitialCreate.Designer.cs` — NEW: migration designer file
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` — NEW: model snapshot
+- `src/AppForge.Api/AppForge.Api.csproj` — added EF Core PackageReferences
+- `src/AppForge.Api/Program.cs` — added `AddDbContext`, `Database.Migrate()`, `UseStaticFiles()`, `StartupLog` partial class with `[LoggerMessage]`
+- `src/AppForge.Api/appsettings.Compose.json` — NEW: Compose-environment connection strings
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — NEW: minimal empty `internal sealed` DbContext
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260522113635_InitialCreate.cs` — NEW: empty EF migration
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260522113635_InitialCreate.Designer.cs` — NEW: migration designer file
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` — NEW: model snapshot
 - `.editorconfig` — added `CA1515.severity = none` for Migrations folder
 - `Dockerfile` — full rewrite of stub; added `.editorconfig` to COPY, removed addgroup/adduser (built-in `app` user used)
 - `docker-compose.yml` — full rewrite of stub; healthcheck uses `GET /` (not `/alive`)

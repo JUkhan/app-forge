@@ -2,7 +2,7 @@
 // Drives the running dev app (http://localhost:5173) with Playwright's
 // bundled Chromium, logging in through the UI as the seeded admin.
 //
-//   ADMIN_EMAIL=admin@formforge.local ADMIN_PASSWORD=... \
+//   ADMIN_EMAIL=admin@appforge.local ADMIN_PASSWORD=... \
 //     node web/scripts/capture-dataset-screenshots.mjs
 //
 // Output: docs/screenshots/14-admin-datasets.png, 15-create-dataset-dialog.png,
@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path'
 import { chromium } from '@playwright/test'
 
 const BASE = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173'
-const EMAIL = process.env.ADMIN_EMAIL ?? 'admin@formforge.local'
+const EMAIL = process.env.ADMIN_EMAIL ?? 'admin@appforge.local'
 const PASSWORD = process.env.ADMIN_PASSWORD
 if (!PASSWORD) throw new Error('Set ADMIN_PASSWORD (and optionally ADMIN_EMAIL) in the environment.')
 

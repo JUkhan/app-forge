@@ -51,7 +51,7 @@ export function refreshSession(): Promise<RefreshResponse | null> {
     try {
       const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined
       if (locks?.request) {
-        return await locks.request('formforge-auth-refresh', fetchRefresh)
+        return await locks.request('appforge-auth-refresh', fetchRefresh)
       }
       return await fetchRefresh()
     } finally {

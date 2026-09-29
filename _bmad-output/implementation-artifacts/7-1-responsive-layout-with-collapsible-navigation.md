@@ -12,7 +12,7 @@ so that I am not limited to desktop access.
 
 **AC-1 — Single-column layout on mobile**
 **Given** a viewport <768 px
-**When** any FormForge route renders
+**When** any AppForge route renders
 **Then** the layout is single-column (sidebar hidden, content fills the full viewport width)
 
 **AC-2 — Sidebar + content layout on desktop**
@@ -27,7 +27,7 @@ so that I am not limited to desktop access.
 **And** tapping any nav item auto-closes the drawer
 
 **AC-4 — Touch target size**
-**Given** any interactive control on any FormForge page
+**Given** any interactive control on any AppForge page
 **When** I inspect it on mobile
 **Then** its touch target is ≥44×44 px (per FR-37 AC-3)
 

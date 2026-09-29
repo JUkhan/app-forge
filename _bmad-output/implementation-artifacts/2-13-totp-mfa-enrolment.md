@@ -11,7 +11,7 @@ so that my account is protected by a second factor.
 ## Acceptance Criteria
 
 1. **AC-1 — GET /me/mfa/enrol returns enrolment data**
-   Given I am authenticated and call `GET /api/users/me/mfa/enrol`, when the endpoint responds, then I receive `{ secret, qrCodeDataUrl, backupCodes[] }` where `secret` is a base32-encoded TOTP secret, `qrCodeDataUrl` is a `data:image/png;base64,...` QR encoding `otpauth://totp/FormForge:<email>?secret=<secret>&issuer=FormForge`, and `backupCodes` is an array of 8 uppercase alphanumeric 8-character codes. The pending enrolment (secret + raw codes) is stored in `IMemoryCache` with a 10-min TTL and NOT persisted to DB yet (per AR-56 enrolment guard).
+   Given I am authenticated and call `GET /api/users/me/mfa/enrol`, when the endpoint responds, then I receive `{ secret, qrCodeDataUrl, backupCodes[] }` where `secret` is a base32-encoded TOTP secret, `qrCodeDataUrl` is a `data:image/png;base64,...` QR encoding `otpauth://totp/AppForge:<email>?secret=<secret>&issuer=AppForge`, and `backupCodes` is an array of 8 uppercase alphanumeric 8-character codes. The pending enrolment (secret + raw codes) is stored in `IMemoryCache` with a 10-min TTL and NOT persisted to DB yet (per AR-56 enrolment guard).
 
 2. **AC-2 — Valid TOTP code persists enrolment**
    Given I called `GET /api/users/me/mfa/enrol` and submit `POST /api/users/me/mfa/verify` with `{ code }` where `code` is a valid 6-digit TOTP (Otp.NET ±1 step tolerance), then: `users.mfa_secret_protected` is set to the `IDataProtector`-encrypted secret (purpose `"mfa-totp-secret"`), `users.mfa_enabled` = true, bcrypt hashes of backup codes are written to `mfa_backup_codes`, old backup codes for this user are atomically deleted, and HTTP 200 is returned.
@@ -34,33 +34,33 @@ so that my account is protected by a second factor.
 ## Tasks / Subtasks
 
 - [x] Task 1: Install NuGet packages and verify Data Protection (AC-1, AC-2)
-  - [x] Add `Otp.NET` to `src/FormForge.Api/FormForge.Api.csproj`
-  - [x] Add `QRCoder` to `src/FormForge.Api/FormForge.Api.csproj` (use `PngByteQRCode` — no GDI+ dependency)
+  - [x] Add `Otp.NET` to `src/AppForge.Api/AppForge.Api.csproj`
+  - [x] Add `QRCoder` to `src/AppForge.Api/AppForge.Api.csproj` (use `PngByteQRCode` — no GDI+ dependency)
   - [x] Verify `builder.Services.AddDataProtection()` is in `Program.cs`; add it before `builder.Build()` if absent
 
 - [x] Task 2: Create `MfaBackupCode` entity and extend `User` (AC-2, AC-5)
-  - [x] Create `src/FormForge.Api/Domain/Entities/MfaBackupCode.cs` with properties: `Guid Id`, `Guid UserId`, `string CodeHash`, `DateTimeOffset? UsedAt`, `DateTimeOffset CreatedAt`, `User User` navigation
+  - [x] Create `src/AppForge.Api/Domain/Entities/MfaBackupCode.cs` with properties: `Guid Id`, `Guid UserId`, `string CodeHash`, `DateTimeOffset? UsedAt`, `DateTimeOffset CreatedAt`, `User User` navigation
   - [x] In `User.cs`, add: `bool MfaEnabled { get; set; }`, `byte[]? MfaSecretProtected { get; set; }`, `ICollection<MfaBackupCode> BackupCodes { get; set; } = []`
 
-- [x] Task 3: Update `FormForgeDbContext.cs` (AC-2, AC-5)
+- [x] Task 3: Update `AppForgeDbContext.cs` (AC-2, AC-5)
   - [x] Add `public DbSet<MfaBackupCode> MfaBackupCodes => Set<MfaBackupCode>();`
   - [x] In `OnModelCreating`, extend the `User` entity block: add column mappings for `mfa_enabled` (default false) and `mfa_secret_protected`
   - [x] Add `MfaBackupCode` entity configuration: table `mfa_backup_codes`, PK, `code_hash` required, cascade-delete FK to `users`
 
 - [x] Task 4: Create EF Core migration (AC-2)
-  - [x] Run `dotnet ef migrations add AddMfaTables --project src/FormForge.Api`
+  - [x] Run `dotnet ef migrations add AddMfaTables --project src/AppForge.Api`
   - [x] Verify migration adds `mfa_enabled bool NOT NULL DEFAULT false`, `mfa_secret_protected bytea NULL` to `users`; creates `mfa_backup_codes` table
   - [x] Apply: migration applied automatically via app startup `Migrate()` and the test fixture's `MigrateAsync()` (Testcontainers)
 
-- [x] Task 5: Create `IMfaService` and `MfaService` in `src/FormForge.Api/Features/Auth/MfaService.cs` (all ACs)
+- [x] Task 5: Create `IMfaService` and `MfaService` in `src/AppForge.Api/Features/Auth/MfaService.cs` (all ACs)
   - [x] Implement `InitiateEnrolment(Guid userId, string email)` — generate secret, QR, backup codes; cache pending enrolment 10 min
   - [x] Implement `VerifyEnrolmentAsync(Guid userId, string code, CancellationToken ct)` — verify TOTP, persist atomically via `SaveChangesAsync`
   - [x] Implement `GetMfaStatusAsync(Guid userId, CancellationToken ct)` — query `users.mfa_enabled`
-  - [x] Create `src/FormForge.Api/Features/Auth/Dtos/MfaEnrolResponse.cs`
+  - [x] Create `src/AppForge.Api/Features/Auth/Dtos/MfaEnrolResponse.cs`
 
 - [x] Task 6: Create `MfaVerifyRequest` DTO + validator (AC-2, AC-3)
-  - [x] Create `src/FormForge.Api/Features/Users/Dtos/MfaVerifyRequest.cs`
-  - [x] Create `src/FormForge.Api/Features/Users/Validators/MfaVerifyRequestValidator.cs` — Code: NotEmpty + Length(6) + Matches `^\d{6}$`
+  - [x] Create `src/AppForge.Api/Features/Users/Dtos/MfaVerifyRequest.cs`
+  - [x] Create `src/AppForge.Api/Features/Users/Validators/MfaVerifyRequestValidator.cs` — Code: NotEmpty + Length(6) + Matches `^\d{6}$`
   - [x] Register both in `Program.cs` after the `ChangePasswordRequestValidator` line
 
 - [x] Task 7: Add three MFA endpoints to `MeEndpoints.cs` (AC-1, AC-2, AC-3, AC-4, AC-6)
@@ -87,15 +87,15 @@ so that my account is protected by a second factor.
 **Code review: 2026-06-01 — 2 decision-needed, 5 patch, 4 defer, 14 dismissed — all resolved**
 
 **Decision-Needed (resolved):**
-- [x] [Review][Decision] D1 — AddDataProtection without key persistence — Fixed: added `Microsoft.AspNetCore.DataProtection.EntityFrameworkCore` package, implemented `IDataProtectionKeyContext` on `FormForgeDbContext`, changed to `.PersistKeysToDbContext<FormForgeDbContext>()`, generated `AddDataProtectionKeys` migration.
+- [x] [Review][Decision] D1 — AddDataProtection without key persistence — Fixed: added `Microsoft.AspNetCore.DataProtection.EntityFrameworkCore` package, implemented `IDataProtectionKeyContext` on `AppForgeDbContext`, changed to `.PersistKeysToDbContext<AppForgeDbContext>()`, generated `AddDataProtectionKeys` migration.
 - [x] [Review][Decision] D2 — Dialog escape-close at Step 3 before backup codes acknowledged — Fixed: `onOpenChange` now ignores close events when `mfaStep === 3`, keeping the modal open until the checkbox is checked and Done is clicked.
 
 **Patch (applied):**
-- [x] [Review][Patch] P1 — otpauth URI email label not URI-encoded [`src/FormForge.Api/Features/Auth/MfaService.cs:InitiateEnrolment`] — Fixed: `Uri.EscapeDataString(email)` applied to the label segment.
-- [x] [Review][Patch] P2 — GetMfaStatusAsync returns `false` for non-existent user instead of 401 [`src/FormForge.Api/Features/Auth/MfaService.cs:GetMfaStatusAsync` + `MeEndpoints.cs:GetMfaStatusHandler`] — Fixed: nullable `bool?` projection; handler returns 401 when `null`.
+- [x] [Review][Patch] P1 — otpauth URI email label not URI-encoded [`src/AppForge.Api/Features/Auth/MfaService.cs:InitiateEnrolment`] — Fixed: `Uri.EscapeDataString(email)` applied to the label segment.
+- [x] [Review][Patch] P2 — GetMfaStatusAsync returns `false` for non-existent user instead of 401 [`src/AppForge.Api/Features/Auth/MfaService.cs:GetMfaStatusAsync` + `MeEndpoints.cs:GetMfaStatusHandler`] — Fixed: nullable `bool?` projection; handler returns 401 when `null`.
 - [x] [Review][Patch] P3 — Enable MFA button not disabled when modal is already open [`web/src/routes/_app/settings.tsx`] — Fixed: `disabled={mfaEnrolMutation.isPending || mfaModalOpen}`.
 - [x] [Review][Patch] P4 — `handleOpenMfaModal` opens modal when `enrolData` is null/undefined [`web/src/routes/_app/settings.tsx`] — Fixed: guard added; toasts error and returns early if `!data`.
-- [x] [Review][Patch] P5 — `VerifyEnrolmentAsync` does not evict cache when user is null [`src/FormForge.Api/Features/Auth/MfaService.cs:VerifyEnrolmentAsync`] — Fixed: `cache.Remove(PendingKey(userId))` added in the `user is null` branch.
+- [x] [Review][Patch] P5 — `VerifyEnrolmentAsync` does not evict cache when user is null [`src/AppForge.Api/Features/Auth/MfaService.cs:VerifyEnrolmentAsync`] — Fixed: `cache.Remove(PendingKey(userId))` added in the `user is null` branch.
 
 **Deferred:**
 - [x] [Review][Defer] W1 — Concurrent enrolment request race (multi-tab) — A second call to GET /me/mfa/enrol while a verify is in-flight replaces the cache entry; the verify reads the new secret and fails TOTP for the user's authenticator. Very narrow race window; fix requires a versioned nonce or per-user lock. Out of scope for 2.13. — deferred, pre-existing
@@ -123,9 +123,9 @@ so that my account is protected by a second factor.
 
 ### New Entity: `MfaBackupCode`
 
-**`src/FormForge.Api/Domain/Entities/MfaBackupCode.cs`:**
+**`src/AppForge.Api/Domain/Entities/MfaBackupCode.cs`:**
 ```csharp
-namespace FormForge.Api.Domain.Entities;
+namespace AppForge.Api.Domain.Entities;
 
 internal sealed class MfaBackupCode
 {
@@ -148,7 +148,7 @@ public ICollection<MfaBackupCode> BackupCodes { get; set; } = [];
 
 ---
 
-### `FormForgeDbContext.cs` Changes
+### `AppForgeDbContext.cs` Changes
 
 Add DbSet (alongside existing ones):
 ```csharp
@@ -186,21 +186,21 @@ modelBuilder.Entity<MfaBackupCode>(b =>
 
 ### `IMfaService` and `MfaService`
 
-**`src/FormForge.Api/Features/Auth/MfaService.cs`** (full file):
+**`src/AppForge.Api/Features/Auth/MfaService.cs`** (full file):
 ```csharp
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
-using FormForge.Api.Domain.Entities;
-using FormForge.Api.Features.Auth.Dtos;
-using FormForge.Api.Infrastructure.Persistence;
+using AppForge.Api.Domain.Entities;
+using AppForge.Api.Features.Auth.Dtos;
+using AppForge.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using OtpNet;
 using QRCoder;
 
-namespace FormForge.Api.Features.Auth;
+namespace AppForge.Api.Features.Auth;
 
 internal interface IMfaService
 {
@@ -215,7 +215,7 @@ internal sealed record MfaVerifyEnrolmentResult(MfaVerifyEnrolmentOutcome Outcom
 
 [SuppressMessage("Performance", "CA1812", Justification = "Instantiated via DI")]
 internal sealed class MfaService(
-    FormForgeDbContext db,
+    AppForgeDbContext db,
     IDataProtectionProvider dataProtectionProvider,
     IMemoryCache cache,
     IPasswordHasher passwordHasher) : IMfaService
@@ -248,7 +248,7 @@ internal sealed class MfaService(
             new PendingEnrolment(base32Secret, rawBackupCodes),
             TimeSpan.FromMinutes(10));
 
-        var otpAuthUri = $"otpauth://totp/FormForge:{email}?secret={base32Secret}&issuer=FormForge";
+        var otpAuthUri = $"otpauth://totp/AppForge:{email}?secret={base32Secret}&issuer=AppForge";
         var qrCodeDataUrl = GenerateQrCodeDataUrl(otpAuthUri);
 
         return new MfaEnrolResponse(base32Secret, qrCodeDataUrl, rawBackupCodes);
@@ -326,9 +326,9 @@ internal sealed class MfaService(
 }
 ```
 
-**`src/FormForge.Api/Features/Auth/Dtos/MfaEnrolResponse.cs`:**
+**`src/AppForge.Api/Features/Auth/Dtos/MfaEnrolResponse.cs`:**
 ```csharp
-namespace FormForge.Api.Features.Auth.Dtos;
+namespace AppForge.Api.Features.Auth.Dtos;
 
 internal sealed record MfaEnrolResponse(string Secret, string QrCodeDataUrl, string[] BackupCodes);
 ```
@@ -337,20 +337,20 @@ internal sealed record MfaEnrolResponse(string Secret, string QrCodeDataUrl, str
 
 ### `MfaVerifyRequest` DTO and Validator
 
-**`src/FormForge.Api/Features/Users/Dtos/MfaVerifyRequest.cs`:**
+**`src/AppForge.Api/Features/Users/Dtos/MfaVerifyRequest.cs`:**
 ```csharp
-namespace FormForge.Api.Features.Users.Dtos;
+namespace AppForge.Api.Features.Users.Dtos;
 
 internal sealed record MfaVerifyRequest(string Code);
 ```
 
-**`src/FormForge.Api/Features/Users/Validators/MfaVerifyRequestValidator.cs`:**
+**`src/AppForge.Api/Features/Users/Validators/MfaVerifyRequestValidator.cs`:**
 ```csharp
 using System.Diagnostics.CodeAnalysis;
 using FluentValidation;
-using FormForge.Api.Features.Users.Dtos;
+using AppForge.Api.Features.Users.Dtos;
 
-namespace FormForge.Api.Features.Users.Validators;
+namespace AppForge.Api.Features.Users.Validators;
 
 [SuppressMessage("Performance", "CA1812", Justification = "Instantiated via DI")]
 internal sealed class MfaVerifyRequestValidator : AbstractValidator<MfaVerifyRequest>
@@ -492,9 +492,9 @@ private static async Task<IResult> GetMfaStatusHandler(
 ```
 
 **Required `using` additions to `MeEndpoints.cs`** (check before adding — some may already be present):
-- `using FormForge.Api.Features.Auth;` — for `IMfaService`, `MfaVerifyEnrolmentOutcome`
-- `using FormForge.Api.Features.Auth.Dtos;` — for `MfaEnrolResponse`
-- `using FormForge.Api.Features.Users.Dtos;` — already present; `MfaVerifyRequest` now lives here too
+- `using AppForge.Api.Features.Auth;` — for `IMfaService`, `MfaVerifyEnrolmentOutcome`
+- `using AppForge.Api.Features.Auth.Dtos;` — for `MfaEnrolResponse`
+- `using AppForge.Api.Features.Users.Dtos;` — already present; `MfaVerifyRequest` now lives here too
 
 **Note on `EnrolMfaHandler` signature:** It is `IResult` (not `Task<IResult>`) because `InitiateEnrolment` is synchronous. Minimal API route handlers accept both sync and async delegates. If the build fails for any reason, wrap with `Task.FromResult<IResult>(...)` to make it `Task<IResult>`.
 
@@ -820,11 +820,11 @@ Inside the existing `"settings"` object, add a `"security"` key:
 
 | File | Purpose |
 |---|---|
-| `src/FormForge.Api/Domain/Entities/MfaBackupCode.cs` | New entity |
-| `src/FormForge.Api/Features/Auth/MfaService.cs` | IMfaService + MfaService + outcomes |
-| `src/FormForge.Api/Features/Auth/Dtos/MfaEnrolResponse.cs` | Enrolment response DTO |
-| `src/FormForge.Api/Features/Users/Dtos/MfaVerifyRequest.cs` | Verify request DTO |
-| `src/FormForge.Api/Features/Users/Validators/MfaVerifyRequestValidator.cs` | FluentValidation |
+| `src/AppForge.Api/Domain/Entities/MfaBackupCode.cs` | New entity |
+| `src/AppForge.Api/Features/Auth/MfaService.cs` | IMfaService + MfaService + outcomes |
+| `src/AppForge.Api/Features/Auth/Dtos/MfaEnrolResponse.cs` | Enrolment response DTO |
+| `src/AppForge.Api/Features/Users/Dtos/MfaVerifyRequest.cs` | Verify request DTO |
+| `src/AppForge.Api/Features/Users/Validators/MfaVerifyRequestValidator.cs` | FluentValidation |
 | `web/src/features/auth/mfaMutations.ts` | TanStack Query hooks |
 | EF Core migration (auto-generated) | `AddMfaTables` |
 
@@ -832,17 +832,17 @@ Inside the existing `"settings"` object, add a `"security"` key:
 
 | File | Change |
 |---|---|
-| `src/FormForge.Api/Domain/Entities/User.cs` | Add `MfaEnabled`, `MfaSecretProtected`, `BackupCodes` |
-| `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` | `MfaBackupCodes` DbSet + entity config |
-| `src/FormForge.Api/Features/Users/MeEndpoints.cs` | 3 new endpoints + handlers; new `using` statements |
-| `src/FormForge.Api/Program.cs` | Register `IMfaService`, `MfaVerifyRequestValidator`; `AddDataProtection()` |
+| `src/AppForge.Api/Domain/Entities/User.cs` | Add `MfaEnabled`, `MfaSecretProtected`, `BackupCodes` |
+| `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` | `MfaBackupCodes` DbSet + entity config |
+| `src/AppForge.Api/Features/Users/MeEndpoints.cs` | 3 new endpoints + handlers; new `using` statements |
+| `src/AppForge.Api/Program.cs` | Register `IMfaService`, `MfaVerifyRequestValidator`; `AddDataProtection()` |
 | `web/src/routes/_app/settings.tsx` | Security card + 3-step Dialog modal |
 | `web/src/lib/i18n/locales/en.json` | `auth.mfaCodeInvalid`, `auth.mfaNoPendingEnrolment`, `settings.security.*` |
 
 ### Files to Leave Untouched
 
-- `src/FormForge.Api/Features/Auth/AuthService.cs` — login MFA challenge is Story 2.14
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs` — `POST /api/auth/mfa/verify` is Story 2.14
+- `src/AppForge.Api/Features/Auth/AuthService.cs` — login MFA challenge is Story 2.14
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs` — `POST /api/auth/mfa/verify` is Story 2.14
 - `web/src/routes/_app.tsx` — no navigation changes needed for this story
 - All Designer, Menu, CRUD, Provisioning files — unrelated
 
@@ -887,7 +887,7 @@ Inside the existing `"settings"` object, add a `"security"` key:
 
 ### Testing
 
-**Backend — add to `src/FormForge.Api.Tests/Features/Users/MeIntegrationTests.cs`:**
+**Backend — add to `src/AppForge.Api.Tests/Features/Users/MeIntegrationTests.cs`:**
 ```
 GetMfaStatus_Unauthenticated_Returns401
 GetMfaStatus_AuthenticatedUser_DefaultsToFalse
@@ -917,11 +917,11 @@ For the valid-code test: use Otp.NET directly in the test to generate a current 
 
 - [Source: `_bmad-output/planning-artifacts/epics.md` — Story 2.13 full AC (lines 800–827), Stories 2.14 & 2.15 (lines 828–889), FR-53, AR-56]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` — Decision 2.12 TOTP MFA (lines 449–461), Decision 4.7 httpClient, Decision 4.9 form composition]
-- [Source: `src/FormForge.Api/Domain/Entities/User.cs` — current entity; extend by adding 3 properties]
-- [Source: `src/FormForge.Api/Features/Auth/AuthService.cs` — `IAuthService`/`AuthService` constructor pattern; `ChangePasswordOutcome`/`ChangePasswordResult` to mirror for MFA outcomes]
-- [Source: `src/FormForge.Api/Features/Users/MeEndpoints.cs` — `ChangePasswordHandler` pattern for ProblemDetails extensions; `UpdateMyPreferencesHandler` for userId claim extraction]
-- [Source: `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — DbSet pattern, `OnModelCreating` entity config style to follow for `MfaBackupCode`]
-- [Source: `src/FormForge.Api/Program.cs` — `AddScoped` registration patterns; `AddRateLimiter` block; route group mappings]
+- [Source: `src/AppForge.Api/Domain/Entities/User.cs` — current entity; extend by adding 3 properties]
+- [Source: `src/AppForge.Api/Features/Auth/AuthService.cs` — `IAuthService`/`AuthService` constructor pattern; `ChangePasswordOutcome`/`ChangePasswordResult` to mirror for MFA outcomes]
+- [Source: `src/AppForge.Api/Features/Users/MeEndpoints.cs` — `ChangePasswordHandler` pattern for ProblemDetails extensions; `UpdateMyPreferencesHandler` for userId claim extraction]
+- [Source: `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — DbSet pattern, `OnModelCreating` entity config style to follow for `MfaBackupCode`]
+- [Source: `src/AppForge.Api/Program.cs` — `AddScoped` registration patterns; `AddRateLimiter` block; route group mappings]
 - [Source: `web/src/features/auth/authMutations.ts` — `useChangePasswordMutation` mutation pattern]
 - [Source: `web/src/routes/_app/settings.tsx` — current page structure to extend; Change Password card layout to mirror for Security card]
 - [Source: `web/src/lib/i18n/locales/en.json` — existing `settings.*` and `auth.*` structure]
@@ -954,24 +954,24 @@ claude-sonnet-4-6 (story authoring); claude-opus-4-8 (implementation)
 ### File List
 
 **Created:**
-- `src/FormForge.Api/Domain/Entities/MfaBackupCode.cs`
-- `src/FormForge.Api/Features/Auth/MfaService.cs`
-- `src/FormForge.Api/Features/Auth/Dtos/MfaEnrolResponse.cs`
-- `src/FormForge.Api/Features/Users/Dtos/MfaVerifyRequest.cs`
-- `src/FormForge.Api/Features/Users/Validators/MfaVerifyRequestValidator.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260531221752_AddMfaTables.cs` (+ `.Designer.cs`, auto-generated)
+- `src/AppForge.Api/Domain/Entities/MfaBackupCode.cs`
+- `src/AppForge.Api/Features/Auth/MfaService.cs`
+- `src/AppForge.Api/Features/Auth/Dtos/MfaEnrolResponse.cs`
+- `src/AppForge.Api/Features/Users/Dtos/MfaVerifyRequest.cs`
+- `src/AppForge.Api/Features/Users/Validators/MfaVerifyRequestValidator.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260531221752_AddMfaTables.cs` (+ `.Designer.cs`, auto-generated)
 - `web/src/features/auth/mfaMutations.ts`
 
 **Modified:**
 - `Directory.Packages.props` — added `Otp.NET` 1.4.0, `QRCoder` 1.6.0 versions
-- `src/FormForge.Api/FormForge.Api.csproj` — `Otp.NET`, `QRCoder` package references
-- `src/FormForge.Api/Domain/Entities/User.cs` — `MfaEnabled`, `MfaSecretProtected`, `BackupCodes`
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — `MfaBackupCodes` DbSet, User column mappings, `MfaBackupCode` entity config
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` — updated by migration
-- `src/FormForge.Api/Features/Users/MeEndpoints.cs` — 3 MFA endpoints + handlers, `Auth.Dtos` using
-- `src/FormForge.Api/Program.cs` — `AddDataProtection()`, `IMfaService` + `MfaVerifyRequestValidator` registrations
-- `src/FormForge.Api.Tests/FormForge.Api.Tests.csproj` — `Otp.NET` package reference
-- `src/FormForge.Api.Tests/Features/Users/MeIntegrationTests.cs` — 8 new MFA integration tests + helpers + DTO
+- `src/AppForge.Api/AppForge.Api.csproj` — `Otp.NET`, `QRCoder` package references
+- `src/AppForge.Api/Domain/Entities/User.cs` — `MfaEnabled`, `MfaSecretProtected`, `BackupCodes`
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — `MfaBackupCodes` DbSet, User column mappings, `MfaBackupCode` entity config
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` — updated by migration
+- `src/AppForge.Api/Features/Users/MeEndpoints.cs` — 3 MFA endpoints + handlers, `Auth.Dtos` using
+- `src/AppForge.Api/Program.cs` — `AddDataProtection()`, `IMfaService` + `MfaVerifyRequestValidator` registrations
+- `src/AppForge.Api.Tests/AppForge.Api.Tests.csproj` — `Otp.NET` package reference
+- `src/AppForge.Api.Tests/Features/Users/MeIntegrationTests.cs` — 8 new MFA integration tests + helpers + DTO
 - `web/src/routes/_app/settings.tsx` — Security card + 3-step MFA enrolment Dialog
 - `web/src/lib/i18n/locales/en.json` — `auth.mfaCodeInvalid`, `auth.mfaNoPendingEnrolment`, `settings.security.*`
 

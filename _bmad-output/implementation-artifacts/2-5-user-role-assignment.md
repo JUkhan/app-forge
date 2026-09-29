@@ -81,10 +81,10 @@ So that I can control their effective permissions.
 
 ### Task 1 — DTO: `AssignRolesRequest`
 
-Create `src/FormForge.Api/Features/Users/Dtos/AssignRolesRequest.cs`:
+Create `src/AppForge.Api/Features/Users/Dtos/AssignRolesRequest.cs`:
 
 ```csharp
-namespace FormForge.Api.Features.Users.Dtos;
+namespace AppForge.Api.Features.Users.Dtos;
 
 internal sealed record AssignRolesRequest(IReadOnlyList<Guid>? RoleIds);
 ```
@@ -95,13 +95,13 @@ internal sealed record AssignRolesRequest(IReadOnlyList<Guid>? RoleIds);
 
 ### Task 2 — Validator: `AssignRolesRequestValidator`
 
-Create `src/FormForge.Api/Features/Users/Validators/AssignRolesRequestValidator.cs`:
+Create `src/AppForge.Api/Features/Users/Validators/AssignRolesRequestValidator.cs`:
 
 ```csharp
 using FluentValidation;
-using FormForge.Api.Features.Users.Dtos;
+using AppForge.Api.Features.Users.Dtos;
 
-namespace FormForge.Api.Features.Users.Validators;
+namespace AppForge.Api.Features.Users.Validators;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
     Justification = "Registered via DI as IValidator<AssignRolesRequest>.")]
@@ -126,14 +126,14 @@ internal sealed class AssignRolesRequestValidator : AbstractValidator<AssignRole
 
 ### Task 3 — `IUserService` / `UserService`
 
-Create `src/FormForge.Api/Features/Users/UserService.cs`:
+Create `src/AppForge.Api/Features/Users/UserService.cs`:
 
 ```csharp
-using FormForge.Api.Domain.Entities;
-using FormForge.Api.Infrastructure.Persistence;
+using AppForge.Api.Domain.Entities;
+using AppForge.Api.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FormForge.Api.Features.Users;
+namespace AppForge.Api.Features.Users;
 
 internal enum AssignRolesOutcome { Success, UserNotFound, RolesNotFound }
 
@@ -148,7 +148,7 @@ internal interface IUserService
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
     Justification = "Registered via DI.")]
-internal sealed class UserService(FormForgeDbContext db) : IUserService
+internal sealed class UserService(AppForgeDbContext db) : IUserService
 {
     public async Task<AssignRolesResult> AssignRolesAsync(
         Guid userId,
@@ -222,13 +222,13 @@ internal sealed class UserService(FormForgeDbContext db) : IUserService
 
 ### Task 4 — `UserEndpoints` with `MapUserAdminEndpoints`
 
-Create `src/FormForge.Api/Features/Users/UserEndpoints.cs`:
+Create `src/AppForge.Api/Features/Users/UserEndpoints.cs`:
 
 ```csharp
-using FormForge.Api.Common.Endpoints;
-using FormForge.Api.Features.Users.Dtos;
+using AppForge.Api.Common.Endpoints;
+using AppForge.Api.Features.Users.Dtos;
 
-namespace FormForge.Api.Features.Users;
+namespace AppForge.Api.Features.Users;
 
 internal static class UserEndpoints
 {
@@ -290,12 +290,12 @@ internal static class UserEndpoints
 
 ### Task 5 — Update `AdminEndpoints`
 
-Edit `src/FormForge.Api/Features/Roles/AdminEndpoints.cs`:
+Edit `src/AppForge.Api/Features/Roles/AdminEndpoints.cs`:
 
 ```csharp
-using FormForge.Api.Features.Users;
+using AppForge.Api.Features.Users;
 
-namespace FormForge.Api.Features.Roles;
+namespace AppForge.Api.Features.Roles;
 
 // Top-level admin dispatcher. Add MapXxxEndpoints() calls here rather than
 // introducing parallel top-level /api/admin route groups in Program.cs.
@@ -311,7 +311,7 @@ internal static class AdminEndpoints
 }
 ```
 
-> **`using FormForge.Api.Features.Users;`** is required so the compiler resolves `MapUserAdminEndpoints` from `UserEndpoints.cs`. Add it as the first using in the file.
+> **`using AppForge.Api.Features.Users;`** is required so the compiler resolves `MapUserAdminEndpoints` from `UserEndpoints.cs`. Add it as the first using in the file.
 
 ---
 
@@ -320,9 +320,9 @@ internal static class AdminEndpoints
 **a) Add usings** at the top of `Program.cs` alongside the existing Roles usings:
 
 ```csharp
-using FormForge.Api.Features.Users;
-using FormForge.Api.Features.Users.Dtos;
-using FormForge.Api.Features.Users.Validators;
+using AppForge.Api.Features.Users;
+using AppForge.Api.Features.Users.Dtos;
+using AppForge.Api.Features.Users.Validators;
 ```
 
 **b) Register user services** after the Role services block (around line 100–102 of current `Program.cs`):
@@ -341,21 +341,21 @@ builder.Services.AddScoped<IValidator<AssignRolesRequest>, AssignRolesRequestVal
 
 ### Task 7 — Integration tests
 
-Create `src/FormForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs`:
+Create `src/AppForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs`:
 
 ```csharp
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using FormForge.Api.Domain.Entities;
-using FormForge.Api.Infrastructure.Persistence;
-using FormForge.Api.Tests.Infrastructure;
+using AppForge.Api.Domain.Entities;
+using AppForge.Api.Infrastructure.Persistence;
+using AppForge.Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FormForge.Api.Tests.Features.Users;
+namespace AppForge.Api.Tests.Features.Users;
 
 [SuppressMessage("Reliability", "CA2000",
     Justification = "WebApplicationFactory is disposed via DisposeAsync in IAsyncLifetime.")]
@@ -379,13 +379,13 @@ public sealed class UserRoleIntegrationTests : IClassFixture<PostgresFixture>, I
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                builder.UseSetting("ConnectionStrings:formforge", _postgres.ConnectionString);
+                builder.UseSetting("ConnectionStrings:appforge", _postgres.ConnectionString);
                 builder.UseSetting("Jwt:SigningKey", "test-signing-key-minimum-32-characters!!");
                 builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:5173");
             });
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
         await db.Database.MigrateAsync();
 
         await db.Database.ExecuteSqlRawAsync(
@@ -524,7 +524,7 @@ public sealed class UserRoleIntegrationTests : IClassFixture<PostgresFixture>, I
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         using var scope = _factory!.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
         var assignment = await db.UserRoles.FirstOrDefaultAsync(ur => ur.UserId == _viewerUserId && ur.RoleId == ViewerRoleId);
         Assert.NotNull(assignment);
     }
@@ -535,7 +535,7 @@ public sealed class UserRoleIntegrationTests : IClassFixture<PostgresFixture>, I
         // Pre-condition: give the viewer user a role.
         using (var scope = _factory!.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
             db.UserRoles.Add(new UserRole { UserId = _viewerUserId, RoleId = ViewerRoleId, CreatedAt = DateTimeOffset.UtcNow });
             await db.SaveChangesAsync();
         }
@@ -552,7 +552,7 @@ public sealed class UserRoleIntegrationTests : IClassFixture<PostgresFixture>, I
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         using var verifyScope = _factory!.Services.CreateScope();
-        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
         Assert.False(await verifyDb.UserRoles.AnyAsync(ur => ur.UserId == _viewerUserId));
     }
 
@@ -587,7 +587,7 @@ public sealed class UserRoleIntegrationTests : IClassFixture<PostgresFixture>, I
         // Start: viewer user has viewer role.
         using (var scope = _factory!.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
             db.UserRoles.Add(new UserRole { UserId = _viewerUserId, RoleId = ViewerRoleId, CreatedAt = DateTimeOffset.UtcNow });
             await db.SaveChangesAsync();
         }
@@ -605,7 +605,7 @@ public sealed class UserRoleIntegrationTests : IClassFixture<PostgresFixture>, I
 
         // Verify: only platform-admin row remains; viewer row is gone.
         using var verifyScope = _factory!.Services.CreateScope();
-        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
         var userRoles = await verifyDb.UserRoles.Where(ur => ur.UserId == _viewerUserId).ToListAsync();
         Assert.Single(userRoles);
         Assert.Equal(PlatformAdminRoleId, userRoles[0].RoleId);
@@ -622,7 +622,7 @@ public sealed class UserRoleIntegrationTests : IClassFixture<PostgresFixture>, I
         return body!.AccessToken;
     }
 
-    private static async Task ReseedSystemRolesAsync(FormForgeDbContext db)
+    private static async Task ReseedSystemRolesAsync(AppForgeDbContext db)
     {
         if (!await db.Roles.AnyAsync(r => r.Id == PlatformAdminRoleId))
         {
@@ -649,7 +649,7 @@ public sealed class UserRoleIntegrationTests : IClassFixture<PostgresFixture>, I
         await db.SaveChangesAsync();
     }
 
-    private static async Task<(Guid AdminId, Guid ViewerId)> SeedTestUsersAsync(FormForgeDbContext db)
+    private static async Task<(Guid AdminId, Guid ViewerId)> SeedTestUsersAsync(AppForgeDbContext db)
     {
         var admin = new User
         {
@@ -731,29 +731,29 @@ public sealed class UserRoleIntegrationTests : IClassFixture<PostgresFixture>, I
 
 ### Current code state — files being modified
 
-**`src/FormForge.Api/Features/Roles/AdminEndpoints.cs`** — Add `using FormForge.Api.Features.Users;` import and the `/users` sub-group registration inside `MapAdminEndpoints`. Do NOT change the `/roles` sub-group registration.
+**`src/AppForge.Api/Features/Roles/AdminEndpoints.cs`** — Add `using AppForge.Api.Features.Users;` import and the `/users` sub-group registration inside `MapAdminEndpoints`. Do NOT change the `/roles` sub-group registration.
 
-**`src/FormForge.Api/Program.cs`** — Add three usings and two `AddScoped` registrations. The `/api/admin` route group mapping in `Program.cs` is unchanged (it already calls `MapAdminEndpoints()` which now includes `/users`).
+**`src/AppForge.Api/Program.cs`** — Add three usings and two `AddScoped` registrations. The `/api/admin` route group mapping in `Program.cs` is unchanged (it already calls `MapAdminEndpoints()` which now includes `/users`).
 
 ### New files
 
 | File | Purpose |
 |------|---------|
-| `src/FormForge.Api/Features/Users/Dtos/AssignRolesRequest.cs` | Request DTO |
-| `src/FormForge.Api/Features/Users/Validators/AssignRolesRequestValidator.cs` | FluentValidation |
-| `src/FormForge.Api/Features/Users/UserService.cs` | `IUserService` + `UserService` |
-| `src/FormForge.Api/Features/Users/UserEndpoints.cs` | `PUT /{id}/roles` handler + `MapUserAdminEndpoints` |
-| `src/FormForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs` | 9 integration tests |
+| `src/AppForge.Api/Features/Users/Dtos/AssignRolesRequest.cs` | Request DTO |
+| `src/AppForge.Api/Features/Users/Validators/AssignRolesRequestValidator.cs` | FluentValidation |
+| `src/AppForge.Api/Features/Users/UserService.cs` | `IUserService` + `UserService` |
+| `src/AppForge.Api/Features/Users/UserEndpoints.cs` | `PUT /{id}/roles` handler + `MapUserAdminEndpoints` |
+| `src/AppForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs` | 9 integration tests |
 
 ### Do NOT touch
 
-- `src/FormForge.Api/Domain/Entities/UserRole.cs` — already correct from Story 2.4.
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — `UserRoles` DbSet is already registered.
-- `src/FormForge.Api/Features/Auth/AuthService.cs` — already queries `db.UserRoles` for role names in both `LoginAsync` and `RefreshAsync`. No changes needed; AC-6 is satisfied by existing code.
+- `src/AppForge.Api/Domain/Entities/UserRole.cs` — already correct from Story 2.4.
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — `UserRoles` DbSet is already registered.
+- `src/AppForge.Api/Features/Auth/AuthService.cs` — already queries `db.UserRoles` for role names in both `LoginAsync` and `RefreshAsync`. No changes needed; AC-6 is satisfied by existing code.
 - Any existing EF Core migration files — `user_roles` table already exists from Story 2.4.
 - `web/src/**` — no frontend work in this story; UI is Story 2.8.
-- `src/FormForge.Api/Features/Roles/RoleService.cs` — no changes.
-- `src/FormForge.Api/Features/Roles/RoleEndpoints.cs` — no changes.
+- `src/AppForge.Api/Features/Roles/RoleService.cs` — no changes.
+- `src/AppForge.Api/Features/Roles/RoleEndpoints.cs` — no changes.
 
 ### Anti-patterns to avoid
 
@@ -823,8 +823,8 @@ Recent commits (most recent first):
   - AR-47 — Domain events: `IDomainEventBus`, `UserRoleAssignmentChanged(userId)`
   - AR-45 — Naming: `Features/Users/` folder, `UserService`, `UserEndpoints`, `IUserService`
 - `_bmad-output/implementation-artifacts/2-4-role-crud.md` — carry-forward patterns (TRUNCATE order, HandleCookies, CA1812, CA2000, system role seed)
-- `src/FormForge.Api/Features/Roles/AdminEndpoints.cs` — the file being modified to add `/users` sub-group
-- `src/FormForge.Api/Features/Auth/AuthService.cs` — already queries `db.UserRoles` in `LoginAsync` + `RefreshAsync`; AC-6 is pre-satisfied
+- `src/AppForge.Api/Features/Roles/AdminEndpoints.cs` — the file being modified to add `/users` sub-group
+- `src/AppForge.Api/Features/Auth/AuthService.cs` — already queries `db.UserRoles` in `LoginAsync` + `RefreshAsync`; AC-6 is pre-satisfied
 
 ---
 
@@ -848,22 +848,22 @@ Claude Opus 4.7 (1M context) — claude-opus-4-7[1m]
 - **AC-6 verification approach**: rather than decoding the JWT and asserting on the `roles` claim payload (which would couple the test to claim names), `AssignRoles_JwtReflectsNewRoles_AfterLoginPostAssignment` does functional proof — after assigning `platform-admin` and re-logging in, the new token is accepted by the `RequirePlatformAdmin` policy on `/api/admin/roles`. Same level of confidence, less brittle.
 - **Atomic-replacement pattern** matches Story 2.4 `UpdateRoleAsync` (`RemoveRange` + single `SaveChangesAsync`). Deliberately did NOT introduce `BeginTransactionAsync` since EF Core already wraps a single `SaveChangesAsync` in a transaction.
 - **Story 2.6 deferral**: `UserRoleAssignmentChanged` event publishing is intentionally NOT wired (`IDomainEventBus` doesn't exist yet). Inline comment in `UserService.AssignRolesAsync` calls this out so 2.6 can patch it in directly.
-- **No changes to**: `AuthService` (already reads `db.UserRoles` for role claims), `UserRole` entity, `FormForgeDbContext` (DbSet + key already configured by Story 2.4), migrations, frontend.
+- **No changes to**: `AuthService` (already reads `db.UserRoles` for role claims), `UserRole` entity, `AppForgeDbContext` (DbSet + key already configured by Story 2.4), migrations, frontend.
 - **Validator pattern**: a single whole-collection `Must(...)` for duplicate detection rather than `RuleForEach`, because the rule is about the set, not each element — one error, not N.
 - **`request.RoleIds!`** null-forgiving in the handler is safe because `ValidationFilter<AssignRolesRequest>` runs `NotNull()` before the handler ever executes.
 
 ### File List
 
 **New files:**
-- `src/FormForge.Api/Features/Users/Dtos/AssignRolesRequest.cs`
-- `src/FormForge.Api/Features/Users/Validators/AssignRolesRequestValidator.cs`
-- `src/FormForge.Api/Features/Users/UserService.cs`
-- `src/FormForge.Api/Features/Users/UserEndpoints.cs`
-- `src/FormForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs`
+- `src/AppForge.Api/Features/Users/Dtos/AssignRolesRequest.cs`
+- `src/AppForge.Api/Features/Users/Validators/AssignRolesRequestValidator.cs`
+- `src/AppForge.Api/Features/Users/UserService.cs`
+- `src/AppForge.Api/Features/Users/UserEndpoints.cs`
+- `src/AppForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs`
 
 **Modified files:**
-- `src/FormForge.Api/Features/Roles/AdminEndpoints.cs` — add using + `/users` sub-group registration
-- `src/FormForge.Api/Program.cs` — add 3 usings + 2 `AddScoped` registrations
+- `src/AppForge.Api/Features/Roles/AdminEndpoints.cs` — add using + `/users` sub-group registration
+- `src/AppForge.Api/Program.cs` — add 3 usings + 2 `AddScoped` registrations
 
 ### Change Log
 
@@ -880,24 +880,24 @@ Three-reviewer adversarial pass — Blind Hunter (diff-only), Edge Case Hunter (
 
 #### Decision-needed (2 — both resolved to Option A)
 
-- [x] **[Review][Decision] Concurrency hardening — race conditions on user-role mutation** [`src/FormForge.Api/Features/Users/UserService.cs`] — resolved: Option A. Added `AssignRolesOutcome.Conflict` and a `try/catch (DbUpdateException ... PostgresException { SqlState: "23503" or "23505" })` block around `SaveChangesAsync` that returns 409. Translates TOCTOU user-deleted, role-deleted (Story 2.4 deferred entry), and concurrent-PUT PK-collision into a clean 409 instead of unhandled 500. Lost-update remains last-writer-wins (acceptable; consistent with Story 2.4 pattern).
-- [x] **[Review][Decision] Self-demotion / last-admin-lockout guard** [`src/FormForge.Api/Features/Users/UserService.cs`] — resolved: Option A. Added `AssignRolesOutcome.LastAdminLockout` → 422 with code `LAST_ADMIN_LOCKOUT` / messageKey `users.lastAdminLockout`. Guard fires when the request would strip the user's `platform-admin` role and no OTHER user holds it. Spec defers `IsActive` semantics to Story 2.8, but lockout prevention via role-removal belongs here because role-removal IS the vector.
+- [x] **[Review][Decision] Concurrency hardening — race conditions on user-role mutation** [`src/AppForge.Api/Features/Users/UserService.cs`] — resolved: Option A. Added `AssignRolesOutcome.Conflict` and a `try/catch (DbUpdateException ... PostgresException { SqlState: "23503" or "23505" })` block around `SaveChangesAsync` that returns 409. Translates TOCTOU user-deleted, role-deleted (Story 2.4 deferred entry), and concurrent-PUT PK-collision into a clean 409 instead of unhandled 500. Lost-update remains last-writer-wins (acceptable; consistent with Story 2.4 pattern).
+- [x] **[Review][Decision] Self-demotion / last-admin-lockout guard** [`src/AppForge.Api/Features/Users/UserService.cs`] — resolved: Option A. Added `AssignRolesOutcome.LastAdminLockout` → 422 with code `LAST_ADMIN_LOCKOUT` / messageKey `users.lastAdminLockout`. Guard fires when the request would strip the user's `platform-admin` role and no OTHER user holds it. Spec defers `IsActive` semantics to Story 2.8, but lockout prevention via role-removal belongs here because role-removal IS the vector.
 
 #### Patch (6 — applied)
 
-- [x] [Review][Patch] **Negative-control assertion missing in `AssignRoles_JwtReflectsNewRoles_AfterLoginPostAssignment`** [`src/FormForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs`] — Blind Hunter Finding 1. Added a pre-assignment login as viewer + assertion that `/api/admin/roles` returns 403. Hardens AC-6 against a broken `RequirePlatformAdmin` policy.
-- [x] [Review][Patch] **Hoist `var now = DateTimeOffset.UtcNow` out of the role-insert loop** [`src/FormForge.Api/Features/Users/UserService.cs`] — Blind Hunter Finding 11. All rows inserted in one transaction now share an identical `CreatedAt` timestamp.
-- [x] [Review][Patch] **Reject `Guid.Empty` in `roleIds` at validator** [`src/FormForge.Api/Features/Users/Validators/AssignRolesRequestValidator.cs`] — Edge Case Hunter F5. New rule `Must(ids => ids == null || ids.All(id => id != Guid.Empty))` with the message `"roleIds entries must not be Guid.Empty."`. Plus new test `AssignRoles_GuidEmptyInRoleIds_Returns422`.
-- [x] [Review][Patch] **Cap `roleIds` collection length to prevent DoS** [`src/FormForge.Api/Features/Users/Validators/AssignRolesRequestValidator.cs`] — Edge Case Hunter F6. Constant `MaxRoleIds = 256` + new rule. Prevents pushing Postgres near its 65 535-parameter cap and bounds the O(N) `Distinct().Count()` cost.
-- [x] [Review][Patch] **Strengthen duplicate-test to assert exact spec-mandated message** [`src/FormForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs`] — Acceptance Auditor A2. `Assert.Contains("Duplicate roleId values are not allowed.", body, StringComparison.Ordinal)` added to `AssignRoles_DuplicateRoleIds_Returns422`. Closes AC-4 coverage gap.
-- [x] [Review][Patch] **Remove unused `_adminUserId` test field** [`src/FormForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs`] — Acceptance Auditor A4. Field removed; tuple destructure uses `_` discard.
+- [x] [Review][Patch] **Negative-control assertion missing in `AssignRoles_JwtReflectsNewRoles_AfterLoginPostAssignment`** [`src/AppForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs`] — Blind Hunter Finding 1. Added a pre-assignment login as viewer + assertion that `/api/admin/roles` returns 403. Hardens AC-6 against a broken `RequirePlatformAdmin` policy.
+- [x] [Review][Patch] **Hoist `var now = DateTimeOffset.UtcNow` out of the role-insert loop** [`src/AppForge.Api/Features/Users/UserService.cs`] — Blind Hunter Finding 11. All rows inserted in one transaction now share an identical `CreatedAt` timestamp.
+- [x] [Review][Patch] **Reject `Guid.Empty` in `roleIds` at validator** [`src/AppForge.Api/Features/Users/Validators/AssignRolesRequestValidator.cs`] — Edge Case Hunter F5. New rule `Must(ids => ids == null || ids.All(id => id != Guid.Empty))` with the message `"roleIds entries must not be Guid.Empty."`. Plus new test `AssignRoles_GuidEmptyInRoleIds_Returns422`.
+- [x] [Review][Patch] **Cap `roleIds` collection length to prevent DoS** [`src/AppForge.Api/Features/Users/Validators/AssignRolesRequestValidator.cs`] — Edge Case Hunter F6. Constant `MaxRoleIds = 256` + new rule. Prevents pushing Postgres near its 65 535-parameter cap and bounds the O(N) `Distinct().Count()` cost.
+- [x] [Review][Patch] **Strengthen duplicate-test to assert exact spec-mandated message** [`src/AppForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs`] — Acceptance Auditor A2. `Assert.Contains("Duplicate roleId values are not allowed.", body, StringComparison.Ordinal)` added to `AssignRoles_DuplicateRoleIds_Returns422`. Closes AC-4 coverage gap.
+- [x] [Review][Patch] **Remove unused `_adminUserId` test field** [`src/AppForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs`] — Acceptance Auditor A4. Field removed; tuple destructure uses `_` discard.
 
 #### Deferred (4)
 
-- [x] [Review][Defer] **Token-revocation gap on role removal** [`src/FormForge.Api/Features/Users/UserService.cs`] — Edge Case Hunter F2 (High). Existing access tokens for the demoted user remain valid until expiry. Spec explicitly defers permission cache and `IDomainEventBus` to Story 2.6. Recorded in `deferred-work.md` with Story 2.6 as owner.
-- [x] [Review][Defer] **Test fixture: migrations + BCrypt-12 hashes run per-test** [`src/FormForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs`] — Blind Hunter Finding 4. Pre-existing pattern from Stories 2.1–2.4; sweep belongs to a test-infrastructure story.
-- [x] [Review][Defer] **TRUNCATE list duplicated across test classes — schema drift risk** [`src/FormForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs:53-54`] — Blind Hunter Finding 3. Same pattern as 2.4; extract to `PostgresFixture.ResetAsync()` in a future test-infra story.
-- [x] [Review][Defer] **`InitializeAsync` factory-creation partial-failure not handled** [`src/FormForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs:38-63`] — Blind Hunter Finding 13. Pre-existing pattern from 2.1–2.4.
+- [x] [Review][Defer] **Token-revocation gap on role removal** [`src/AppForge.Api/Features/Users/UserService.cs`] — Edge Case Hunter F2 (High). Existing access tokens for the demoted user remain valid until expiry. Spec explicitly defers permission cache and `IDomainEventBus` to Story 2.6. Recorded in `deferred-work.md` with Story 2.6 as owner.
+- [x] [Review][Defer] **Test fixture: migrations + BCrypt-12 hashes run per-test** [`src/AppForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs`] — Blind Hunter Finding 4. Pre-existing pattern from Stories 2.1–2.4; sweep belongs to a test-infrastructure story.
+- [x] [Review][Defer] **TRUNCATE list duplicated across test classes — schema drift risk** [`src/AppForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs:53-54`] — Blind Hunter Finding 3. Same pattern as 2.4; extract to `PostgresFixture.ResetAsync()` in a future test-infra story.
+- [x] [Review][Defer] **`InitializeAsync` factory-creation partial-failure not handled** [`src/AppForge.Api.Tests/Features/Users/UserRoleIntegrationTests.cs:38-63`] — Blind Hunter Finding 13. Pre-existing pattern from 2.1–2.4.
 
 #### Dismissed (10)
 
@@ -910,4 +910,4 @@ Three-reviewer adversarial pass — Blind Hunter (diff-only), Edge Case Hunter (
 - **`Cors:AllowedOrigins:0` test setting** (Blind 14) — not a defect; mirrors production config shape.
 - **No `IsActive` check on target user** (Edge F3) — spec explicitly lists this as an anti-pattern (Dev Notes anti-patterns table).
 - **Comment block in `AdminEndpoints.cs` reworded vs spec** (Auditor A1) — cosmetic; both versions convey the same architectural intent.
-- **Cosmetic blank-line after `using FormForge.Api.Features.Users;`** (Auditor A3) — formatter-driven; `dotnet format` clean.
+- **Cosmetic blank-line after `using AppForge.Api.Features.Users;`** (Auditor A3) — formatter-driven; `dotnet format` clean.

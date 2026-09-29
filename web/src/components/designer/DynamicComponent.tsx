@@ -266,7 +266,7 @@ export default function DynamicComponent({
   const isLoading = !providedSchema && fetchedIsLoading
   const isError = !providedSchema && fetchedIsError
 
-  // FormForge's ComponentSchemaDto carries rootElement as a parsed object (not
+  // AppForge's ComponentSchemaDto carries rootElement as a parsed object (not
   // a JSON string). Still gate on the runtime shape probe so a backend bug or
   // malformed payload can't crash the renderer — we'd rather show the
   // fallbackUI than a stack trace.

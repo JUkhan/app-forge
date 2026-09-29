@@ -58,7 +58,7 @@ So that I can browse and find data efficiently.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Create `DynamicRecord.cs`** (AC: 1)
-  - [x] Create `src/FormForge.Api/Features/DynamicCrud/DynamicRecord.cs`
+  - [x] Create `src/AppForge.Api/Features/DynamicCrud/DynamicRecord.cs`
   - Represents one row from a provisioned dynamic table
   - Internal constructor accepts `IReadOnlyDictionary<string, object?>` (raw PG column names → values from Dapper)
   - Contains the `DynamicRecordJsonConverter : JsonConverter<DynamicRecord>` nested class (or companion class in same file) that implements AR-46 Option C hybrid serialization:
@@ -79,7 +79,7 @@ So that I can browse and find data efficiently.
     ```
 
 - [x] **Task 2 — Create `DynamicQueryBuilder.cs`** (AC: 1, 2, 3, 5, 6)
-  - [x] Create `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
+  - [x] Create `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
   - Pure static class; all methods are `internal static`; no DI dependencies — makes unit testing straightforward
   - **`ParseSort(string? sortParam, IReadOnlySet<string> allowedColumns)`** → `ParseSortResult` (discriminated union: success list of `(Column, Direction)` or validation error string/code)
     - Splits on comma, then each token on `:` — exactly two parts required
@@ -111,7 +111,7 @@ So that I can browse and find data efficiently.
   - **Allowed filter columns**: same registry user columns + the five system PG names: `id`, `created_at`, `updated_at`, `is_deleted`, `created_by`
 
 - [x] **Task 3 — Implement GET handler in `DynamicDataEndpoints.cs`** (AC: 1–7)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
   - Add `GET /` handler (maps to the base path of the group `/api/data/{designerId}`)
   - Handler signature (Minimal API parameter binding):
     ```csharp
@@ -121,7 +121,7 @@ So that I can browse and find data efficiently.
         int pageSize,
         string? sort,
         [AsParameters] FilterParams filterParams,
-        FormForgeDbContext db,
+        AppForgeDbContext db,
         ISchemaRegistry schemaRegistry,
         DbConnectionFactory connectionFactory,
         CancellationToken ct)
@@ -146,7 +146,7 @@ So that I can browse and find data efficiently.
   - **OpenAPI metadata** (per Decision 3.7): `Produces<PagedResult<DynamicRecord>>(200)`, `Produces<ProblemDetails>(404)`, `Produces<ProblemDetails>(422)`, `Produces<ProblemDetails>(403)`
 
 - [x] **Task 4 — Backend tests** (AC: 1–7)
-  - [x] Create `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` (unit tests, no DB needed)
+  - [x] Create `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` (unit tests, no DB needed)
     - `ParseSort_SingleAscColumn_ReturnsParsed`
     - `ParseSort_ThreeColumns_AllValid_ReturnsParsed`
     - `ParseSort_FourColumns_ReturnsError`
@@ -158,7 +158,7 @@ So that I can browse and find data efficiently.
     - `BuildCountQuery_WithFilter_CountSqlHasNoLimitOffset`
     - Estimated: ~10 unit tests
 
-  - [x] Create `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs` (integration tests, uses `PostgresFixture` + `WebApplicationFactory<Program>`)
+  - [x] Create `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs` (integration tests, uses `PostgresFixture` + `WebApplicationFactory<Program>`)
     - Class signature: `IClassFixture<PostgresFixture>, IAsyncLifetime`
     - `InitializeAsync`: same pattern as `ProvisioningIntegrationTests` — TRUNCATE tables, drop dynamic tables, seed roles+users, create `_client`
     - Integration tests:
@@ -296,7 +296,7 @@ The handler receives `HttpContext` or `IHttpContextAccessor` to access `Request.
 `Program.cs` registers the `/api/data/{designerId}` group with `RequireRateLimiting("data-read")` (300 req/min per user). The GET handler inherits this. Do NOT add a second `.RequireRateLimiting(...)` call to the mapped GET endpoint.
 
 **9. EF + Dapper connection discipline** (Decision 1.6)
-For CRUD queries, open a raw `NpgsqlConnection` via `DbConnectionFactory.CreateOpenConnectionAsync` — do NOT use `FormForgeDbContext.Database.GetDbConnection()`. EF owns static schema reads (menu lookup, schema version lookup); Dapper owns all dynamic table queries. The EF queries (schema resolution) run first via the injected `FormForgeDbContext`; then the Dapper queries run on their own fresh connection.
+For CRUD queries, open a raw `NpgsqlConnection` via `DbConnectionFactory.CreateOpenConnectionAsync` — do NOT use `AppForgeDbContext.Database.GetDbConnection()`. EF owns static schema reads (menu lookup, schema version lookup); Dapper owns all dynamic table queries. The EF queries (schema resolution) run first via the injected `AppForgeDbContext`; then the Dapper queries run on their own fresh connection.
 
 **10. Pagination defaults and clamping**
 Follow the existing convention in `AuditEndpoints.cs`:
@@ -312,10 +312,10 @@ Apply this at the start of the handler before any DB calls.
 
 | New file | Path |
 |---|---|
-| `DynamicRecord.cs` | `src/FormForge.Api/Features/DynamicCrud/DynamicRecord.cs` |
-| `DynamicQueryBuilder.cs` | `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs` |
-| `DynamicQueryBuilderTests.cs` | `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` |
-| `DynamicCrudIntegrationTests.cs` | `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs` |
+| `DynamicRecord.cs` | `src/AppForge.Api/Features/DynamicCrud/DynamicRecord.cs` |
+| `DynamicQueryBuilder.cs` | `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs` |
+| `DynamicQueryBuilderTests.cs` | `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` |
+| `DynamicCrudIntegrationTests.cs` | `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs` |
 | `recordListApi.ts` | `web/src/features/data-entry/recordListApi.ts` |
 | `useRecordList.ts` | `web/src/features/data-entry/useRecordList.ts` |
 
@@ -330,7 +330,7 @@ Apply this at the start of the handler before any DB calls.
 
 ### Schema registry and EF dependency on reads
 
-The GET handler injects both `FormForgeDbContext` (scoped — gets a fresh scope per request via DI) and `ISchemaRegistry` (singleton). The EF context is used for two reads before the Dapper query:
+The GET handler injects both `AppForgeDbContext` (scoped — gets a fresh scope per request via DI) and `ISchemaRegistry` (singleton). The EF context is used for two reads before the Dapper query:
 
 1. **Binding check** — find the highest `BoundVersion` for a successful Menu binding:
    ```csharp
@@ -360,7 +360,7 @@ The GET handler injects both `FormForgeDbContext` (scoped — gets a fresh scope
    ```
    `RootElementParser.Parse` is already tested (Story 5.3). `ChildRepeaterDesignerIds` can be populated from the parser output — check `RootElementParser.cs` for how it extracts repeater child IDs.
 
-3. After both schema registry reads (or cache hit), the `FormForgeDbContext` is no longer needed and the Dapper connection is opened. The EF context and Dapper connection do NOT share a transaction for reads (read isolation is fine).
+3. After both schema registry reads (or cache hit), the `AppForgeDbContext` is no longer needed and the Dapper connection is opened. The EF context and Dapper connection do NOT share a transaction for reads (read isolation is fine).
 
 ---
 
@@ -438,19 +438,19 @@ Place this near the top of the service registration block (before `builder.Build
 
 ### References
 
-- [Source: `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`] — stub to modify; currently just returns `group`
-- [Source: `src/FormForge.Api/Features/SchemaRegistry/ISchemaRegistry.cs`] — `TryGet(designerId, version)`, `Populate(entry)`, `InvalidateDesigner(designerId)` — full interface
-- [Source: `src/FormForge.Api/Features/SchemaRegistry/ColumnDefinition.cs`] — has `ColumnName`, `PgType`, `ComponentType`, `IsImage` (no `IsRepeater` yet)
-- [Source: `src/FormForge.Api/Features/SchemaRegistry/SchemaRegistryEntry.cs`] — `(DesignerId, Version, Columns, ChildRepeaterDesignerIds, CachedAt)` positional record
-- [Source: `src/FormForge.Api/Features/SchemaRegistry/RootElementParser.cs`] — `Parse(string rootElement)` returns column list; check its return type and how `ChildRepeaterDesignerIds` is extracted
-- [Source: `src/FormForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs`] — `CreateOpenConnectionAsync(CancellationToken)`, `DdlCommandTimeoutSeconds = 60`; CRUD timeout is 5 (hardcode at call site)
-- [Source: `src/FormForge.Api/Common/PagedResult.cs`] — `PagedResult<T>(Data, Total, Page, PageSize)` with `TotalPages` computed property — already exists, do NOT recreate
-- [Source: `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs`] — `RequirePermission(string action)` extension method — MUST call on the mapped GET handler
-- [Source: `src/FormForge.Api/Features/Provisioning/DdlEmitter.cs:50-53`] — `SystemColumnNames` set: `{ "id", "created_at", "created_by", "updated_at", "updated_by", "is_deleted", "cascade_event_id" }` — use this set (access via `DdlEmitter.SystemColumnNames`) for the SELECT column list rather than duplicating it
-- [Source: `src/FormForge.Api/Features/Audit/AuditEndpoints.cs`] — handler pattern: parameter binding, clamping, `Results.Problem(...)` error returns, `Results.Ok(...)` success
-- [Source: `src/FormForge.Api/Features/Designer/SafeIdentifier.cs`] — `SafeIdentifier.TryCreate(raw, out result, out error)` two-arg overload; `result.Value` gives the unquoted string; quote as `$"\"{result.Value}\""` in SQL
-- [Source: `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — integration test class shape, `PostgresFixture`, `InitializeAsync` pattern, `LoginAsync`, `CreateMenuViaApiAsync`, `PutBindingAsync`, `PollUntilTerminalAsync`
-- [Source: `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — `CreateAndPublishDesignerWithFieldsAsync` — use this helper (not the zero-column version) for tests that need sortable/filterable user columns
+- [Source: `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`] — stub to modify; currently just returns `group`
+- [Source: `src/AppForge.Api/Features/SchemaRegistry/ISchemaRegistry.cs`] — `TryGet(designerId, version)`, `Populate(entry)`, `InvalidateDesigner(designerId)` — full interface
+- [Source: `src/AppForge.Api/Features/SchemaRegistry/ColumnDefinition.cs`] — has `ColumnName`, `PgType`, `ComponentType`, `IsImage` (no `IsRepeater` yet)
+- [Source: `src/AppForge.Api/Features/SchemaRegistry/SchemaRegistryEntry.cs`] — `(DesignerId, Version, Columns, ChildRepeaterDesignerIds, CachedAt)` positional record
+- [Source: `src/AppForge.Api/Features/SchemaRegistry/RootElementParser.cs`] — `Parse(string rootElement)` returns column list; check its return type and how `ChildRepeaterDesignerIds` is extracted
+- [Source: `src/AppForge.Api/Infrastructure/Persistence/DbConnectionFactory.cs`] — `CreateOpenConnectionAsync(CancellationToken)`, `DdlCommandTimeoutSeconds = 60`; CRUD timeout is 5 (hardcode at call site)
+- [Source: `src/AppForge.Api/Common/PagedResult.cs`] — `PagedResult<T>(Data, Total, Page, PageSize)` with `TotalPages` computed property — already exists, do NOT recreate
+- [Source: `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs`] — `RequirePermission(string action)` extension method — MUST call on the mapped GET handler
+- [Source: `src/AppForge.Api/Features/Provisioning/DdlEmitter.cs:50-53`] — `SystemColumnNames` set: `{ "id", "created_at", "created_by", "updated_at", "updated_by", "is_deleted", "cascade_event_id" }` — use this set (access via `DdlEmitter.SystemColumnNames`) for the SELECT column list rather than duplicating it
+- [Source: `src/AppForge.Api/Features/Audit/AuditEndpoints.cs`] — handler pattern: parameter binding, clamping, `Results.Problem(...)` error returns, `Results.Ok(...)` success
+- [Source: `src/AppForge.Api/Features/Designer/SafeIdentifier.cs`] — `SafeIdentifier.TryCreate(raw, out result, out error)` two-arg overload; `result.Value` gives the unquoted string; quote as `$"\"{result.Value}\""` in SQL
+- [Source: `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — integration test class shape, `PostgresFixture`, `InitializeAsync` pattern, `LoginAsync`, `CreateMenuViaApiAsync`, `PutBindingAsync`, `PollUntilTerminalAsync`
+- [Source: `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — `CreateAndPublishDesignerWithFieldsAsync` — use this helper (not the zero-column version) for tests that need sortable/filterable user columns
 - [Architecture: Decision 1.4] — Schema registry cache: lazy population from `component_schemas` on first CRUD request; `IMemoryCache`-backed; `TryGet` + `Populate` are the two entry points
 - [Architecture: Decision 1.6] — EF + Dapper separation; `commandTimeout = 5` for CRUD queries; `commandTimeout = 60` for DDL
 - [Architecture: AR-46 (Option C hybrid)] — system columns camelCase in JSON response; user fieldKeys verbatim; custom `JsonConverter<DynamicRecord>`
@@ -489,17 +489,17 @@ Claude Opus 4.7 (1M context)
 ### File List
 
 **New files:**
-- `src/FormForge.Api/Features/DynamicCrud/DynamicRecord.cs`
-- `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
-- `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
-- `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs`
+- `src/AppForge.Api/Features/DynamicCrud/DynamicRecord.cs`
+- `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
+- `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
+- `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicCrudIntegrationTests.cs`
 - `web/src/features/data-entry/recordListApi.ts`
 - `web/src/features/data-entry/useRecordList.ts`
 
 **Modified files:**
-- `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` — added `MapGet("/")` → `ListRecordsHandler` with `.RequirePermission("read")`
-- `src/FormForge.Api/Program.cs` — registered `DynamicRecordJsonConverter` in `ConfigureHttpJsonOptions`
-- `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningRecoveryIntegrationTests.cs` — pre-existing CA2234 fix (`HttpClient.GetAsync` overload)
+- `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` — added `MapGet("/")` → `ListRecordsHandler` with `.RequirePermission("read")`
+- `src/AppForge.Api/Program.cs` — registered `DynamicRecordJsonConverter` in `ConfigureHttpJsonOptions`
+- `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningRecoveryIntegrationTests.cs` — pre-existing CA2234 fix (`HttpClient.GetAsync` overload)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — `6-1` → `review`, `epic-6` → `in-progress`
 
 ## Change Log

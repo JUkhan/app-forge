@@ -2,7 +2,7 @@ import type { DesignerElement } from '@/types/designer'
 
 // Story B — the PgType property model, shared by the PgType inspector component
 // and the save-time validator. Mirrors the backend SafePgType allowlist + ranges
-// (src/FormForge.Api/Features/SchemaRegistry/SafePgType.cs): keep the two in sync.
+// (src/AppForge.Api/Features/SchemaRegistry/SafePgType.cs): keep the two in sync.
 
 // PostgreSQL limits: char/varchar length 1..1 GB; numeric precision 1..1000,
 // scale 0..precision.

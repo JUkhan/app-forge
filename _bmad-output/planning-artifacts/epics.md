@@ -9,16 +9,16 @@ inputDocuments:
   - _bmad-output/planning-artifacts/architecture.md
   - _bmad-output/planning-artifacts/ux-design-specification.md
   - _bmad-output/planning-artifacts/sprint-change-proposal-2026-09-08.md
-project_name: 'FormForge (tinnitus)'
+project_name: 'AppForge (tinnitus)'
 user_name: 'jukhan'
 date: '2026-05-22'
 ---
 
-# FormForge (tinnitus) - Epic Breakdown
+# AppForge (tinnitus) - Epic Breakdown
 
 ## Overview
 
-This document provides the complete epic and story breakdown for FormForge (tinnitus), decomposing the requirements from the PRD, the Architecture document, and the PRD Addendum into implementable stories. No standalone UX Design specification exists; UX requirements are extracted from PRD Epic F and Architecture Section 4 (Frontend Architecture).
+This document provides the complete epic and story breakdown for AppForge (tinnitus), decomposing the requirements from the PRD, the Architecture document, and the PRD Addendum into implementable stories. No standalone UX Design specification exists; UX requirements are extracted from PRD Epic F and Architecture Section 4 (Frontend Architecture).
 
 ## Requirements Inventory
 
@@ -114,8 +114,8 @@ NFR-15 (Scale Target): ~~Single-tenant, internal-users-only~~ **Superseded 2026-
 
 Architecture-Derived Requirements:
 
-- AR-1: Starter Template — Solution scaffolded with `aspire new aspire-starter --name FormForge --output .` for the backend (AppHost + ServiceDefaults + ApiService) and `npm create vite@latest web -- --template react-ts` + `npx shadcn@latest init` for the frontend. **This impacts Epic 1 / Story 1 — see new Story G-1.1 (project scaffolding) prepended to Sprint S0.**
-- AR-2: Monorepo layout — `src/FormForge.AppHost`, `src/FormForge.ServiceDefaults`, `src/FormForge.Api`, `src/FormForge.Api.Tests`, `web/` (frontend), `docker-compose.yml`, `docs/`, `_bmad-output/`.
+- AR-1: Starter Template — Solution scaffolded with `aspire new aspire-starter --name AppForge --output .` for the backend (AppHost + ServiceDefaults + ApiService) and `npm create vite@latest web -- --template react-ts` + `npx shadcn@latest init` for the frontend. **This impacts Epic 1 / Story 1 — see new Story G-1.1 (project scaffolding) prepended to Sprint S0.**
+- AR-2: Monorepo layout — `src/AppForge.AppHost`, `src/AppForge.ServiceDefaults`, `src/AppForge.Api`, `src/AppForge.Api.Tests`, `web/` (frontend), `docker-compose.yml`, `docs/`, `_bmad-output/`.
 - AR-3: Routing override — TanStack Router (file-based, with `@tanstack/router-plugin` + `autoCodeSplitting: true`) replaces the PRD Addendum's React Router v7 assumption (A2). PRD addendum must be updated.
 - AR-4: Identifier sanitization pipeline — Regex `^[a-z_][a-z0-9_]{0,62}$`; hardcoded reserved keyword list (PG 17 reserved subset); `SafeIdentifier` value type re-validates on construction; whitelist check against schema registry before SQL composition.
 - AR-5: Complete component → PG type mapping — 14 types mapped; unknowns fall back to JSONB. All dynamic columns nullable.
@@ -139,7 +139,7 @@ Architecture-Derived Requirements:
 - AR-23: Version Re-Bind Diff — `GET /api/admin/menus/{menuId}/binding-diff?targetVersion={N}` returns column diff preview. `PUT /api/admin/menus/{menuId}/binding` returns 202 + provisioningStatus=Pending. Async via Channel + BackgroundService.
 - AR-24: Correlation ID Propagation — Read X-Correlation-ID header or generate ULID; injected into ILogger scope; flowed onto Dapper SQL comments; in every log, every audit row (new correlation_id column), every error response, response header.
 - AR-25: Health-Check Endpoint Authentication — /health/live anonymous; /health/ready anonymous; /health (detailed) requires platform-admin role.
-- AR-26: MinIO Presigned URLs — Schema registry marks IsImage=true columns; serializer enriches with `{ objectKey, url, expiresAt }`; TTL 5 min; single bucket `formforge` with path prefixes; `POST /api/files/upload` and `POST /api/files/refresh-urls` endpoints.
+- AR-26: MinIO Presigned URLs — Schema registry marks IsImage=true columns; serializer enriches with `{ objectKey, url, expiresAt }`; TTL 5 min; single bucket `appforge` with path prefixes; `POST /api/files/upload` and `POST /api/files/refresh-urls` endpoints.
 - AR-27: Theme No-Flash Hydration — Inline `<script nonce>` in `<head>` reads localStorage.getItem('ff-theme') synchronously; sets data-theme attribute before React; CSP nonce flowed via IndexHtmlRewriter.
 - AR-28: Error Boundary & Loading Strategy — TanStack Router pendingComponent/errorComponent per route + defaultPendingComponent/defaultErrorComponent on __root; React Error Boundary at app root; 404s via notFoundComponent.
 - AR-29: Toast Notifications — `sonner` (shadcn-supported) mounted at <Toaster /> in __root; used for form-save success, transient API errors, copy-to-clipboard, provisioning status.
@@ -153,9 +153,9 @@ Architecture-Derived Requirements:
 - AR-37: Background Work — Channel<ProvisioningJob> + BackgroundService, single consumer (prevents concurrent DDL conflicts); outcomes persisted to menus.provisioningStatus; no Hangfire/Quartz in v1.
 - AR-38: Observability Stack — OpenTelemetry via Aspire ServiceDefaults (traces, metrics, logs); MSExtLogging + JSON console formatter + OTel logging exporter; custom metrics (permission cache hits/misses, schema registry hits/misses, provisioning jobs completed/failed, dynamic CRUD request duration, refresh token issued/revoked/replayed, deactivated_token_use counter).
 - AR-39: Frontend Production Hosting — API project serves SPA in v1 (UseStaticFiles + fallback to /index.html); Vite dist/ copied into wwwroot/ during container build; single origin.
-- AR-40: Container Image — Multi-stage Dockerfile producing single formforge-api:tag; sdk 10.0 → node:22-alpine (vite build) → aspnet:10.0-alpine (non-root UID 1000).
+- AR-40: Container Image — Multi-stage Dockerfile producing single appforge-api:tag; sdk 10.0 → node:22-alpine (vite build) → aspnet:10.0-alpine (non-root UID 1000).
 - AR-41: Database Backup & Restore — Architectural minimum: PG WAL archiving + daily pg_dump to MinIO + MinIO bucket replication; retention 30 days daily, 7 days WAL; RPO ≤24 h (daily) or ≤5 min (WAL); RTO ≤2 h; quarterly restore test.
-- AR-42: Environment Configuration — Layering appsettings.json → appsettings.{Environment}.json (no secrets) → env vars (secrets, mandatory) → user secrets (dev only); Aspire WithReference() wires ConnectionStrings__formforge etc.; frontend reads VITE_API_BASE_URL.
+- AR-42: Environment Configuration — Layering appsettings.json → appsettings.{Environment}.json (no secrets) → env vars (secrets, mandatory) → user secrets (dev only); Aspire WithReference() wires ConnectionStrings__appforge etc.; frontend reads VITE_API_BASE_URL.
 - AR-43: CI/CD Pipeline — GitHub Actions; on PR: build + dotnet test + vitest + ESLint + TS typecheck + container build + axe-core smoke + dotnet list package --vulnerable + npm audit. On merge: tagged image push + staging deploy. Gates: tests pass, no high-severity vulns, axe-core zero critical.
 - AR-44: Docker Compose Parity — services: postgres, minio, minio-init (bucket create), api; no frontend dev service; EF Core migrations auto-run.
 - AR-45: Naming Conventions — DB: snake_case (tables plural for static, singular for dynamic = designerId); FKs `parent_{parentDesignerId}_id` for Repeater, `{entity}_id` for static. Indexes idx_{table}_{cols}. API: plural camelCase params, kebab-Title-Case headers. C#: PascalCase types, _camelCase fields, Async suffix. TS: PascalCase components, useCamelCase hooks.
@@ -164,7 +164,7 @@ Architecture-Derived Requirements:
 - AR-48: TanStack Query Keys — Tuple convention `['scope', 'entity', ...params]`; standard examples documented; invalidation via prefix match.
 - AR-49: Mutation Strategy — Optimistic only for theme change, soft-delete row removal, drag-reorder; pessimistic for form saves, DDL-triggering operations, role assignments.
 - AR-50: Logging Conventions — Required structured fields per log entry; DDL/CRUD Information level adds designerId, operation, sqlFingerprint (parameterized only); blocked: string interpolation in ILogger, PII in audit messages, request body logging.
-- AR-51: Architectural Boundaries — API boundary at FormForge.Api; auth boundary RequireAuth filter; admin boundary RequirePlatformAdmin on /api/admin/*; static vs dynamic schema boundary (EF DbContext vs DbConnectionFactory); SchemaRegistry is the single documented bridge.
+- AR-51: Architectural Boundaries — API boundary at AppForge.Api; auth boundary RequireAuth filter; admin boundary RequirePlatformAdmin on /api/admin/*; static vs dynamic schema boundary (EF DbContext vs DbConnectionFactory); SchemaRegistry is the single documented bridge.
 - AR-52: ProvisioningRecoveryService — Runs on startup; scans menus WHERE provisioningStatus='Pending' and re-enqueues each into Channel<ProvisioningJob>. Story added to Sprint S5.
 - AR-53: Email Service — MailKit standalone NuGet; Mailpit container (`axllent/mailpit`) added to Aspire AppHost (SMTP :1025, web UI :8025) and injected into API via `WithEnvironment` in dev; async fire-and-forget dispatch pattern (`Task.Run` + catch); structured log per dispatch attempt with `recipient`, `templateType`, `correlationId`, `success/failure`; no DB email audit table (AD-12 resolved — Option A); config env vars: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`. Decision 2.9.
 - AR-54: Password Reset Token — 32-byte random via `RandomNumberGenerator.GetBytes(32)` encoded as 64-char hex; only the SHA-256 hash persisted in `password_reset_tokens (id, user_id, token_hash, expires_at, used_at)` (EF Core managed); 1-hour TTL absolute; single-use (`used_at` set on redemption); on success invalidates all refresh tokens for the user; anti-enumeration: forgot-password endpoint always HTTP 200 regardless of email presence. Decision 2.10.
@@ -179,7 +179,7 @@ Dataset Manager Architecture-Derived Requirements (Decisions 6.1–6.13):
 - AR-60: Optimistic Concurrency (Decision 6.4) — `version INTEGER NOT NULL DEFAULT 1` on `custom_dataset`; every PUT must include `version`; `UPDATE WHERE id=@id AND version=@expectedVersion`; 0 rows affected → HTTP 409 `{ code: "DATASET_CONCURRENCY_CONFLICT", currentVersion: N }`; `version` incremented within same transaction as VIEW DDL.
 - AR-61: SELECT-Only SQL Enforcement (Decision 6.5, AD-15 resolved) — `PgQuery.NET` NuGet (wraps libpg_query); `SqlSelectEnforcer.cs`: (1) parse fails → 422 INVALID_QUERY; (2) root node must be SelectStmt or WithClause→SelectStmt (CTEs allowed); rejected roots: InsertStmt, UpdateStmt, DeleteStmt, CreateStmt, DropStmt, CopyStmt, DoStmt, CallStmt; applied at three checkpoints: (a) Custom Query create/update before VIEW DDL, (b) generated SQL from builder_state before VIEW DDL, (c) preview execution defense-in-depth.
 - AR-62: Table Allowlist & Catalog Source (Decision 6.6, AD-14 + OQ-11 resolved) — `appsettings.json DatasetManager:AllowedTables` array; env-var override `DatasetManager__AllowedTables__0=...`; startup cross-check against `information_schema.tables`; `DatasetAllowlist.cs` permanently strips denylist tables even if listed in config; `GET /api/datasets/catalog` (requires dataset-management) returns allowlisted tables + columns from `information_schema.columns`; catalog result cached in `IMemoryCache` 5 min; `DatasetSqlGenerator` validates every `node.data.tableName` against allowlist before SQL generation.
-- AR-63: Preview Execution Security & Isolation (Decision 6.7, AD-16 resolved) — dedicated `formforge_preview` PostgreSQL read-only role (NOINHERIT; GRANT SELECT on allowlisted tables; REVOKE on internal audit/auth tables); `IPreviewConnectionFactory` / `PreviewConnectionFactory` wraps dedicated `NpgsqlDataSource` with `formforge_preview` credentials and `MaxPoolSize = 5`; execution: `BEGIN; SET LOCAL statement_timeout = '5s'; SELECT * FROM ({query}) AS _preview LIMIT 10; COMMIT;`; `NpgsqlException.SqlState == "57014"` → HTTP 408 PREVIEW_TIMEOUT; PostgreSQL error → HTTP 422 with PG error message (no stack traces); preview is read-only and does not save or create the Dataset.
+- AR-63: Preview Execution Security & Isolation (Decision 6.7, AD-16 resolved) — dedicated `appforge_preview` PostgreSQL read-only role (NOINHERIT; GRANT SELECT on allowlisted tables; REVOKE on internal audit/auth tables); `IPreviewConnectionFactory` / `PreviewConnectionFactory` wraps dedicated `NpgsqlDataSource` with `appforge_preview` credentials and `MaxPoolSize = 5`; execution: `BEGIN; SET LOCAL statement_timeout = '5s'; SELECT * FROM ({query}) AS _preview LIMIT 10; COMMIT;`; `NpgsqlException.SqlState == "57014"` → HTTP 408 PREVIEW_TIMEOUT; PostgreSQL error → HTTP 422 with PG error message (no stack traces); preview is read-only and does not save or create the Dataset.
 - AR-64: CASE and Calculated Column Expression Security (Decision 6.8, AD-19 resolved) — `ExpressionSecurityValidator.cs` applies three layers: (1) per-expression keyword scan (reject if starts with DROP/INSERT/UPDATE/DELETE/CREATE/ALTER/TRUNCATE/MERGE/CALL or contains unquoted `;`); (2) wrap-parse via PgQuery.NET (`SELECT ({expression}) AS _x FROM generate_series(1,1) _t`); (3) final assembled query SELECT-only check (Decision 6.5); residual attack surface limited to `dataset-management` users.
 - AR-65: Dataset API Contract (Decision 6.9) — 8 endpoints: GET /api/datasets (auth), GET /api/datasets/{id} (auth), GET /api/datasets/catalog (dataset-management), POST /api/datasets (dataset-management), PUT /api/datasets/{id} (dataset-management), DELETE /api/datasets/{id} (dataset-management), POST /api/datasets/preview (dataset-management), GET /api/admin/datasets/audit (platform-admin); 7 new error codes added to `ErrorCodes.cs`: INVALID_QUERY (422), INVALID_DATASET_NAME (422), DATASET_NAME_CONFLICT (409), DATASET_CONCURRENCY_CONFLICT (409), PREVIEW_TIMEOUT (408), TABLE_NOT_ALLOWLISTED (422), BUILDER_STATE_INVALID (422).
 - AR-66: Server-Authoritative SQL Generator (Decision 6.10) — `DatasetSqlGenerator.cs` pure deterministic function, no I/O; 10-step algorithm: (1) pre-flight validation (left node exists, ≥1 column, aliases non-empty); (2) allowlist validation; (3) identifier safety via `SafeIdentifier`; (4) FROM clause (left-designated table, self-join aliases `t<index>`); (5) JOIN clauses per join edge; (6) SELECT list (plain/aggregated/CASE/calculated columns, all double-quoted `"table"."col" AS "alias"`); (7) GROUP BY auto-derived from aggregate presence; (8) WHERE with parameterized placeholders `$1,$2,...`; (9) ORDER BY in declared clause order; (10) final SELECT-only validation; returns `{ Sql, Parameters }` or `{ Errors }`; `custom_dataset.query` always set to generated SQL on save.
@@ -280,7 +280,7 @@ UX-DR11: Stakeholder decision — Solarized accent fidelity — choose: (A, defa
 | FR-69 Order By Configuration | Epic 10 | ORDER BY panel; drag reorder; builder_state persisted; Story 10.8 |
 | FR-70 Server-Authoritative SQL Generation | Epic 11 | DatasetSqlGenerator: FROM/JOIN/SELECT/GROUP BY/WHERE/ORDER BY; SELECT-only final check; Story 11.1 |
 | FR-71 builder_state Persistence & Restore | Epic 11 | builder_state JSONB persisted on save; canvas restores exactly on reopen; query always in sync; Story 11.2 |
-| FR-72 Query Preview (Hard LIMIT 10) | Epic 11 | LIMIT 10 + statement timeout + formforge_preview read-only role; Story 11.3 |
+| FR-72 Query Preview (Hard LIMIT 10) | Epic 11 | LIMIT 10 + statement timeout + appforge_preview read-only role; Story 11.3 |
 | FR-73 Builder-Mode View Lifecycle Integration | Epic 11 | Builder-mode save reuses FR-58 transactional lifecycle; Story 11.4 |
 | FR-74 Tenant Data Model & Schema-Per-Tenant Isolation | Epic 12 (new) | `tenants` table; every previously-global table moves into a per-tenant schema; Story 12.1 |
 | FR-75 Admin-Provisioned Tenant Onboarding | Epic 12 (new) | Synchronous CREATE SCHEMA + migrate + seed; tenant-admin seeded per tenant; Story 12.2 |
@@ -310,7 +310,7 @@ UX-DR11: Stakeholder decision — Solarized accent fidelity — choose: (A, defa
 ## Epic List
 
 ### Epic 1: Foundation & Infrastructure
-Stand up the runnable shell of FormForge so all subsequent feature epics have a working dev loop, observability, and deployment story. After this epic, a developer can clone the repo and run the full stack (API + PostgreSQL + MinIO + React SPA) via either `dotnet run` on the Aspire AppHost or `docker compose up`; structured logs flow with correlation IDs, OpenAPI is browsable, and health checks gate readiness.
+Stand up the runnable shell of AppForge so all subsequent feature epics have a working dev loop, observability, and deployment story. After this epic, a developer can clone the repo and run the full stack (API + PostgreSQL + MinIO + React SPA) via either `dotnet run` on the Aspire AppHost or `docker compose up`; structured logs flow with correlation IDs, OpenAPI is browsable, and health checks gate readiness.
 
 **User outcome:** Developer / Integrator and Operator can run, integrate with, and monitor the platform. Enables every subsequent epic.
 
@@ -417,7 +417,7 @@ Deliver the Dataset Manager subsystem foundation: the `custom_dataset` table and
 **FRs covered:** FR-55, FR-56, FR-57, FR-58, FR-59, FR-60, FR-61, FR-62
 **NFRs covered:** NFR-17 (Dataset Manager security — identifier quoting, parameterized values, SELECT-only enforcement, table allowlist, transactional DDL, optimistic concurrency)
 **Architecture-derived scope:** AR-57 (schema + migration + datasets PG schema), AR-58 (dataset-management permission model), AR-59 (transactional view lifecycle — synchronous NpgsqlTransaction), AR-60 (optimistic concurrency version column), AR-61 (SELECT-only enforcement via PgQuery.NET), AR-65 (Dataset API contract + 7 new error codes)
-**Multi-tenant amendment (2026-09-08, High rework — Decision 7.8; not mechanical, a real security rework):** the `datasets` VIEW schema is provisioned per tenant instead of a single shared schema; the `formforge_preview` role's grants are scoped per-tenant-schema instead of `GRANT SELECT ON ALL TABLES IN SCHEMA public`. Prior to this amendment, a Custom Query author (FR-60) had no structural tenant boundary at all. **Gated by the tenant-isolation test suite (Decision 7.10) before this epic is considered done.**
+**Multi-tenant amendment (2026-09-08, High rework — Decision 7.8; not mechanical, a real security rework):** the `datasets` VIEW schema is provisioned per tenant instead of a single shared schema; the `appforge_preview` role's grants are scoped per-tenant-schema instead of `GRANT SELECT ON ALL TABLES IN SCHEMA public`. Prior to this amendment, a Custom Query author (FR-60) had no structural tenant boundary at all. **Gated by the tenant-isolation test suite (Decision 7.10) before this epic is considered done.**
 
 **Dependencies:** Epic 12 (tenant context must exist before per-tenant `datasets` schema provisioning), Epic 2 (RBAC infrastructure for dataset-management permission), Epic 1 (EF migrations + Dapper infrastructure)
 
@@ -455,8 +455,8 @@ Closes the Query Builder loop: the server generates authoritative SQL from `buil
 **User outcome:** Users can preview their visually-built query (up to 10 rows) before saving, see the canvas exactly as they left it when reopening a Dataset, and rely on the same rollback safety for builder-mode saves as for hand-authored SQL.
 
 **FRs covered:** FR-70, FR-71, FR-72, FR-73
-**Architecture-derived scope:** AR-63 (preview execution isolation — formforge_preview read-only PG role; IPreviewConnectionFactory MaxPoolSize=5; SET LOCAL statement_timeout), AR-66 (DatasetSqlGenerator 10-step algorithm), AR-67 (builder_state contract — generator and canvas implement same interface)
-**Multi-tenant amendment (2026-09-08, High rework — Decision 7.8):** `DatasetSqlGenerator`'s `FROM` clause is schema-qualified against the resolved tenant context, injected server-side and never accepted from `builder_state`; the `formforge_preview` role's tenant-scoped grants (Epic 8 amendment) mean Preview cannot cross tenants even if a crafted query tried. **This epic carries the full tenant-isolation test suite (Decision 7.10) as its release gate for all of Epics 8–11 — the suite must pass here, not just be planned.**
+**Architecture-derived scope:** AR-63 (preview execution isolation — appforge_preview read-only PG role; IPreviewConnectionFactory MaxPoolSize=5; SET LOCAL statement_timeout), AR-66 (DatasetSqlGenerator 10-step algorithm), AR-67 (builder_state contract — generator and canvas implement same interface)
+**Multi-tenant amendment (2026-09-08, High rework — Decision 7.8):** `DatasetSqlGenerator`'s `FROM` clause is schema-qualified against the resolved tenant context, injected server-side and never accepted from `builder_state`; the `appforge_preview` role's tenant-scoped grants (Epic 8 amendment) mean Preview cannot cross tenants even if a crafted query tried. **This epic carries the full tenant-isolation test suite (Decision 7.10) as its release gate for all of Epics 8–11 — the suite must pass here, not just be planned.**
 
 **Dependencies:** Epic 12 (tenant context feeds the generator and the preview connection factory), Epic 10 (Builder Config — SQL generator consumes full builder_state including columns, filters, ORDER BY, CASE, calculated columns), Epic 8 (view lifecycle — builder-mode saves reuse FR-58 lifecycle)
 
@@ -494,22 +494,22 @@ Epic 1 (Foundation)
 
 ## Epic 1: Foundation & Infrastructure
 
-Stand up the runnable shell of FormForge so all subsequent feature epics have a working dev loop, observability, and deployment story. After this epic, a developer can clone the repo and run the full stack via either `dotnet run` on the Aspire AppHost or `docker compose up`; structured logs flow with correlation IDs, OpenAPI is browsable, and health checks gate readiness.
+Stand up the runnable shell of AppForge so all subsequent feature epics have a working dev loop, observability, and deployment story. After this epic, a developer can clone the repo and run the full stack via either `dotnet run` on the Aspire AppHost or `docker compose up`; structured logs flow with correlation IDs, OpenAPI is browsable, and health checks gate readiness.
 
 ### Story 1.1: Initial Project Scaffolding
 
 As a Developer,
-I want a scaffolded FormForge monorepo using the architecture's chosen starter templates,
+I want a scaffolded AppForge monorepo using the architecture's chosen starter templates,
 So that all subsequent feature work begins from a stable, decision-aligned foundation.
 
 **Acceptance Criteria:**
 
 **Given** an empty repo root
-**When** I run `aspire new aspire-starter --name FormForge --output .`
-**Then** the solution `FormForge.sln` is created with `src/FormForge.AppHost/`, `src/FormForge.ServiceDefaults/`, and the Aspire-default web project
+**When** I run `aspire new aspire-starter --name AppForge --output .`
+**Then** the solution `AppForge.sln` is created with `src/AppForge.AppHost/`, `src/AppForge.ServiceDefaults/`, and the Aspire-default web project
 **And** the Aspire-default Blazor sample web project is removed
-**And** `ApiService` is renamed to `FormForge.Api` in the solution and folder names
-**And** `src/FormForge.Api.Tests/` (xUnit + `Testcontainers.PostgreSQL`) is added to the solution
+**And** `ApiService` is renamed to `AppForge.Api` in the solution and folder names
+**And** `src/AppForge.Api.Tests/` (xUnit + `Testcontainers.PostgreSQL`) is added to the solution
 
 **Given** the backend scaffold is in place
 **When** I run `npm create vite@latest web -- --template react-ts` followed by `npx shadcn@latest init` and the full dependency-install command sequence from the Architecture's Starter Template Evaluation section
@@ -530,8 +530,8 @@ So that local development requires no manual service management.
 **Acceptance Criteria:**
 
 **Given** the AppHost project is configured
-**When** I run `dotnet run --project src/FormForge.AppHost`
-**Then** the AppHost starts PostgreSQL (via `Aspire.Hosting.PostgreSQL`), MinIO (as an Aspire container with endpoints 9000/9001), the API project (`FormForge.Api`), and the React frontend (via `AddViteApp`)
+**When** I run `dotnet run --project src/AppForge.AppHost`
+**Then** the AppHost starts PostgreSQL (via `Aspire.Hosting.PostgreSQL`), MinIO (as an Aspire container with endpoints 9000/9001), the API project (`AppForge.Api`), and the React frontend (via `AddViteApp`)
 **And** the API project waits for PostgreSQL to be ready before starting
 **And** the React frontend waits for the API to be ready before starting
 
@@ -559,7 +559,7 @@ So that contributors without the Aspire toolchain can still run the platform.
 **Given** the API container starts for the first time
 **When** it boots
 **Then** EF Core migrations run automatically against the Compose-provided PostgreSQL (idempotent `Database.Migrate()`)
-**And** the `formforge` MinIO bucket is created by the `minio-init` service on first startup
+**And** the `appforge` MinIO bucket is created by the `minio-init` service on first startup
 
 **Given** any service in the compose network
 **When** it resolves another service's URL
@@ -883,7 +883,7 @@ So that I have my credentials without requiring an out-of-band handoff.
 **When** the user record is created successfully
 **Then** a welcome email is dispatched asynchronously (fire-and-forget via `Task.Run` + catch per AR-53)
 **And** the email is sent to the new user's registered email address
-**And** the email body contains: the platform name ("FormForge"), the user's email address, their temporary password (plaintext as supplied by the admin), and a link to the login page
+**And** the email body contains: the platform name ("AppForge"), the user's email address, their temporary password (plaintext as supplied by the admin), and a link to the login page
 
 **Given** the SMTP delivery fails (network error, server unavailable, etc.)
 **When** the dispatch attempt throws
@@ -983,7 +983,7 @@ So that my account is protected by a second factor.
 **When** the endpoint responds
 **Then** I receive `{ secret, qrCodeDataUrl, backupCodes[] }`
 **And** `secret` is a base32-encoded TOTP secret
-**And** `qrCodeDataUrl` is a `data:image/png;base64,...` QR code encoding the URI `otpauth://totp/FormForge:<email>?secret=<secret>&issuer=FormForge` (per FR-53 AC-1)
+**And** `qrCodeDataUrl` is a `data:image/png;base64,...` QR code encoding the URI `otpauth://totp/AppForge:<email>?secret=<secret>&issuer=AppForge` (per FR-53 AC-1)
 **And** `backupCodes` is an array of 8 single-use 8-character alphanumeric codes — only their bcrypt hashes are stored in `mfa_backup_codes`; the raw codes are shown to the user at this step only (per AR-56)
 
 **Given** I submit a 6-digit TOTP code to `POST /api/users/me/mfa/verify` with `{ code }`
@@ -1071,13 +1071,13 @@ Platform Admins design data-entry forms visually. The designer is ported from th
 
 As a Developer,
 I want to audit and port the component designer (ComponentDesignerPage, ComponentLibraryPage, DynamicComponent, DesignerCanvas, ElementRenderer, DesignerToolbar) from the ESG Platform reference codebase, refactoring for shadcn/ui, React 19 patterns, TanStack React Query v5, and the new project structure,
-So that the designer is a first-class part of FormForge with no ESG-platform-specific dependencies.
+So that the designer is a first-class part of AppForge with no ESG-platform-specific dependencies.
 
 **Acceptance Criteria:**
 
 **Given** the ESG Platform source at `C:\Users\MY\Downloads\esg_platform\BkmeaEsgPlatform\client\src\` (with the four designer components at `components\designer\` and the two pages at `pages\`)
 **When** I run the port
-**Then** the six files land in FormForge at `web/src/components/designer/` (canvas, DynamicComponent, ElementRenderer, DesignerToolbar) and at `web/src/routes/_app/designer.*.tsx` (page wrappers) per Architecture Decision 4.6
+**Then** the six files land in AppForge at `web/src/components/designer/` (canvas, DynamicComponent, ElementRenderer, DesignerToolbar) and at `web/src/routes/_app/designer.*.tsx` (page wrappers) per Architecture Decision 4.6
 
 **Given** the ported designer
 **When** I drag any of the 14 component types (Stack, Row, Tabs, Label, Button, TextInput, TextArea, NumberInput, Checkbox, Dropdown, DateTimePicker, ColorPicker, Repeater, RepeaterField, Image) from the palette onto the canvas
@@ -1312,7 +1312,7 @@ So that data entry requires no per-module custom code.
 
 As a Platform Admin using only a keyboard,
 I want to interact with the designer canvas (and reuse the same hook for menu reorder in Epic 4) via keyboard,
-So that the designer is usable without a pointing device and FormForge meets WCAG 2.1 AA (FR-42 AC-4).
+So that the designer is usable without a pointing device and AppForge meets WCAG 2.1 AA (FR-42 AC-4).
 
 **Acceptance Criteria:**
 
@@ -2049,7 +2049,7 @@ So that I am not limited to desktop access.
 **Acceptance Criteria:**
 
 **Given** a viewport <768 px
-**When** any FormForge route renders
+**When** any AppForge route renders
 **Then** the layout is single-column
 
 **Given** a viewport ≥768 px
@@ -2061,7 +2061,7 @@ So that I am not limited to desktop access.
 **Then** it collapses to a hamburger menu (validating FR-22 AC-3 / Story 4.7 across all pages)
 **And** tapping any item auto-closes the nav
 
-**Given** any interactive control on any FormForge page
+**Given** any interactive control on any AppForge page
 **When** I inspect it on mobile
 **Then** its touch target is ≥44×44 px (per FR-37 AC-3)
 
@@ -2123,12 +2123,12 @@ So that I do not re-select it each session.
 ### Story 7.4: Accessibility Compliance
 
 As a user with assistive technology,
-I want to navigate and use FormForge with a keyboard and screen reader,
+I want to navigate and use AppForge with a keyboard and screen reader,
 So that the platform is accessible to all users.
 
 **Acceptance Criteria:**
 
-**Given** any interactive control on any FormForge page
+**Given** any interactive control on any AppForge page
 **When** I navigate via keyboard
 **Then** the control is keyboard-reachable in a logical tab order
 
@@ -2945,11 +2945,11 @@ So that I can validate correctness before the VIEW is persisted.
 
 **Given** I click "Preview" in Custom Query Mode
 **When** the request is sent to POST /api/datasets/preview
-**Then** the server validates SELECT-only on the submitted `query`, appends `LIMIT 10`, applies `SET LOCAL statement_timeout = '{PreviewTimeoutSeconds}s'` (default 5 s from `DatasetManager:PreviewTimeoutSeconds` env var per AR-63), and executes against PostgreSQL using the `formforge_preview` read-only connection pool (per FR-72 AC-3 / AR-63)
+**Then** the server validates SELECT-only on the submitted `query`, appends `LIMIT 10`, applies `SET LOCAL statement_timeout = '{PreviewTimeoutSeconds}s'` (default 5 s from `DatasetManager:PreviewTimeoutSeconds` env var per AR-63), and executes against PostgreSQL using the `appforge_preview` read-only connection pool (per FR-72 AC-3 / AR-63)
 
 **Given** I click "Preview" in Query Builder Mode
 **When** the request is sent to POST /api/datasets/preview with `builder_state`
-**Then** the server generates SQL from `builder_state` (Story 11.1), appends `LIMIT 10`, applies the statement timeout, and executes against the `formforge_preview` pool (per FR-72 AC-2 / AR-63)
+**Then** the server generates SQL from `builder_state` (Story 11.1), appends `LIMIT 10`, applies the statement timeout, and executes against the `appforge_preview` pool (per FR-72 AC-2 / AR-63)
 
 **Given** the preview returns results
 **When** the UI renders them
@@ -3141,7 +3141,7 @@ I want the tenant fully onboarded — Dataset Manager scoped, a tenant-admin see
 
 **Given** a tenant whose schema and static tables already exist (Story 12.2 complete)
 **When** onboarding continues
-**Then** the tenant-scoped `{schema_name}_datasets` VIEW namespace is created and the `formforge_preview` role's grants are scoped to the new schema (per FR-75 AC-1 / Decision 7.8)
+**Then** the tenant-scoped `{schema_name}_datasets` VIEW namespace is created and the `appforge_preview` role's grants are scoped to the new schema (per FR-75 AC-1 / Decision 7.8)
 
 **Given** the Dataset Manager scoping is in place
 **When** onboarding continues

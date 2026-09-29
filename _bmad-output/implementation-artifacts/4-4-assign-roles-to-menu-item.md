@@ -39,11 +39,11 @@ Then the response is HTTP 404 with `code: "MENU_NOT_FOUND"`
 ## Tasks / Subtasks
 
 - [x] Task 1: Backend — `AssignMenuRolesRequest` DTO (AC-1, AC-3)
-  - [x] Create `src/FormForge.Api/Features/Menus/Dtos/AssignMenuRolesRequest.cs`
+  - [x] Create `src/AppForge.Api/Features/Menus/Dtos/AssignMenuRolesRequest.cs`
     - `internal sealed record AssignMenuRolesRequest(IReadOnlyList<Guid>? RoleIds);`
 
 - [x] Task 2: Backend — `AssignMenuRolesRequestValidator` (AC-1, AC-3)
-  - [x] Create `src/FormForge.Api/Features/Menus/Validators/AssignMenuRolesRequestValidator.cs`
+  - [x] Create `src/AppForge.Api/Features/Menus/Validators/AssignMenuRolesRequestValidator.cs`
   - [x] Mirror `AssignRolesRequestValidator` rules: NotNull, no duplicates, no Guid.Empty, max 256 entries
   - [x] Register in `Program.cs`: `builder.Services.AddScoped<IValidator<AssignMenuRolesRequest>, AssignMenuRolesRequestValidator>();`
     - Insert near the existing `CreateMenuRequest`/`UpdateMenuRequest` validator registrations (lines 133–134)
@@ -82,7 +82,7 @@ Then the response is HTTP 404 with `code: "MENU_NOT_FOUND"`
   - [x] Deduplicate roleIds: `var distinctRoleIds = roleIds.Distinct().ToList();` (validator rejects dups from HTTP, but guard for non-HTTP callers)
 
 - [x] Task 5: Backend — integration tests (AC-1, AC-3, AC-4, AC-5)
-  - [x] Add to `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs`:
+  - [x] Add to `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs`:
     - `AssignMenuRoles_Unauthenticated_Returns401`
     - `AssignMenuRoles_AsNonAdmin_Returns403`
     - `AssignMenuRoles_ValidRoleIds_Returns204AndRoundTrips`
@@ -156,13 +156,13 @@ _Code review run: 2026-05-24 — Blind Hunter + Edge Case Hunter + Acceptance Au
 
 **Patch** (9) — unambiguous fixes:
 
-- [x] [Review][Patch] `AssignMenuRolesAsync` lacks DbUpdateException catch — concurrent PUT/delete races bubble to 500 [src/FormForge.Api/Features/Menus/MenuService.cs:174-235]. Mirror `UserService.AssignRolesAsync` (lines 151-173): catch 23503/23505/40001 → return new `AssignMenuRolesOutcome.Conflict` → 409. SERIALIZABLE wrapper is optional (no last-admin invariant), but the exception catch is mandatory.
+- [x] [Review][Patch] `AssignMenuRolesAsync` lacks DbUpdateException catch — concurrent PUT/delete races bubble to 500 [src/AppForge.Api/Features/Menus/MenuService.cs:174-235]. Mirror `UserService.AssignRolesAsync` (lines 151-173): catch 23503/23505/40001 → return new `AssignMenuRolesOutcome.Conflict` → 409. SERIALIZABLE wrapper is optional (no last-admin invariant), but the exception catch is mandatory.
 - [x] [Review][Patch] `RoleAssignmentSection` lacks `availableRoles.length === 0` empty-state [web/src/routes/_app/admin/menus.$menuId.tsx:604-620]. Mirror `users.$userId.tsx:317` — render `t('admin.menus.rolesEmpty')` when empty; add the i18n key.
 - [x] [Review][Patch] Save button enables on `rolesQuery` error/refetch — silent destructive clear [web/src/routes/_app/admin/menus.$menuId.tsx:632]. Gate `disabled` on `rolesQuery.isError`, `rolesQuery.isFetching`, and `availableRoles.length === 0` in addition to the current `isSaving || isLoading`.
-- [x] [Review][Patch] `admin.menus.rolesNotFound` messageKey emitted by backend but missing from `en.json` [src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs:189]. Add the key under `admin.menus` in `web/src/lib/i18n/locales/en.json` for contract consistency.
-- [x] [Review][Patch] `AssignMenuRoles_InvalidRoleId_Returns422WithRolesNotFound` asserts substring, not field [src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs:572-591]. Parse body as `JsonDocument` and assert the bogus Guid appears in the `invalidIds` array specifically — substring match passes even if the Guid leaks into title/detail.
-- [x] [Review][Patch] Validator `Distinct().Count()` runs before MaxRoleIds cap [src/FormForge.Api/Features/Menus/Validators/AssignMenuRolesRequestValidator.cs:20-30]. A 1M-entry payload allocates a 1M HashSet before the size rule fires. Move MaxRoleIds before Distinct, or guard Distinct with `.When(ids => ids != null && ids.Count <= MaxRoleIds)`. (Same shape exists in `AssignRolesRequestValidator` — deferred separately.)
-- [x] [Review][Patch] P7 (from D1): `AssignMenuRolesAsync` preserves `CreatedAt` for unchanged rows [src/FormForge.Api/Features/Menus/MenuService.cs:210-229]. Replace the blanket `RemoveRange(existing) + AddRange(distinctRoleIds)` with a delta: `existing.Where(e => !distinctRoleIds.Contains(e.RoleId))` → RemoveRange; `distinctRoleIds.Where(rid => existing.All(e => e.RoleId != rid))` → AddRange (only the truly-new). Unchanged rows retain their original `CreatedAt`. Add `AssignMenuRoles_ReassignSameRole_PreservesCreatedAt` integration test.
+- [x] [Review][Patch] `admin.menus.rolesNotFound` messageKey emitted by backend but missing from `en.json` [src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs:189]. Add the key under `admin.menus` in `web/src/lib/i18n/locales/en.json` for contract consistency.
+- [x] [Review][Patch] `AssignMenuRoles_InvalidRoleId_Returns422WithRolesNotFound` asserts substring, not field [src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs:572-591]. Parse body as `JsonDocument` and assert the bogus Guid appears in the `invalidIds` array specifically — substring match passes even if the Guid leaks into title/detail.
+- [x] [Review][Patch] Validator `Distinct().Count()` runs before MaxRoleIds cap [src/AppForge.Api/Features/Menus/Validators/AssignMenuRolesRequestValidator.cs:20-30]. A 1M-entry payload allocates a 1M HashSet before the size rule fires. Move MaxRoleIds before Distinct, or guard Distinct with `.When(ids => ids != null && ids.Count <= MaxRoleIds)`. (Same shape exists in `AssignRolesRequestValidator` — deferred separately.)
+- [x] [Review][Patch] P7 (from D1): `AssignMenuRolesAsync` preserves `CreatedAt` for unchanged rows [src/AppForge.Api/Features/Menus/MenuService.cs:210-229]. Replace the blanket `RemoveRange(existing) + AddRange(distinctRoleIds)` with a delta: `existing.Where(e => !distinctRoleIds.Contains(e.RoleId))` → RemoveRange; `distinctRoleIds.Where(rid => existing.All(e => e.RoleId != rid))` → AddRange (only the truly-new). Unchanged rows retain their original `CreatedAt`. Add `AssignMenuRoles_ReassignSameRole_PreservesCreatedAt` integration test.
 - [x] [Review][Patch] P8 (from D2): Empty-list save requires inline warning + double-click within 3s [web/src/routes/_app/admin/menus.$menuId.tsx:625-636]. When `selected.size === 0`, render a yellow warning band ("This will hide the menu from all users") and require two Save clicks within 3 seconds. Use a `pendingConfirmRef` (timestamp) to track the first click; clear on timeout or successful second click. Add `admin.menus.rolesEmptyWarning` i18n key.
 - [x] [Review][Patch] P9 (from D3): Merge hidden-assigned roles + caption [web/src/routes/_app/admin/menus.$menuId.tsx:589-619] + [web/src/features/admin/roles/useRolesQuery.ts]. (1) In `RoleAssignmentSection`, compute `hiddenAssignedIds = currentRoleIds.filter(id => !availableRoles.some(r => r.id === id))`. For each hidden ID, render a pre-checked row labeled by role name (fetch via a new `useRoleByIdsQuery` batch hook, OR fall back to `t('admin.menus.unknownRole', { id })`). User can uncheck to remove; can never silently drop. (2) When `availableRoles.length === 100`, render a caption `{t('admin.menus.rolesCatalogCapped')}` ("Showing first 100 roles. Roles beyond this set cannot be added here — manage them in the Roles admin first."). Add 2 i18n keys.
 
@@ -170,8 +170,8 @@ _Code review run: 2026-05-24 — Blind Hunter + Edge Case Hunter + Acceptance Au
 
 - [x] [Review][Defer] Cross-user concurrent edit detection [web/src/routes/_app/admin/menus.$menuId.tsx:550-639] — deferred, pre-existing tradeoff (`key={…}` remount discards in-progress local edits when another admin saves; the opposite Story 4.3 P6 bug was the other direction). A "stale state, refresh?" prompt is the right fix but out of scope.
 - [x] [Review][Defer] `ApiError` drops `invalidIds` extension [web/src/lib/api/apiError.ts + web/src/features/auth/httpClient.ts:113-123] — deferred, pre-existing. Cross-cutting: the same drop affects the Users assign-roles 422 response. Needs a single widening of `ApiError` to carry extensions.
-- [x] [Review][Defer] EF `Contains` translates to flat IN list [src/FormForge.Api/Features/Menus/MenuService.cs:198] — deferred, pre-existing. Cross-cutting EF pattern across the codebase; 256-cap mitigates here.
-- [x] [Review][Defer] Cache invalidation outside DB transaction [src/FormForge.Api/Features/Menus/MenuService.cs:231-232] — deferred, pre-existing pattern. `IMenuCache` is `NoOpMenuCache` today; forward-looking for Story 4.7's 5 s TTL cache.
+- [x] [Review][Defer] EF `Contains` translates to flat IN list [src/AppForge.Api/Features/Menus/MenuService.cs:198] — deferred, pre-existing. Cross-cutting EF pattern across the codebase; 256-cap mitigates here.
+- [x] [Review][Defer] Cache invalidation outside DB transaction [src/AppForge.Api/Features/Menus/MenuService.cs:231-232] — deferred, pre-existing pattern. `IMenuCache` is `NoOpMenuCache` today; forward-looking for Story 4.7's 5 s TTL cache.
 - [x] [Review][Defer] Checkbox `<input>` has no `id`/`htmlFor` linkage [web/src/routes/_app/admin/menus.$menuId.tsx:609-617] — deferred, pre-existing. Cross-cuts with `users.$userId.tsx:322-326`; fix both together in Story 7.4 (Accessibility).
 - [x] [Review][Defer] Sub-menu role-gate semantics undefined [web/src/routes/_app/admin/menus.$menuId.tsx:213-222] — deferred, forward-looking. Story 4.7 navbar gate must specify behavior for sub-menus whose parent has different role assignments.
 
@@ -186,15 +186,15 @@ _Code review run: 2026-05-24 — Blind Hunter + Edge Case Hunter + Acceptance Au
 - FK to `roles(id)` ON DELETE CASCADE
 - Index on `role_id`
 
-`Menu.RoleAssignments` navigation property is already configured in `FormForgeDbContext.OnModelCreating` and loaded by `GetMenuAsync` via `.Include(m => m.RoleAssignments)`. `ToResponse()` already projects to `AllowedRoleIds`. This feature is entirely "un-wiring" existing scaffolding.
+`Menu.RoleAssignments` navigation property is already configured in `AppForgeDbContext.OnModelCreating` and loaded by `GetMenuAsync` via `.Include(m => m.RoleAssignments)`. `ToResponse()` already projects to `AllowedRoleIds`. This feature is entirely "un-wiring" existing scaffolding.
 
 ### Backend: File Locations and Naming
 
 Follow existing story naming conventions:
-- DTO: `src/FormForge.Api/Features/Menus/Dtos/AssignMenuRolesRequest.cs`
-- Validator: `src/FormForge.Api/Features/Menus/Validators/AssignMenuRolesRequestValidator.cs`
-- Existing validators dir: `src/FormForge.Api/Features/Menus/Validators/` (contains `CreateMenuRequestValidator.cs`, `UpdateMenuRequestValidator.cs`)
-- Existing user analog: `src/FormForge.Api/Features/Users/Dtos/AssignRolesRequest.cs` + `Validators/AssignRolesRequestValidator.cs`
+- DTO: `src/AppForge.Api/Features/Menus/Dtos/AssignMenuRolesRequest.cs`
+- Validator: `src/AppForge.Api/Features/Menus/Validators/AssignMenuRolesRequestValidator.cs`
+- Existing validators dir: `src/AppForge.Api/Features/Menus/Validators/` (contains `CreateMenuRequestValidator.cs`, `UpdateMenuRequestValidator.cs`)
+- Existing user analog: `src/AppForge.Api/Features/Users/Dtos/AssignRolesRequest.cs` + `Validators/AssignRolesRequestValidator.cs`
 
 ### Backend: Validator Rules (exact match with `AssignRolesRequestValidator`)
 
@@ -345,13 +345,13 @@ menu: { id: string; name: string; order: number; isActive: boolean; parentId: st
 
 The AC references `MenuBindingCreated` per AR-11. The existing event record is:
 ```csharp
-// src/FormForge.Api/Infrastructure/EventBus/IDomainEventBus.cs
+// src/AppForge.Api/Infrastructure/EventBus/IDomainEventBus.cs
 internal sealed record MenuBindingCreated(string DesignerId);
 ```
 
 This event requires a `DesignerId` (the Designer's safe identifier). Story 4.4 assigns Roles to a Menu Item, but the menu has no `DesignerId` until a schema is bound to it in Epic 5. **Do not fire `MenuBindingCreated` in this story.** Epic 5 fires it when `PUT /api/admin/menus/{id}/binding` is implemented. The event infrastructure (`IDomainEventBus`, `InProcessEventBus`) is already in place for that future use.
 
-There is also a duplicate record at `src/FormForge.Api/Features/Menus/Events/MenuBindingCreated.cs` (same shape, different namespace). This was likely a forward-looking stub. Do not touch or fire either variant.
+There is also a duplicate record at `src/AppForge.Api/Features/Menus/Events/MenuBindingCreated.cs` (same shape, different namespace). This was likely a forward-looking stub. Do not touch or fire either variant.
 
 ### Integration Test Patterns
 
@@ -423,14 +423,14 @@ claude-opus-4-7[1m]
 ### File List
 
 **New files:**
-- `src/FormForge.Api/Features/Menus/Dtos/AssignMenuRolesRequest.cs`
-- `src/FormForge.Api/Features/Menus/Validators/AssignMenuRolesRequestValidator.cs`
+- `src/AppForge.Api/Features/Menus/Dtos/AssignMenuRolesRequest.cs`
+- `src/AppForge.Api/Features/Menus/Validators/AssignMenuRolesRequestValidator.cs`
 
 **Modified files:**
-- `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` — add `PUT /{id:guid}/roles` route + `AssignRolesHandler`
-- `src/FormForge.Api/Features/Menus/MenuService.cs` — add `AssignMenuRolesOutcome`, `AssignMenuRolesResult`, `AssignMenuRolesAsync`; extend `IMenuService`
-- `src/FormForge.Api/Program.cs` — register `AssignMenuRolesRequestValidator`
-- `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — +6 tests
+- `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` — add `PUT /{id:guid}/roles` route + `AssignRolesHandler`
+- `src/AppForge.Api/Features/Menus/MenuService.cs` — add `AssignMenuRolesOutcome`, `AssignMenuRolesResult`, `AssignMenuRolesAsync`; extend `IMenuService`
+- `src/AppForge.Api/Program.cs` — register `AssignMenuRolesRequestValidator`
+- `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — +6 tests
 - `web/src/features/admin/menus/menuAdminMutations.ts` — add `useAssignMenuRolesMutation`
 - `web/src/routes/_app/admin/menus.$menuId.tsx` — add `RoleAssignmentSection`, extend `MenuDetailContentProps.menu` type
 - `web/src/lib/i18n/locales/en.json` — +6 keys under `admin.menus`

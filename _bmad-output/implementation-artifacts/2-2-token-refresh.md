@@ -30,7 +30,7 @@ so that my session persists without re-login, even across page reloads.
 **When** the client POSTs `/api/auth/refresh`
 **Then** the server returns HTTP 401 (same as AC-2 above)
 **And** a Warning-level log entry is emitted for the replay event (security observability)
-**And** the `formforge.refresh_token.replayed` counter is incremented
+**And** the `appforge.refresh_token.replayed` counter is incremented
 
 **Given** no `refresh_token` cookie is present
 **When** the client POSTs `/api/auth/refresh`
@@ -71,11 +71,11 @@ so that my session persists without re-login, even across page reloads.
 
 **Given** a successful refresh
 **When** `RefreshAsync` issues a new token pair
-**Then** the `formforge.refresh_token.issued` counter is incremented by 1
+**Then** the `appforge.refresh_token.issued` counter is incremented by 1
 
 **Given** a successful refresh (old token rotation)
 **When** the old token is revoked
-**Then** the `formforge.refresh_token.revoked` counter is incremented by 1
+**Then** the `appforge.refresh_token.revoked` counter is incremented by 1
 
 ---
 
@@ -85,15 +85,15 @@ so that my session persists without re-login, even across page reloads.
 
 **`AuthMetrics` class:**
 
-- [x] Create `src/FormForge.Api/Features/Auth/AuthMetrics.cs`:
+- [x] Create `src/AppForge.Api/Features/Auth/AuthMetrics.cs`:
   ```csharp
   using System.Diagnostics.Metrics;
 
-  namespace FormForge.Api.Features.Auth;
+  namespace AppForge.Api.Features.Auth;
 
   internal sealed class AuthMetrics : IDisposable
   {
-      public const string MeterName = "FormForge.Auth";
+      public const string MeterName = "AppForge.Auth";
 
       private readonly Meter _meter;
       private readonly Counter<long> _refreshIssued;
@@ -105,11 +105,11 @@ so that my session persists without re-login, even across page reloads.
       public AuthMetrics()
       {
           _meter = new Meter(MeterName);
-          _refreshIssued = _meter.CreateCounter<long>("formforge.refresh_token.issued",
+          _refreshIssued = _meter.CreateCounter<long>("appforge.refresh_token.issued",
               description: "Number of refresh tokens successfully issued.");
-          _refreshRevoked = _meter.CreateCounter<long>("formforge.refresh_token.revoked",
+          _refreshRevoked = _meter.CreateCounter<long>("appforge.refresh_token.revoked",
               description: "Number of refresh tokens revoked during rotation.");
-          _refreshReplayed = _meter.CreateCounter<long>("formforge.refresh_token.replayed",
+          _refreshReplayed = _meter.CreateCounter<long>("appforge.refresh_token.replayed",
               description: "Number of replayed (already-revoked) refresh token presentations.");
       }
 
@@ -174,7 +174,7 @@ so that my session persists without re-login, even across page reloads.
 - [x] Add `AuthMetrics` to `AuthService` constructor injection:
   ```csharp
   internal sealed class AuthService(
-      FormForgeDbContext db,
+      AppForgeDbContext db,
       IPasswordHasher passwordHasher,
       IJwtTokenService jwtTokenService,
       IOptions<JwtOptions> jwtOptions,
@@ -276,7 +276,7 @@ so that my session persists without re-login, even across page reloads.
 
 ### Task 3 — Add `/refresh` endpoint to `AuthEndpoints` (AC: 1, 2, 6)
 
-- [x] In `src/FormForge.Api/Features/Auth/AuthEndpoints.cs`, register the new route inside `MapAuthEndpoints`:
+- [x] In `src/AppForge.Api/Features/Auth/AuthEndpoints.cs`, register the new route inside `MapAuthEndpoints`:
   ```csharp
   group.MapPost("/refresh", RefreshHandler)
        .RequireRateLimiting("auth-refresh")
@@ -612,7 +612,7 @@ so that my session persists without re-login, even across page reloads.
 
 ### Task 8 — Backend integration tests for `/refresh` (AC: 1, 2, 3)
 
-- [x] Add the following tests to `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`.
+- [x] Add the following tests to `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`.
 
   Add a helper method to log in and extract the refresh cookie:
   ```csharp
@@ -691,7 +691,7 @@ so that my session persists without re-login, even across page reloads.
 
       // Manually revoke the token in the DB
       using var scope = _factory!.Services.CreateScope();
-      var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+      var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
       var tokenHash = Convert.ToHexString(
               System.Security.Cryptography.SHA256.HashData(
                   System.Text.Encoding.UTF8.GetBytes(rawToken)))
@@ -714,7 +714,7 @@ so that my session persists without re-login, even across page reloads.
 
       // Manually expire the token
       using var scope = _factory!.Services.CreateScope();
-      var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+      var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
       var tokenHash = Convert.ToHexString(
               System.Security.Cryptography.SHA256.HashData(
                   System.Text.Encoding.UTF8.GetBytes(rawToken)))
@@ -775,7 +775,7 @@ so that my session persists without re-login, even across page reloads.
 - [x] `dotnet test` — all tests pass; prior 77 tests still pass (zero regressions). New tests: 5–6 additional refresh integration tests.
 - [x] `cd web && npm run build` — clean TypeScript + Vite build.
 - [x] Manual verification (interactive):
-  - `dotnet run --project src/FormForge.AppHost` — confirm Aspire Dashboard shows all services healthy.
+  - `dotnet run --project src/AppForge.AppHost` — confirm Aspire Dashboard shows all services healthy.
   - Log in at `http://localhost:5173/login`. Confirm redirect to `/`.
   - Hard-reload the page (`Ctrl+F5` / `Cmd+Shift+R`). Confirm the page loads without redirecting to `/login` (silent refresh recovers the session).
   - Open DevTools → Network → filter by `auth/refresh`. Verify a POST fires on reload and every ~13 minutes.
@@ -790,7 +790,7 @@ so that my session persists without re-login, even across page reloads.
 
 **In scope:**
 1. **`POST /api/auth/refresh`** — single-use token rotation; reads HttpOnly cookie; returns new access token + new refresh token + sets new cookie.
-2. **`AuthMetrics`** — OTel counters: `formforge.refresh_token.{issued, revoked, replayed}` per architecture spec (Decision 5.3).
+2. **`AuthMetrics`** — OTel counters: `appforge.refresh_token.{issued, revoked, replayed}` per architecture spec (Decision 5.3).
 3. **`RefreshAsync` in `AuthService`** — validates, revokes, and rotates in one atomic `SaveChangesAsync` call.
 4. **"auth-refresh" rate limiter** — 30/min per IP per AR-15.
 5. **`httpClient.ts` 401 → refresh-and-retry** — deferred explicitly from Story 2.1 Dev Notes.
@@ -804,7 +804,7 @@ so that my session persists without re-login, even across page reloads.
 - `POST /api/auth/logout` — Story 2.3 (server-side revoke + SPA token clear)
 - Role-populated JWT claims (`roles: [...]`) — Story 2.4 (seeding) + Story 2.5 (assignment)
 - `RequireAuth()` filter on protected route groups — Story 2.6
-- `formforge.auth.deactivated_token_use` counter — Story 2.6 (server middleware that re-checks `is_active`)
+- `appforge.auth.deactivated_token_use` counter — Story 2.6 (server middleware that re-checks `is_active`)
 - Full shadcn/ui styled login form — Epic 7
 - Deactivated-user cache eviction + refresh token revocation event (UserDeactivated) — Story 2.6
 
@@ -823,11 +823,11 @@ so that my session persists without re-login, even across page reloads.
 
 ### Current code state (files being modified)
 
-**`src/FormForge.Api/Features/Auth/AuthService.cs`** — Add `AuthRefreshOutcome` enum, `AuthRefreshResult` record, `IAuthService.RefreshAsync` declaration, inject `AuthMetrics`, add `HashToken` helper, add `RefreshAsync` body. The existing `LoginAsync` body must be updated to call `HashToken(raw)` instead of the inline SHA-256 block (DRY).
+**`src/AppForge.Api/Features/Auth/AuthService.cs`** — Add `AuthRefreshOutcome` enum, `AuthRefreshResult` record, `IAuthService.RefreshAsync` declaration, inject `AuthMetrics`, add `HashToken` helper, add `RefreshAsync` body. The existing `LoginAsync` body must be updated to call `HashToken(raw)` instead of the inline SHA-256 block (DRY).
 
-**`src/FormForge.Api/Features/Auth/AuthEndpoints.cs`** — Add `MapPost("/refresh", RefreshHandler)` registration and the `RefreshHandler` private static method. The existing `SetRefreshCookieAndReturn` helper is reused unchanged.
+**`src/AppForge.Api/Features/Auth/AuthEndpoints.cs`** — Add `MapPost("/refresh", RefreshHandler)` registration and the `RefreshHandler` private static method. The existing `SetRefreshCookieAndReturn` helper is reused unchanged.
 
-**`src/FormForge.Api/Program.cs`** — Two additions inside `AddRateLimiter`: the "auth-refresh" policy. Plus `builder.Services.AddSingleton<AuthMetrics>()` and `AddOpenTelemetry().WithMetrics(m => m.AddMeter(AuthMetrics.MeterName))`.
+**`src/AppForge.Api/Program.cs`** — Two additions inside `AddRateLimiter`: the "auth-refresh" policy. Plus `builder.Services.AddSingleton<AuthMetrics>()` and `AddOpenTelemetry().WithMetrics(m => m.AddMeter(AuthMetrics.MeterName))`.
 
 **`web/src/features/auth/httpClient.ts`** — Full replacement (add `_pendingRefresh` module-level var, `refreshSession()`, and `isRetry` parameter to `request()`). The existing public API (`httpClient.get/post/put/delete`) is unchanged — no callers need to update.
 
@@ -856,16 +856,16 @@ so that my session persists without re-login, even across page reloads.
 ### File structure
 
 **New files (backend):**
-- `src/FormForge.Api/Features/Auth/AuthMetrics.cs`
+- `src/AppForge.Api/Features/Auth/AuthMetrics.cs`
 
 **New files (frontend):**
 - `web/src/features/auth/useAuthQuery.ts`
 
 **Modified files (backend):**
-- `src/FormForge.Api/Features/Auth/AuthService.cs` — new types + RefreshAsync + HashToken + metrics injection
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs` — add /refresh route + handler
-- `src/FormForge.Api/Program.cs` — auth-refresh rate limiter + AuthMetrics registration + OTel meter
-- `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs` — add refresh tests + helper
+- `src/AppForge.Api/Features/Auth/AuthService.cs` — new types + RefreshAsync + HashToken + metrics injection
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs` — add /refresh route + handler
+- `src/AppForge.Api/Program.cs` — auth-refresh rate limiter + AuthMetrics registration + OTel meter
+- `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs` — add refresh tests + helper
 
 **Modified files (frontend):**
 - `web/src/features/auth/httpClient.ts` — 401 → refresh-and-retry logic
@@ -879,12 +879,12 @@ so that my session persists without re-login, even across page reloads.
 - `_bmad-output/implementation-artifacts/deferred-work.md` — close Story 1.6 deferred item
 
 **Do NOT touch:**
-- `src/FormForge.Api/Features/Auth/JwtTokenService.cs` — no changes (CreateAccessToken signature unchanged)
-- `src/FormForge.Api/Features/Auth/Dtos/LoginResponse.cs` — reused as-is for refresh response shape
-- `src/FormForge.Api/Features/Auth/JwtOptions.cs` — no changes
-- `src/FormForge.Api/Domain/Entities/RefreshToken.cs` — no schema changes (RevokedAt column already exists)
+- `src/AppForge.Api/Features/Auth/JwtTokenService.cs` — no changes (CreateAccessToken signature unchanged)
+- `src/AppForge.Api/Features/Auth/Dtos/LoginResponse.cs` — reused as-is for refresh response shape
+- `src/AppForge.Api/Features/Auth/JwtOptions.cs` — no changes
+- `src/AppForge.Api/Domain/Entities/RefreshToken.cs` — no schema changes (RevokedAt column already exists)
 - Any existing EF Core migration files
-- `src/FormForge.ServiceDefaults/` — OTel meter added in `Program.cs`, not ServiceDefaults
+- `src/AppForge.ServiceDefaults/` — OTel meter added in `Program.cs`, not ServiceDefaults
 
 ### Anti-patterns to avoid
 
@@ -939,7 +939,7 @@ Recent commits (most recent first):
   - Decision 2.6 — Rate Limiting (auth-refresh: 30/min per IP)
   - Decision 3.9 — Idempotency (refresh is single-use by design)
   - Decision 4.7 — HTTP Client Wrapper (401 → refresh-and-retry)
-  - Decision 5.3 — Observability Stack (custom metrics: formforge.refresh_token.*)
+  - Decision 5.3 — Observability Stack (custom metrics: appforge.refresh_token.*)
   - AR-12, AR-15, AR-18, AR-24, AR-22, AR-48
   - NFR-5 (HttpOnly cookie, single-use rotation, server-stored)
 - `_bmad-output/implementation-artifacts/2-1-jwt-login.md`
@@ -979,18 +979,18 @@ claude-sonnet-4-6
 ### File List
 
 **New files:**
-- `src/FormForge.Api/Features/Auth/AuthMetrics.cs`
+- `src/AppForge.Api/Features/Auth/AuthMetrics.cs`
 - `web/src/features/auth/useAuthQuery.ts`
 
 **Modified files (backend):**
-- `src/FormForge.Api/Program.cs`
-- `src/FormForge.Api/Features/Auth/AuthService.cs`
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs`
-- `src/FormForge.Api/Domain/Entities/RefreshToken.cs` — added `[ConcurrencyCheck]` (review fix)
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` — snapshot bump
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260523005829_AddRefreshTokenConcurrencyCheck.cs` — empty migration (review fix)
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260523005829_AddRefreshTokenConcurrencyCheck.Designer.cs` — designer file (review fix)
-- `src/FormForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`
+- `src/AppForge.Api/Program.cs`
+- `src/AppForge.Api/Features/Auth/AuthService.cs`
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs`
+- `src/AppForge.Api/Domain/Entities/RefreshToken.cs` — added `[ConcurrencyCheck]` (review fix)
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` — snapshot bump
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260523005829_AddRefreshTokenConcurrencyCheck.cs` — empty migration (review fix)
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260523005829_AddRefreshTokenConcurrencyCheck.Designer.cs` — designer file (review fix)
+- `src/AppForge.Api.Tests/Features/Auth/AuthIntegrationTests.cs`
 
 **Modified files (frontend):**
 - `web/src/features/auth/httpClient.ts`
@@ -1039,16 +1039,16 @@ claude-sonnet-4-6
 
 #### Deferred (pre-existing or out of scope for this review)
 
-- [x] [Review][Defer] **Refresh response echoes raw refresh token in JSON body** [`src/FormForge.Api/Features/Auth/AuthEndpoints.cs:155`, Story 2.1 design] — deferred, pre-existing from Story 2.1. The new integration tests harden the leak into the test contract; revisit when Story 2.6 lands or when admin/operator surface is hardened.
-- [x] [Review][Defer] **Cache-Control no-store missing on `/login` and `/refresh` responses** [`src/FormForge.Api/Features/Auth/AuthEndpoints.cs:139-156`] — deferred, pre-existing — also affects Story 2.1 login. Plan a single sweep across all auth endpoints.
-- [x] [Review][Defer] **`AuthMetrics` IDisposable Singleton may double-register on `dotnet watch` hot reload** [`src/FormForge.Api/Features/Auth/AuthMetrics.cs`] — deferred, dev-environment cosmetic only.
+- [x] [Review][Defer] **Refresh response echoes raw refresh token in JSON body** [`src/AppForge.Api/Features/Auth/AuthEndpoints.cs:155`, Story 2.1 design] — deferred, pre-existing from Story 2.1. The new integration tests harden the leak into the test contract; revisit when Story 2.6 lands or when admin/operator surface is hardened.
+- [x] [Review][Defer] **Cache-Control no-store missing on `/login` and `/refresh` responses** [`src/AppForge.Api/Features/Auth/AuthEndpoints.cs:139-156`] — deferred, pre-existing — also affects Story 2.1 login. Plan a single sweep across all auth endpoints.
+- [x] [Review][Defer] **`AuthMetrics` IDisposable Singleton may double-register on `dotnet watch` hot reload** [`src/AppForge.Api/Features/Auth/AuthMetrics.cs`] — deferred, dev-environment cosmetic only.
 - [x] [Review][Defer] **`tokenStore` is a module-level singleton with no `.reset()` helper for tests** [`web/src/features/auth/tokenStore.ts`] — deferred, no frontend tests yet; revisit when Vitest comes in.
-- [x] [Review][Defer] **`RefreshAsync` does not pre-check empty string defensively** [`src/FormForge.Api/Features/Auth/AuthService.cs:118`] — deferred, defense-in-depth only; current sole caller (the endpoint) already rejects empty/null.
-- [x] [Review][Defer] **Clock-skew at `ExpiresAt <= UtcNow` boundary** [`src/FormForge.Api/Features/Auth/AuthService.cs:146`] — deferred, single-millisecond edge under multi-instance NTP drift.
+- [x] [Review][Defer] **`RefreshAsync` does not pre-check empty string defensively** [`src/AppForge.Api/Features/Auth/AuthService.cs:118`] — deferred, defense-in-depth only; current sole caller (the endpoint) already rejects empty/null.
+- [x] [Review][Defer] **Clock-skew at `ExpiresAt <= UtcNow` boundary** [`src/AppForge.Api/Features/Auth/AuthService.cs:146`] — deferred, single-millisecond edge under multi-instance NTP drift.
 - [x] [Review][Defer] **`_app.tsx beforeLoad` catches `JSON.parse` errors silently and redirects to login on a 200-with-bad-body** [`web/src/routes/_app.tsx:19-32`] — deferred, requires upstream server bug to trigger.
 - [x] [Review][Defer] **`useAuthQuery` does not honor `Retry-After` on 429** [`web/src/features/auth/useAuthQuery.ts:36`] — deferred, AC-6 rate-limit is server-side; SPA-side 429 handling is a polish item.
-- [x] [Review][Defer] **Global rate-limiter `OnRejected` always emits `Retry-After: 60` regardless of policy window** [`src/FormForge.Api/Program.cs:166-180`] — deferred, AC-6 only requires `/api/auth/refresh`; other policies happen to share the same window.
-- [x] [Review][Defer] **Duplicate `refresh_token` cookies (`Cookie: refresh_token=a; refresh_token=b`) — first-wins is implementation-defined** [`src/FormForge.Api/Features/Auth/AuthEndpoints.cs:85`] — deferred, theoretical — requires hostile proxy or attacker that already controls cookies.
+- [x] [Review][Defer] **Global rate-limiter `OnRejected` always emits `Retry-After: 60` regardless of policy window** [`src/AppForge.Api/Program.cs:166-180`] — deferred, AC-6 only requires `/api/auth/refresh`; other policies happen to share the same window.
+- [x] [Review][Defer] **Duplicate `refresh_token` cookies (`Cookie: refresh_token=a; refresh_token=b`) — first-wins is implementation-defined** [`src/AppForge.Api/Features/Auth/AuthEndpoints.cs:85`] — deferred, theoretical — requires hostile proxy or attacker that already controls cookies.
 
 #### Dismissed
 

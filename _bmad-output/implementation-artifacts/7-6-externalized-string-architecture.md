@@ -59,7 +59,7 @@ so that translation to additional languages is a configuration task, not a code 
   - [x] Do NOT create new top-level keys unless none of the 10 existing top-level sections fit
 
 - [x] **Task 3 — Audit and fix backend ProblemDetails for AC-3** (AC-3)
-  - [x] Search `src/FormForge.Api/Features/**/*.cs` for all `Results.Problem(` calls
+  - [x] Search `src/AppForge.Api/Features/**/*.cs` for all `Results.Problem(` calls
   - [x] For each call, verify BOTH: (1) `extensions["messageKey"]` is set, (2) the `detail` parameter (not in `extensions`) is set to an English string
   - [x] The `detail` parameter is the 3rd positional param or named `detail:` in `Results.Problem(detail: "...", statusCode: ..., extensions: ...)`
   - [x] Fix any `Results.Problem(` calls that have `messageKey` but are missing a `detail` string — infer the English detail from the `title` or from existing error semantics
@@ -249,13 +249,13 @@ describe('i18n synchronous initialization (AC-5)', () => {
 ### §4 — Backend ProblemDetails Audit (AC-3)
 
 **Files to audit** (all `Results.Problem(` callsites):
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs`
-- `src/FormForge.Api/Features/Audit/AuditEndpoints.cs`
-- `src/FormForge.Api/Features/Designer/DesignerAdminEndpoints.cs`
-- `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs`
-- `src/FormForge.Api/Features/DynamicCrud/DynamicCrudEndpoints.cs`
-- `src/FormForge.Api/Features/Menus/MenuEndpoints.cs`
-- `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs`
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs`
+- `src/AppForge.Api/Features/Audit/AuditEndpoints.cs`
+- `src/AppForge.Api/Features/Designer/DesignerAdminEndpoints.cs`
+- `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs`
+- `src/AppForge.Api/Features/DynamicCrud/DynamicCrudEndpoints.cs`
+- `src/AppForge.Api/Features/Menus/MenuEndpoints.cs`
+- `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs`
 
 **AC-3 compliant pattern** (both `detail` and `messageKey` present):
 ```csharp
@@ -298,7 +298,7 @@ The `test-frontend` job already runs `npm install` before lint steps, so no addi
 | MODIFY | `web/package.json` | Add `lint:i18n` script |
 | MODIFY | `.github/workflows/ci.yml` | Add i18n lint step to test-frontend job |
 | MODIFY | `web/src/lib/i18n/locales/en.json` | Add any missing keys found during audit |
-| MODIFY | `src/FormForge.Api/Features/**/*.cs` | Add missing `detail` or `messageKey` to Results.Problem() calls |
+| MODIFY | `src/AppForge.Api/Features/**/*.cs` | Add missing `detail` or `messageKey` to Results.Problem() calls |
 | CREATE | `web/src/__tests__/i18n-lint.test.ts` | Tests for AC-4, AC-5, AC-6 |
 
 ### §7 — Critical Do-Nots
@@ -384,16 +384,16 @@ claude-opus-4-7[1m]
 - `web/src/routes/_app/designer.$designerId.tsx` — `aria-label="Component display name"` → `t('designer.canvas.componentDisplayNameAria')`.
 
 **Modified (backend):**
-- `src/FormForge.Api/Features/Auth/AuthEndpoints.cs` — added `detail:` to the three branded Problem helpers (InvalidCredentials, AccountInactive, RefreshTokenInvalidResponse); rewrote one fallback 500 to include `detail` + `messageKey` + correlationId.
-- `src/FormForge.Api/Features/Audit/AuditEndpoints.cs` — added `detail:` to both Designer-not-found 404 branches (replace_all).
-- `src/FormForge.Api/Features/Designer/DesignerEndpoints.cs` — added `detail:` to `FieldKeyValidationProblem`, `VersionConflictProblem`, `DesignerNotFoundProblem`, `DuplicateConflictProblem`, `DuplicateIdTooLongProblem`, `DesignerExistsProblem`, `VersionNotFoundProblem`, `VersionNotPublishedProblem`, `PublishConflictProblem`, `StatusInvalidProblem`; rewrote 4 fallback 500s.
-- `src/FormForge.Api/Features/Designer/DesignerAdminEndpoints.cs` — added `detail:` to `ColumnProtected`, `ColumnNotOrphaned`, `DesignerNotFoundProblem`, `ColumnNotFoundProblem`; rewrote 1 fallback 500.
-- `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` — added `detail:` to the six `Problems.*` helpers (`TableNotProvisioned`, `RecordNotFound`, `RecordDeleted`, `RecordAlreadyDeleted`, `RecordNotDeleted`, `ChildNotFound`); `ValidationFailed` already had detail.
-- `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` — added `detail:` to `ParentNotFound`, `MaxDepthExceeded`, `HasChildren`, `RolesNotFound`, `Conflict` (assign roles), `MenusNotFound`, `MixedScopes`, `Conflict` (reorder), `DesignerNotFound`, `VersionNotPublished`, `RepeaterCycle`, `NoBinding`, the inline `targetVersion <= 0` validation, `MenuNotFoundProblem`, `UploadInvalid`; rewrote 8 fallback 500s.
-- `src/FormForge.Api/Features/Roles/RoleEndpoints.cs` — added `detail:` to `HasAssignments`, `RoleNotFoundProblem`, `RoleNameConflictProblem`, `RoleSystemProtectedProblem`; rewrote 3 fallback 500s.
-- `src/FormForge.Api/Features/Users/UserEndpoints.cs` — added `detail:` to `RolesNotFound`, `LastAdminLockout`, `Conflict`, `UserNotFoundProblem`, `UserEmailConflictProblem`, `SelfDeactivationProblem`; rewrote 5 fallback 500s.
-- `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs` — added `detail:` + `messageKey` to the 400 (missing-designerId) and 403 (permission-denied) branches of `RequirePermission`.
-- `src/FormForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs` — added `detail:` + `messageKey` to the 400 (invalid-body) branch.
+- `src/AppForge.Api/Features/Auth/AuthEndpoints.cs` — added `detail:` to the three branded Problem helpers (InvalidCredentials, AccountInactive, RefreshTokenInvalidResponse); rewrote one fallback 500 to include `detail` + `messageKey` + correlationId.
+- `src/AppForge.Api/Features/Audit/AuditEndpoints.cs` — added `detail:` to both Designer-not-found 404 branches (replace_all).
+- `src/AppForge.Api/Features/Designer/DesignerEndpoints.cs` — added `detail:` to `FieldKeyValidationProblem`, `VersionConflictProblem`, `DesignerNotFoundProblem`, `DuplicateConflictProblem`, `DuplicateIdTooLongProblem`, `DesignerExistsProblem`, `VersionNotFoundProblem`, `VersionNotPublishedProblem`, `PublishConflictProblem`, `StatusInvalidProblem`; rewrote 4 fallback 500s.
+- `src/AppForge.Api/Features/Designer/DesignerAdminEndpoints.cs` — added `detail:` to `ColumnProtected`, `ColumnNotOrphaned`, `DesignerNotFoundProblem`, `ColumnNotFoundProblem`; rewrote 1 fallback 500.
+- `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` — added `detail:` to the six `Problems.*` helpers (`TableNotProvisioned`, `RecordNotFound`, `RecordDeleted`, `RecordAlreadyDeleted`, `RecordNotDeleted`, `ChildNotFound`); `ValidationFailed` already had detail.
+- `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` — added `detail:` to `ParentNotFound`, `MaxDepthExceeded`, `HasChildren`, `RolesNotFound`, `Conflict` (assign roles), `MenusNotFound`, `MixedScopes`, `Conflict` (reorder), `DesignerNotFound`, `VersionNotPublished`, `RepeaterCycle`, `NoBinding`, the inline `targetVersion <= 0` validation, `MenuNotFoundProblem`, `UploadInvalid`; rewrote 8 fallback 500s.
+- `src/AppForge.Api/Features/Roles/RoleEndpoints.cs` — added `detail:` to `HasAssignments`, `RoleNotFoundProblem`, `RoleNameConflictProblem`, `RoleSystemProtectedProblem`; rewrote 3 fallback 500s.
+- `src/AppForge.Api/Features/Users/UserEndpoints.cs` — added `detail:` to `RolesNotFound`, `LastAdminLockout`, `Conflict`, `UserNotFoundProblem`, `UserEmailConflictProblem`, `SelfDeactivationProblem`; rewrote 5 fallback 500s.
+- `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs` — added `detail:` + `messageKey` to the 400 (missing-designerId) and 403 (permission-denied) branches of `RequirePermission`.
+- `src/AppForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs` — added `detail:` + `messageKey` to the 400 (invalid-body) branch.
 
 **Modified (planning artifacts):**
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — `7-6-externalized-string-architecture: ready-for-dev` → `in-progress` (Step 4) → `review` (Step 9).
@@ -401,8 +401,8 @@ claude-opus-4-7[1m]
 ### Review Findings
 
 - [x] [Review][Decision] dangerouslySetInnerHTML without sanitization for PropertyInspector help texts — accepted as-is: en.json is developer-controlled source code, strings use only `<em>`/`<code>` tags, designer is an authenticated-admin-only surface. No action needed unless translation CMS is adopted.
-- [x] [Review][Patch] `errors.badRequest` messageKey missing from en.json [`web/src/lib/i18n/locales/en.json` + `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs`]
-- [x] [Review][Patch] `errors.invalidRequestBody` messageKey missing from en.json [`web/src/lib/i18n/locales/en.json` + `src/FormForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs`]
+- [x] [Review][Patch] `errors.badRequest` messageKey missing from en.json [`web/src/lib/i18n/locales/en.json` + `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs`]
+- [x] [Review][Patch] `errors.invalidRequestBody` messageKey missing from en.json [`web/src/lib/i18n/locales/en.json` + `src/AppForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs`]
 - [x] [Review][Patch] `require('node:fs')` used in ESM test file — `readFileSync` is already imported; `symlinkSync` should be added to top-level import instead of using `require()` [`web/src/__tests__/i18n-lint.test.ts:35,55`]
 - [x] [Review][Patch] AC-6 test brittle with OS hidden files — `expect(files).toEqual(['en.json'])` will fail if OS creates `.DS_Store` or similar; filter dot-files before asserting [`web/src/__tests__/i18n-lint.test.ts:77`]
 - [x] [Review][Defer] Pre-existing `errors.*` en.json gaps (validationFailed, tableNotProvisioned, notFound, recordDeleted, recordAlreadyDeleted, recordNotDeleted, childNotFound) — deferred, pre-existing

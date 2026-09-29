@@ -5,7 +5,7 @@ inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-tinnitus-2026-05-22/addendum.md
   - _bmad-output/planning-artifacts/sprint-change-proposal-2026-09-08.md
 workflowType: 'architecture'
-project_name: 'FormForge (tinnitus)'
+project_name: 'AppForge (tinnitus)'
 user_name: 'jukhan'
 date: '2026-05-22'
 lastStep: 8
@@ -15,7 +15,7 @@ updatedAt: '2026-09-08'
 prdUpdateNotes: 'FR-50..53 added (welcome email, forgot password, password change, TOTP MFA); decisions 2.9–2.12; AD-12 + OQ-7 resolved. 2026-06-02: FR-54 Component Mode (CRUD/VIEW) added — decisions 1.8 + 4.11, DynamicComponent VIEW read-only (4.10); story collision resolved (a11y DnD renumbered B-11); OQ-9 noted. 2026-06-03: FR-55..73 Dataset Manager (Epics H–K) added — decisions 6.1–6.13; AD-14..19 + OQ-11 + OQ-13 resolved; 19 new FRs, 13 new decisions. 2026-09-08: Multi-Tenant Architecture added via Sprint Change Proposal (reverses PRD Decision Log #3 / Non-Goal A10 / NFR-15) — decisions 7.1–7.10, schema-per-tenant isolation, JWT-claim routing, admin-provisioned onboarding, new Tenant Foundation & Provisioning epic; 10 new decisions (64→74); risk register R-18..R-20 added; PRD and epics.md amendments still pending PM/epic-breakdown handoff — architecture is ready, formal requirements docs are not yet in sync'
 ---
 
-# Architecture Decision Document — FormForge
+# Architecture Decision Document — AppForge
 
 _This document builds collaboratively through step-by-step discovery. Sections are appended as we work through each architectural decision together._
 
@@ -123,12 +123,12 @@ The PRD locks every architectural technology. The starter question is therefore 
 
 ```
 tinnitus/
-├── FormForge.sln
+├── AppForge.sln
 ├── src/
-│   ├── FormForge.AppHost/         # Aspire 13.1 orchestrator
-│   ├── FormForge.ServiceDefaults/ # OTel, health checks, service discovery, resilience
-│   ├── FormForge.Api/             # ASP.NET Core Minimal APIs (.NET 10)
-│   └── FormForge.Api.Tests/       # xUnit + Testcontainers (PostgreSQL)
+│   ├── AppForge.AppHost/         # Aspire 13.1 orchestrator
+│   ├── AppForge.ServiceDefaults/ # OTel, health checks, service discovery, resilience
+│   ├── AppForge.Api/             # ASP.NET Core Minimal APIs (.NET 10)
+│   └── AppForge.Api.Tests/       # xUnit + Testcontainers (PostgreSQL)
 ├── web/                           # React 19 + Vite 7 + TS + shadcn/ui + Tailwind 4
 ├── docker-compose.yml             # Alternative orchestration (PRD G-5)
 ├── docs/
@@ -139,13 +139,13 @@ tinnitus/
 
 ```bash
 # Backend
-aspire new aspire-starter --name FormForge --output .
-# (or: dotnet new aspire-starter --name FormForge --output .)
+aspire new aspire-starter --name AppForge --output .
+# (or: dotnet new aspire-starter --name AppForge --output .)
 
 # Cleanup post-scaffold
-# - Remove src/FormForge.Web (Blazor sample web project)
-# - Rename ApiService → FormForge.Api in solution and folders
-# - Add FormForge.Api.Tests project (xUnit + Testcontainers.PostgreSQL)
+# - Remove src/AppForge.Web (Blazor sample web project)
+# - Rename ApiService → AppForge.Api in solution and folders
+# - Add AppForge.Api.Tests project (xUnit + Testcontainers.PostgreSQL)
 
 # Frontend (from repo root)
 npm create vite@latest web -- --template react-ts
@@ -183,12 +183,12 @@ export default defineConfig({
 ### Aspire AppHost Wiring Outline
 
 ```csharp
-// src/FormForge.AppHost/Program.cs
+// src/AppForge.AppHost/Program.cs
 var builder = DistributedApplication.CreateBuilder(args);
 
 var postgres = builder.AddPostgres("postgres")
                       .WithDataVolume()
-                      .AddDatabase("formforge");
+                      .AddDatabase("appforge");
 
 var minio = builder.AddContainer("minio", "minio/minio")
                    .WithArgs("server", "/data", "--console-address", ":9001")
@@ -202,7 +202,7 @@ var mailpit = builder.AddContainer("mailpit", "axllent/mailpit")
                      .WithEndpoint(containerPort: 1025, hostPort: 1025, name: "smtp")
                      .WithEndpoint(containerPort: 8025, hostPort: 8025, name: "ui");
 
-var api = builder.AddProject<Projects.FormForge_Api>("api")
+var api = builder.AddProject<Projects.AppForge_Api>("api")
                  .WithReference(postgres)
                  .WithEnvironment("SMTP_HOST", mailpit.GetEndpoint("smtp"))
                  .WaitFor(postgres);
@@ -235,10 +235,10 @@ builder.Build().Run();
 **Code Organization:**
 - Solution: `src/` for projects (AppHost, ServiceDefaults, Api, Api.Tests).
 - Frontend: `web/src/` with conventional Vite layout. shadcn components in `web/src/components/ui/`; route tree auto-generated to `web/src/routeTree.gen.ts` by the TanStack Router Vite plugin. Designer port code lands in `web/src/components/designer/` and `web/src/routes/`.
-- Monorepo root holds `FormForge.sln`, `docker-compose.yml`, `_bmad-output/`, `docs/`.
+- Monorepo root holds `AppForge.sln`, `docker-compose.yml`, `_bmad-output/`, `docs/`.
 
 **Development Experience:**
-- `dotnet run --project src/FormForge.AppHost` starts: API, PostgreSQL, MinIO, React dev server, Aspire Dashboard (https://localhost:15888).
+- `dotnet run --project src/AppForge.AppHost` starts: API, PostgreSQL, MinIO, React dev server, Aspire Dashboard (https://localhost:15888).
 - Aspire Dashboard provides per-service logs, traces, metrics, environment, and resource state.
 - `docker compose up` (PRD G-5) provides an alternative path for contributors without the .NET 10 SDK.
 
@@ -479,7 +479,7 @@ Via `NetEscapades.AspNetCore.SecurityHeaders`:
 #### 3.1 — Standardized Error Envelope (RFC 7807 ProblemDetails)
 ```json
 {
-  "type": "https://docs.formforge.app/errors/forbidden",
+  "type": "https://docs.appforge.app/errors/forbidden",
   "title": "Forbidden",
   "status": 403,
   "detail": "...",
@@ -583,12 +583,12 @@ app.MapGroup("/api/data/{designerId}").RequireAuth().MapDynamicDataEndpoints();
   {
     "photo": {
       "objectKey": "incident_report/photos/01HX_photo.png",
-      "url": "https://minio.local:9000/formforge/.../?X-Amz-...",
+      "url": "https://minio.local:9000/appforge/.../?X-Amz-...",
       "expiresAt": "2026-05-22T10:35:00Z"
     }
   }
   ```
-- **TTL:** 5 minutes. **Bucket:** single `formforge` with path prefixes (`menus/icons/`, `{designerId}/{fieldKey}/`).
+- **TTL:** 5 minutes. **Bucket:** single `appforge` with path prefixes (`menus/icons/`, `{designerId}/{fieldKey}/`).
 - **Upload:** `POST /api/files/upload` (multipart) → `{ objectKey, url, expiresAt }`. Form stores `objectKey`.
 - **Refresh:** `POST /api/files/refresh-urls { objectKeys: [...] }` returns fresh URL bundles.
 - **Client caching:** record-level TanStack Query cache; no separate URL cache.
@@ -703,12 +703,12 @@ web/src/
 - **Logging:** built-in `Microsoft.Extensions.Logging` + JSON console formatter + OTel logging exporter. No Serilog.
 - **Exporter:** Aspire Dashboard OTLP in dev; real backend (Tempo / Jaeger / App Insights / Honeycomb) in prod (deferred).
 - **Custom metrics:**
-  - `formforge.permission_cache.{hits,misses}`
-  - `formforge.schema_registry.{hits,misses}`
-  - `formforge.provisioning_jobs.{completed,failed}`
-  - `formforge.dynamic_crud.request.duration` histogram tagged `designerId`, `operation`
-  - `formforge.refresh_token.{issued,revoked,replayed}`
-  - `formforge.auth.deactivated_token_use` counter, tagged `userId` — incremented when a request arrives with a still-valid JWT for a user whose `isActive: false` (within the 15-min grace window after deactivation; PRD R-5 observability)
+  - `appforge.permission_cache.{hits,misses}`
+  - `appforge.schema_registry.{hits,misses}`
+  - `appforge.provisioning_jobs.{completed,failed}`
+  - `appforge.dynamic_crud.request.duration` histogram tagged `designerId`, `operation`
+  - `appforge.refresh_token.{issued,revoked,replayed}`
+  - `appforge.auth.deactivated_token_use` counter, tagged `userId` — incremented when a request arrives with a still-valid JWT for a user whose `isActive: false` (within the 15-min grace window after deactivation; PRD R-5 observability)
 - **Trace tags:** every span carries `correlation_id`, `user_id`, `roles[]`. DDL spans tag `db.statement` (fingerprint only — FR-46 AC-3).
 
 #### 5.4 — Health Checks
@@ -719,24 +719,24 @@ web/src/
 
 #### 5.5 — Frontend Production Hosting
 - **API project serves the SPA** in v1. `app.UseStaticFiles()` + fallback to `/index.html` for SPA routes.
-- Vite `dist/` copied into `src/FormForge.Api/wwwroot/` during container build.
+- Vite `dist/` copied into `src/AppForge.Api/wwwroot/` during container build.
 - Single origin — simplifies CORS, refresh-cookie semantics, CSP.
 - Production `index.html` rewriter injects CSP nonce (Decision 2.7) and theme `<script>` (Decision 4.2).
 - Migration paths to reverse proxy / CDN deferred.
 
 #### 5.6 — Container Image Strategy
-Multi-stage Dockerfile producing single `formforge-api:tag`:
+Multi-stage Dockerfile producing single `appforge-api:tag`:
 1. `mcr.microsoft.com/dotnet/sdk:10.0` — restore, build, test (excluded from final).
 2. `node:22-alpine` — `npm ci`, `vite build`.
-3. `mcr.microsoft.com/dotnet/aspnet:10.0-alpine` — copy API publish + `web/dist/` → `/app/wwwroot/`. Non-root user UID 1000. Entry `dotnet FormForge.Api.dll`.
+3. `mcr.microsoft.com/dotnet/aspnet:10.0-alpine` — copy API publish + `web/dist/` → `/app/wwwroot/`. Non-root user UID 1000. Entry `dotnet AppForge.Api.dll`.
 
 Other images: `postgres:17-alpine`, `minio/minio` (official). Image labels carry git SHA, build timestamp, semver tag.
 
 **Frontend build targets (PRD §7 browser support):** `web/vite.config.ts` sets `build.target: 'es2022'`; `web/package.json` declares `"browserslist": ["last 2 Chrome versions", "last 2 Edge versions", "last 2 Firefox versions", "last 2 Safari versions"]`. No IE11 / legacy transpile.
 
 #### 5.7 — Database Backup & Restore (Architectural Minimum)
-- **PG WAL archiving** to MinIO `formforge-wal-archive/`.
-- **Daily `pg_dump --format=custom`** to MinIO `formforge-backups/`.
+- **PG WAL archiving** to MinIO `appforge-wal-archive/`.
+- **Daily `pg_dump --format=custom`** to MinIO `appforge-backups/`.
 - **MinIO bucket replication** to a second instance / external S3 target.
 - **Retention:** 30 days daily; 7 days WAL.
 - **Targets:** RPO ≤24 h (daily) or ≤5 min (WAL replay); RTO ≤2 h.
@@ -744,7 +744,7 @@ Other images: `postgres:17-alpine`, `minio/minio` (official). Image labels carry
 
 #### 5.8 — Environment Configuration
 - **Layering:** `appsettings.json` → `appsettings.{Environment}.json` (no secrets) → env vars (secrets, mandatory) → user secrets (dev only).
-- **Aspire injection:** `WithReference()` wires connection strings as `ConnectionStrings__formforge`, `ConnectionStrings__minio`, etc.
+- **Aspire injection:** `WithReference()` wires connection strings as `ConnectionStrings__appforge`, `ConnectionStrings__minio`, etc.
 - **Frontend:** Vite reads `VITE_API_BASE_URL` (empty in prod when API serves SPA from same origin; explicit URL in dev).
 - **Production secrets:** env vars from deployment platform's secret manager (deferred).
 - No secrets in `appsettings.*.json`.
@@ -752,7 +752,7 @@ Other images: `postgres:17-alpine`, `minio/minio` (official). Image labels carry
 #### 5.9 — CI/CD Pipeline Outline
 Tools: GitHub Actions assumed (substitutable).
 - **On PR:** restore + build, `dotnet test` (xUnit + Testcontainers), `vitest run`, ESLint + TS typecheck, container build (no push), axe-core smoke audit, `dotnet list package --vulnerable`, `npm audit --audit-level=high`.
-- **On merge to main:** all above + tagged image push (`ghcr.io/.../formforge-api:sha-{short}` + `:main`) + staging deploy.
+- **On merge to main:** all above + tagged image push (`ghcr.io/.../appforge-api:sha-{short}` + `:main`) + staging deploy.
 - **Gates:** all tests pass, no high-severity vulns, axe-core zero critical.
 
 #### 5.10 — Docker Compose Parity (G-5)
@@ -881,18 +881,18 @@ Column metadata from `information_schema.columns WHERE table_schema = 'public' A
 
 #### 6.7 — Preview Execution Security & Isolation (FR-72, AD-16 resolved)
 
-**Dedicated read-only PostgreSQL role `formforge_preview`** created in the same migration (executed via Dapper DDL in an `IHostedService.StartAsync`):
+**Dedicated read-only PostgreSQL role `appforge_preview`** created in the same migration (executed via Dapper DDL in an `IHostedService.StartAsync`):
 ```sql
-CREATE ROLE formforge_preview LOGIN NOINHERIT;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO formforge_preview;
+CREATE ROLE appforge_preview LOGIN NOINHERIT;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO appforge_preview;
 -- Revoke internal tables individually:
 REVOKE SELECT ON users, roles, refresh_tokens, password_reset_tokens,
                  mfa_backup_codes, mfa_sessions, schema_audit_log,
                  mutation_audit_log, dataset_audit_log, custom_dataset
-FROM formforge_preview;
+FROM appforge_preview;
 ```
 
-**Separate Npgsql connection pool:** `IPreviewConnectionFactory` / `PreviewConnectionFactory` wraps a dedicated `NpgsqlDataSource` built with the `formforge_preview` credentials. `MaxPoolSize = 5` — caps preview concurrency to prevent starvation of CRUD operations.
+**Separate Npgsql connection pool:** `IPreviewConnectionFactory` / `PreviewConnectionFactory` wraps a dedicated `NpgsqlDataSource` built with the `appforge_preview` credentials. `MaxPoolSize = 5` — caps preview concurrency to prevent starvation of CRUD operations.
 
 **Execution:**
 ```sql
@@ -1080,7 +1080,7 @@ New `ITenantProvisioningService`, modeled on the existing `IProvisioningService`
 2. INSERT INTO tenants (..., status='Provisioning') — EF Core, own transaction.
 3. CREATE SCHEMA "{schema_name}" — Dapper DDL, own transaction.
 4. Apply the full static-schema EF migration set into "{schema_name}" (same migrations used for `public` pre-7.x, now targeted per-tenant via a scripted `search_path` swap — see Decision 7.9).
-5. CREATE SCHEMA "{schema_name}_datasets" (tenant-scoped Dataset VIEW namespace — Decision 7.8) and set `formforge_preview` grants scoped to "{schema_name}" only (Decision 7.8).
+5. CREATE SCHEMA "{schema_name}_datasets" (tenant-scoped Dataset VIEW namespace — Decision 7.8) and set `appforge_preview` grants scoped to "{schema_name}" only (Decision 7.8).
 6. Seed the tenant-admin role (Decision 7.4) + first user in "{schema_name}".users; dispatch welcome email (reuses AR-53/Decision 2.9).
 7. UPDATE tenants SET status='Active'.
 ```
@@ -1142,7 +1142,7 @@ This is the one area requiring more than mechanical schema-qualification, becaus
 
 - **6.1 (View namespace):** `datasets` schema becomes tenant-scoped — provisioned per-tenant as `"{tenantSchema}_datasets"` during Decision 7.2 step 5, not a single shared `datasets` schema.
 - **6.6 (Table allowlist & catalog):** `DatasetAllowlist`'s `information_schema` discovery query is scoped to `table_schema = @tenantSchema` — a tenant's Query Builder and Custom Query catalog can only ever enumerate that tenant's own tables. This closes the previously-identified leak vector structurally (a tenant cannot even *see* another tenant's table names, let alone query them).
-- **6.7 (Preview role):** `formforge_preview`'s grants are no longer `GRANT SELECT ON ALL TABLES IN SCHEMA public`. Grants are issued per-tenant-schema at provisioning time (Decision 7.2 step 5): `GRANT SELECT ON ALL TABLES IN SCHEMA "{tenantSchema}" TO formforge_preview` (still with the internal-table `REVOKE` list applied within that schema). The preview connection additionally sets `SET search_path = "{tenantSchema}"` per request so a crafted query cannot schema-qualify its way to another tenant even if it tried.
+- **6.7 (Preview role):** `appforge_preview`'s grants are no longer `GRANT SELECT ON ALL TABLES IN SCHEMA public`. Grants are issued per-tenant-schema at provisioning time (Decision 7.2 step 5): `GRANT SELECT ON ALL TABLES IN SCHEMA "{tenantSchema}" TO appforge_preview` (still with the internal-table `REVOKE` list applied within that schema). The preview connection additionally sets `SET search_path = "{tenantSchema}"` per request so a crafted query cannot schema-qualify its way to another tenant even if it tried.
 - **6.10 (SQL generator):** `DatasetSqlGenerator`'s `FROM "public"."<table>"` becomes `FROM "{tenantSchema}"."<table>"`, with `tenantSchema` injected server-side from `ITenantContext` — never accepted from the client, never present in `builder_state` JSON.
 - **6.5 (SELECT-only enforcement):** unchanged; remains a necessary but no longer sole line of defense, now backstopped by the schema-scoped allowlist and role grants above.
 
@@ -1150,16 +1150,16 @@ This is the one area requiring more than mechanical schema-qualification, becaus
 
 #### 7.9 — Remaining Cross-Cutting Decisions
 
-- **MinIO (extends Decision 4.1):** object-key prefix gains a tenant segment: `{tenantSchema}/{designerId}/{fieldKey}/...` (was `{designerId}/{fieldKey}/...`). Bucket stays the single shared `formforge` bucket — isolation is via prefix + presigned URL scoping, consistent with the admin-provisioned-only trust model (no tenant ever receives a presigned URL outside its own prefix, since the schema registry entry that drives serialization is itself tenant-scoped per Decision 7.6).
+- **MinIO (extends Decision 4.1):** object-key prefix gains a tenant segment: `{tenantSchema}/{designerId}/{fieldKey}/...` (was `{designerId}/{fieldKey}/...`). Bucket stays the single shared `appforge` bucket — isolation is via prefix + presigned URL scoping, consistent with the admin-provisioned-only trust model (no tenant ever receives a presigned URL outside its own prefix, since the schema registry entry that drives serialization is itself tenant-scoped per Decision 7.6).
 - **Rate limiting (extends Decision 2.6):** add a per-tenant sliding-window policy on `/api/data/*` and `/api/admin/*`; partition key becomes `(tenantId, userId)` instead of `userId` alone, so one tenant cannot exhaust the shared instance's quota against another.
 - **Migrations (extends Decision 1.7):** `Database.Migrate()` against `public` is unchanged (it now only owns `tenants`, `platform_admins`, `tenant_user_index`). A new startup step iterates every row in `tenants` and applies the static-schema EF migration set to that tenant's schema (via a scripted `search_path`/target-schema override — EF Core's migration runner is pointed at each schema in turn). New-tenant provisioning (Decision 7.2 step 4) runs the same migration set once, synchronously, at creation time — the startup loop and the provisioning step share one `ApplyTenantMigrationsAsync(schemaName)` method.
 - **CORS (Decision 2.5):** **explicitly unaffected.** JWT-claim tenant routing (not subdomain) means one application origin serves all tenants; the existing single allowed-origins list stands as-is. Recorded here so this was a considered decision, not an oversight.
 
 #### 7.10 — Tenant Isolation Test Gate (new, extends Testing Strategy)
 
-A dedicated tenant-isolation integration test suite is added to `FormForge.Api.Tests` (Testcontainers.PostgreSQL, provisioning 2+ tenants per test run) and treated as a **release gate**, not ordinary coverage: no tenant-scoped epic (2, 3, 4, 5, 6, 8, 9, 10, 11) is considered done until this suite passes. Coverage required:
+A dedicated tenant-isolation integration test suite is added to `AppForge.Api.Tests` (Testcontainers.PostgreSQL, provisioning 2+ tenants per test run) and treated as a **release gate**, not ordinary coverage: no tenant-scoped epic (2, 3, 4, 5, 6, 8, 9, 10, 11) is considered done until this suite passes. Coverage required:
 - CRUD (Decision 7.7): Tenant A cannot read/write/list a table that exists only in Tenant B's schema; guessed `designerId` → 404, never 403.
-- Dataset Manager (Decision 7.8): Tenant A's `/api/datasets/catalog` never lists Tenant B's tables; a Custom Query authored in Tenant A cannot reference a Tenant B table even if the name is guessed correctly; the `formforge_preview` role cannot read across schemas.
+- Dataset Manager (Decision 7.8): Tenant A's `/api/datasets/catalog` never lists Tenant B's tables; a Custom Query authored in Tenant A cannot reference a Tenant B table even if the name is guessed correctly; the `appforge_preview` role cannot read across schemas.
 - MinIO (Decision 7.9): a presigned URL issued to Tenant A never resolves to a Tenant B object key.
 - Admin (Decision 7.4): a tenant-admin in Tenant A cannot list, view, or act on Tenant B's users/roles/menus; a platform-super-admin can create/suspend tenants but cannot read tenant data.
 - Provisioning (Decision 7.2): a failed provisioning run leaves no partially-visible tenant schema reachable by any tenant-scoped request.
@@ -1181,7 +1181,7 @@ This suite runs inside the existing `dotnet test` CI gate (Decision 5.9) — no 
 8. **S9 (Dataset Foundation):** Decisions 6.1–6.4 (schema + migration + `datasets` schema + view lifecycle + optimistic concurrency) + 6.2 (permission model) + 6.5 (SELECT-only enforcer) + 6.9 (API contract) + 7.8 (per-tenant `datasets` schema, tenant-scoped allowlist and preview-role grants).
 9. **S10 (Query Builder Canvas):** Decisions 6.6 (allowlist/catalog) + 6.12 (React Flow integration) + 7.8 (tenant-scoped catalog discovery); catalog endpoint live; Table Palette, TableNode, JoinEdge, JoinInspector, side-designation all functional.
 10. **S11 (Builder Config):** Decision 6.11 (`builder_state` contract) + 6.10 (SQL generator, incl. column selection, aggregates, GROUP BY, CASE, calculated columns, filter groups, ORDER BY) + 7.8 (server-side tenant schema injection into generated FROM clauses); `builder_state` persisted and restored.
-11. **S12 (SQL Gen, Preview & Sync):** Decision 6.7 (preview pool + `formforge_preview` role) + 6.8 (expression security) + 7.8/7.10 (tenant-scoped preview role, tenant-isolation test gate) + preview endpoint live; builder-mode save reuses view lifecycle; builder_state + query always in sync.
+11. **S12 (SQL Gen, Preview & Sync):** Decision 6.7 (preview pool + `appforge_preview` role) + 6.8 (expression security) + 7.8/7.10 (tenant-scoped preview role, tenant-isolation test gate) + preview endpoint live; builder-mode save reuses view lifecycle; builder_state + query always in sync.
 
 ### Cross-Component Dependencies
 
@@ -1264,9 +1264,9 @@ Rationale: user fieldKeys are authored intent (admin typed them in the canvas); 
 **Backend layout (vertical feature slicing):**
 ```
 src/
-├── FormForge.AppHost/             # Aspire orchestrator only
-├── FormForge.ServiceDefaults/     # OTel, health checks, resilience extensions
-├── FormForge.Api/
+├── AppForge.AppHost/             # Aspire orchestrator only
+├── AppForge.ServiceDefaults/     # OTel, health checks, resilience extensions
+├── AppForge.Api/
 │   ├── Features/                  # Feature folders own endpoints + services + validators + DTOs
 │   │   ├── Auth/
 │   │   ├── Users/
@@ -1285,7 +1285,7 @@ src/
 │   ├── Common/                    # Cross-cutting: ProblemDetails mapper, endpoint filters, IExceptionHandler
 │   ├── wwwroot/                   # SPA build artifacts (populated at container build)
 │   └── Program.cs                 # Minimal API composition root
-└── FormForge.Api.Tests/           # xUnit + Testcontainers.PostgreSQL
+└── AppForge.Api.Tests/           # xUnit + Testcontainers.PostgreSQL
 ```
 
 **Frontend layout:** see Decision 4.6.
@@ -1408,7 +1408,7 @@ src/
 ### Complete Project Directory Structure
 
 ```
-tinnitus/                                       # Repo root (FormForge product)
+tinnitus/                                       # Repo root (AppForge product)
 ├── .editorconfig
 ├── .gitattributes
 ├── .gitignore
@@ -1419,7 +1419,7 @@ tinnitus/                                       # Repo root (FormForge product)
 │       └── codeql.yml                          # SAST
 ├── .config/
 │   └── dotnet-tools.json                       # Pinned dotnet-ef, dotnet-format
-├── FormForge.sln
+├── AppForge.sln
 ├── Directory.Build.props                       # Repo-wide MSBuild defaults
 ├── Directory.Packages.props                    # Central Package Management
 ├── global.json                                 # Pinned .NET 10 SDK version
@@ -1450,20 +1450,20 @@ tinnitus/                                       # Repo root (FormForge product)
 │   └── implementation-artifacts/
 │
 ├── src/
-│   ├── FormForge.AppHost/                      # Aspire 13.1 orchestrator
-│   │   ├── FormForge.AppHost.csproj
+│   ├── AppForge.AppHost/                      # Aspire 13.1 orchestrator
+│   │   ├── AppForge.AppHost.csproj
 │   │   ├── Program.cs                          # AddPostgres + AddContainer(minio) + AddProject(api) + AddViteApp(web)
 │   │   ├── appsettings.json
 │   │   ├── appsettings.Development.json
 │   │   └── Properties/launchSettings.json
 │   │
-│   ├── FormForge.ServiceDefaults/              # Shared service configuration
-│   │   ├── FormForge.ServiceDefaults.csproj
+│   ├── AppForge.ServiceDefaults/              # Shared service configuration
+│   │   ├── AppForge.ServiceDefaults.csproj
 │   │   ├── Extensions.cs                       # AddServiceDefaults() — OTel, health, resilience, discovery
 │   │   └── OpenTelemetryExtensions.cs
 │   │
-│   ├── FormForge.Api/
-│   │   ├── FormForge.Api.csproj
+│   ├── AppForge.Api/
+│   │   ├── AppForge.Api.csproj
 │   │   ├── Program.cs                          # Composition root; route group wiring
 │   │   ├── appsettings.json
 │   │   ├── appsettings.Development.json
@@ -1517,7 +1517,7 @@ tinnitus/                                       # Repo root (FormForge product)
 │   │   │
 │   │   ├── Infrastructure/
 │   │   │   ├── Persistence/
-│   │   │   │   ├── FormForgeDbContext.cs
+│   │   │   │   ├── AppForgeDbContext.cs
 │   │   │   │   ├── DbConnectionFactory.cs
 │   │   │   │   └── Migrations/
 │   │   │   ├── Minio/
@@ -1602,8 +1602,8 @@ tinnitus/                                       # Repo root (FormForge product)
 │   │   ├── wwwroot/                            # SPA build artifacts (populated by Dockerfile stage 3)
 │   │   └── Properties/launchSettings.json
 │   │
-│   └── FormForge.Api.Tests/
-│       ├── FormForge.Api.Tests.csproj
+│   └── AppForge.Api.Tests/
+│       ├── AppForge.Api.Tests.csproj
 │       ├── Features/
 │       │   ├── Auth/AuthEndpointsTests.cs
 │       │   ├── Provisioning/
@@ -1731,7 +1731,7 @@ tinnitus/                                       # Repo root (FormForge product)
 
 ### Project Structure Additions — Dataset Manager (Epics H–K)
 
-**Backend additions to `src/FormForge.Api/`:**
+**Backend additions to `src/AppForge.Api/`:**
 
 `Domain/Entities/`:
 - `CustomDataset.cs` — EF entity for `custom_dataset` table (Decision 6.1)
@@ -1741,11 +1741,11 @@ tinnitus/                                       # Repo root (FormForge product)
 - `DatasetName.cs` — identifier validation + denylist, mirrors `SafeIdentifier` pattern (Decision 6.1)
 
 `Infrastructure/Persistence/Migrations/`:
-- New migration: creates `custom_dataset`, `dataset_audit_log`, `datasets` schema, indexes, `can_manage_datasets` column on `roles`; seeds `formforge_preview` role grants via Dapper (Decision 6.1, 6.2, 6.7)
+- New migration: creates `custom_dataset`, `dataset_audit_log`, `datasets` schema, indexes, `can_manage_datasets` column on `roles`; seeds `appforge_preview` role grants via Dapper (Decision 6.1, 6.2, 6.7)
 
 `Infrastructure/Datasets/`:
 - `IPreviewConnectionFactory.cs` — dedicated preview pool interface (Decision 6.7)
-- `PreviewConnectionFactory.cs` — `formforge_preview` NpgsqlDataSource, MaxPoolSize 5 (Decision 6.7)
+- `PreviewConnectionFactory.cs` — `appforge_preview` NpgsqlDataSource, MaxPoolSize 5 (Decision 6.7)
 
 `Features/Datasets/`:
 - `DatasetEndpoints.cs` — `/api/datasets/*` route handlers (Decision 6.9)
@@ -1760,7 +1760,7 @@ tinnitus/                                       # Repo root (FormForge product)
 - `Dtos/DatasetDto.cs`, `DatasetSummaryDto.cs`, `CreateDatasetRequest.cs`, `UpdateDatasetRequest.cs`, `PreviewRequest.cs`, `PreviewResultDto.cs`, `CatalogDto.cs`, `BuilderStateDto.cs` (C# mirror of the TS `BuilderState` interface — Decision 6.11)
 - `Events/DatasetChanged.cs`
 
-**Test additions to `src/FormForge.Api.Tests/Features/Datasets/`:**
+**Test additions to `src/AppForge.Api.Tests/Features/Datasets/`:**
 - `DatasetNameValidatorTests.cs` — unit: regex, denylist, reserved keywords
 - `DatasetSqlGeneratorTests.cs` — unit: FROM/JOIN, aggregates → GROUP BY, nested filter groups, parameterized values, ORDER BY, CASE columns, calculated columns, empty state → validation errors
 - `SqlSelectEnforcerTests.cs` — unit: SELECT permitted; DML/DDL rejected; CTEs (WITH … SELECT) permitted; parse error → rejection
@@ -1789,13 +1789,13 @@ Feature folder (`features/datasets/`):
 
 **New dependencies:**
 - `package.json`: `@xyflow/react` v12 (React Flow — Decision 6.12)
-- `FormForge.Api.csproj`: `PgQuery.NET` NuGet (Decision 6.5)
+- `AppForge.Api.csproj`: `PgQuery.NET` NuGet (Decision 6.5)
 
 ---
 
 ### Project Structure Additions — Multi-Tenant Architecture
 
-**Backend additions to `src/FormForge.Api/`:**
+**Backend additions to `src/AppForge.Api/`:**
 
 `Domain/Entities/`:
 - `Tenant.cs` — EF entity for `tenants` table (Decision 7.1)
@@ -1820,7 +1820,7 @@ Feature folder (`features/datasets/`):
 - `Features/Files/*` (MinIO) — object-key prefix builder gains a tenant segment
 - `Program.cs` — rate-limit partition keys gain `tenantId`; startup migration loop iterates all tenant schemas; bootstrap seeds `platform_admins` instead of a global `platform-admin` role
 
-**Test additions to `src/FormForge.Api.Tests/Features/Tenancy/`:**
+**Test additions to `src/AppForge.Api.Tests/Features/Tenancy/`:**
 - `TenantProvisioningServiceTests.cs` — integration (Testcontainers): schema created, migrations applied, tenant-admin seeded, rollback on mid-sequence failure leaves no partially-visible schema
 - `TenantIsolationTests.cs` — the release-gate suite from Decision 7.10: cross-tenant CRUD, Dataset, MinIO, and admin isolation, run with 2+ provisioned tenants per test
 
@@ -1836,7 +1836,7 @@ Routes (`routes/_app/admin/`):
 ### Architectural Boundaries
 
 **API boundary (external):**
-- All HTTP enters via `FormForge.Api`. Public surface: `/api/*`, `/openapi/v1.json`, `/health/*`, SPA fallback at `/`.
+- All HTTP enters via `AppForge.Api`. Public surface: `/api/*`, `/openapi/v1.json`, `/health/*`, SPA fallback at `/`.
 - Auth boundary: `RequireAuth()` filter on every group except `/api/auth/*`, `/openapi/*`, `/health/live`, `/health/ready`.
 - Admin boundary: `RequirePlatformAdmin()` on `/api/admin/*`.
 
@@ -1846,7 +1846,7 @@ Routes (`routes/_app/admin/`):
 - Platform-super-admin (`platform_admins`) and tenant-admin (a per-tenant role) are distinct boundaries: a platform-super-admin can manage the `tenants` table but has no implicit grant into any tenant schema.
 
 **Static schema vs dynamic schema boundary:**
-- `FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — EF Core; static tables only.
+- `AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — EF Core; static tables only.
 - `Features/Provisioning/*` + `Features/DynamicCrud/*` — Dapper via `DbConnectionFactory`.
 - Bridge: `SchemaRegistry` reads `component_schemas` rows via EF; produces entries consumed by Dapper code.
 
@@ -1872,12 +1872,12 @@ Routes (`routes/_app/admin/`):
 | **D — Dynamic Table Provisioning (FR-23..28)** | `Features/{Provisioning,SchemaRegistry,Audit}/`, `Domain/Entities/SchemaAuditLogEntry.cs`, `routes/_app/admin/designers.$designerId.drift.tsx` |
 | **E — Generic CRUD Service (FR-29..36)** | `Features/DynamicCrud/`, `Domain/Entities/MutationAuditLogEntry.cs`, `routes/_app/data.$designerId*.tsx`, `features/data-entry/*` |
 | **F — UI / UX & Theming (FR-37..43)** | `web/src/lib/{theme,i18n}/*`, `routes/__root.tsx`, `components/ui/*`, `Common/Spa/IndexHtmlRewriter.cs` |
-| **G — Platform / Cross-Cutting (FR-44..49)** | `src/FormForge.AppHost/`, `src/FormForge.ServiceDefaults/`, `Common/Logging/*`, `Infrastructure/HealthChecks/*`, `docker-compose.yml`, OpenAPI emitted by Minimal API metadata |
+| **G — Platform / Cross-Cutting (FR-44..49)** | `src/AppForge.AppHost/`, `src/AppForge.ServiceDefaults/`, `Common/Logging/*`, `Infrastructure/HealthChecks/*`, `docker-compose.yml`, OpenAPI emitted by Minimal API metadata |
 | **H — Dataset Foundation & Custom Query (FR-55..62)** | `Features/Datasets/`, `Domain/Entities/{CustomDataset,DatasetAuditLogEntry}.cs`, `Domain/ValueTypes/DatasetName.cs`, `Infrastructure/Datasets/*ConnectionFactory.cs`, `Infrastructure/Persistence/Migrations/` (`datasets` schema), `web/src/routes/_app/admin/datasets.tsx`, `features/datasets/*` |
 | **I — Query Builder Canvas & Joins (FR-63..66)** | `Features/Datasets/DatasetAllowlist.cs` (catalog endpoint), `web/src/components/query-builder/{TableNode,JoinEdge,JoinInspector}.tsx`, `features/datasets/{QueryBuilderCanvas,TablePalette}.tsx` |
 | **J — Builder Config (FR-67..69)** | `Features/Datasets/DatasetSqlGenerator.cs` (column selection, aggregates, GROUP BY, CASE, calculated, filter groups, ORDER BY), `Features/Datasets/ExpressionSecurityValidator.cs`, `features/datasets/{FilterConditionsDialog,OrderByPanel}.tsx` |
 | **K — SQL Generation, Preview & View Sync (FR-70..73)** | `Features/Datasets/{DatasetSqlGenerator,PreviewService,SqlSelectEnforcer,DatasetViewManager}.cs`, `Infrastructure/Datasets/PreviewConnectionFactory.cs`, `features/datasets/useDatasetPreview.ts`, `features/datasets/types/builderState.ts` |
-| **T — Tenant Foundation & Provisioning (new, Decisions 7.1–7.10)** | `Features/Tenancy/*`, `Domain/Entities/{Tenant,PlatformAdmin,TenantUserIndexEntry}.cs`, `web/src/routes/_app/admin/tenants.tsx`, `FormForge.Api.Tests/Features/Tenancy/*` |
+| **T — Tenant Foundation & Provisioning (new, Decisions 7.1–7.10)** | `Features/Tenancy/*`, `Domain/Entities/{Tenant,PlatformAdmin,TenantUserIndexEntry}.cs`, `web/src/routes/_app/admin/tenants.tsx`, `AppForge.Api.Tests/Features/Tenancy/*` |
 
 ### Integration Points
 
@@ -1901,9 +1901,9 @@ Routes (`routes/_app/admin/`):
 
 ### Development Workflow Integration
 
-- **Dev (Aspire):** `dotnet run --project src/FormForge.AppHost` starts everything; Aspire Dashboard at https://localhost:15888.
+- **Dev (Aspire):** `dotnet run --project src/AppForge.AppHost` starts everything; Aspire Dashboard at https://localhost:15888.
 - **Dev (Compose):** `docker compose up`; SPA served from API container (no HMR).
-- **Build:** `dotnet build` + `npm run build`. Container build: `docker build -t formforge-api:local .`.
+- **Build:** `dotnet build` + `npm run build`. Container build: `docker build -t appforge-api:local .`.
 - **Test:** `dotnet test` (xUnit + Testcontainers) + `npm test` (Vitest).
 
 ## Architecture Validation Results
@@ -1911,7 +1911,7 @@ Routes (`routes/_app/admin/`):
 ### Coherence Validation ✅
 
 **Decision Compatibility:** All 74 Core Architectural Decisions interlock cleanly.
-- Schema-per-tenant isolation (7.1–7.9) integrates with the EF/Dapper separated-transaction model (1.6) without changing its shape — both engines now target a request-scoped schema via `ITenantContext` instead of a hardcoded `public`, but the boundary between them (`FormForgeDbContext` for static, `DbConnectionFactory` for dynamic) is unchanged.
+- Schema-per-tenant isolation (7.1–7.9) integrates with the EF/Dapper separated-transaction model (1.6) without changing its shape — both engines now target a request-scoped schema via `ITenantContext` instead of a hardcoded `public`, but the boundary between them (`AppForgeDbContext` for static, `DbConnectionFactory` for dynamic) is unchanged.
 - The v1 single-process invariant (in-memory caches, Decision 5.1) extends cleanly to multi-tenancy: tenant-keyed cache entries (7.6) still live in one process's `ICacheStore`; the v2 Redis swap remains a single binding change.
 - TanStack Router + TanStack Query integrated via `ensureQueryData` in route loaders.
 - EF Core + Dapper on shared PG instance with separated transactions (Decision 1.6).
@@ -1921,7 +1921,7 @@ Routes (`routes/_app/admin/`):
 
 **Pattern Consistency:** All naming, format, and communication patterns support the architectural decisions. The only non-standard pattern is **Option C JSON casing** for dynamic endpoints (snake-case user fieldKeys + camelCase system columns), explicitly documented with rationale.
 
-**Structure Alignment:** Vertical feature folders honor every cross-cutting boundary. The static/dynamic schema boundary lives at exactly two integration points (`FormForgeDbContext` for static; `DbConnectionFactory` for dynamic) with `SchemaRegistry` as the single documented bridge.
+**Structure Alignment:** Vertical feature folders honor every cross-cutting boundary. The static/dynamic schema boundary lives at exactly two integration points (`AppForgeDbContext` for static; `DbConnectionFactory` for dynamic) with `SchemaRegistry` as the single documented bridge.
 
 ### Requirements Coverage Validation ✅
 
@@ -1935,7 +1935,7 @@ All 73 FRs map to specific files/folders in the project structure (see Requireme
 | FR-23..28 (Provisioning) | `Features/{Provisioning,SchemaRegistry,Audit}/` + `SafeIdentifier` | ✅ |
 | FR-29..36 (Dynamic CRUD) | `Features/DynamicCrud/*` + `SoftDeleteCascade` + `RepeaterWriteCoordinator` | ✅ |
 | FR-37..43 (UI/UX) | `lib/theme/*` + `lib/i18n/*` + `routes/__root.tsx` + axe-core CI | ✅ |
-| FR-44..49 (Cross-cutting) | `FormForge.AppHost/` + `ServiceDefaults/` + `Common/Logging/*` + Compose | ✅ |
+| FR-44..49 (Cross-cutting) | `AppForge.AppHost/` + `ServiceDefaults/` + `Common/Logging/*` + Compose | ✅ |
 | FR-55..62 (Dataset Foundation) | `Features/Datasets/` + `Domain/Entities/{CustomDataset,DatasetAuditLogEntry}` + `DatasetName` value type | ✅ |
 | FR-63..66 (Query Builder Canvas) | `Features/Datasets/DatasetAllowlist` + `components/query-builder/*` + `features/datasets/TablePalette` | ✅ |
 | FR-67..69 (Builder Config) | `Features/Datasets/DatasetSqlGenerator` + `ExpressionSecurityValidator` + `features/datasets/FilterConditionsDialog + OrderByPanel` | ✅ |
@@ -1981,7 +1981,7 @@ All 73 FRs map to specific files/folders in the project structure (see Requireme
 
 | Risk | Mitigation |
 |---|---|
-| R-18 Cross-tenant data leak via Dataset Custom Query or Query Builder | Structural, not conventional: allowlist/catalog discovery, `formforge_preview` role grants, and generated `FROM` clauses are all scoped to the caller's tenant schema server-side (Decision 7.8); a tenant cannot even enumerate another tenant's table names. Tenant-isolation test gate (Decision 7.10) is a release blocker for Epics 8–11. |
+| R-18 Cross-tenant data leak via Dataset Custom Query or Query Builder | Structural, not conventional: allowlist/catalog discovery, `appforge_preview` role grants, and generated `FROM` clauses are all scoped to the caller's tenant schema server-side (Decision 7.8); a tenant cannot even enumerate another tenant's table names. Tenant-isolation test gate (Decision 7.10) is a release blocker for Epics 8–11. |
 | R-19 Cross-tenant data leak via guessed `designerId` in Generic CRUD | Every dynamic SQL call site schema-qualifies against `ITenantContext` (Decision 7.7), not a `tenant_id` predicate that could be omitted; a request for a table that exists only in another tenant's schema 404s (`TABLE_NOT_PROVISIONED`) rather than confirming/denying existence. |
 | R-20 Partial tenant-provisioning failure leaves an inconsistent or partially-visible schema | `ITenantProvisioningService` runs schema creation, migration, and seeding as a defined sequence with `status='Provisioning'` until the final step succeeds (Decision 7.2); `TenantProvisioningRecoveryService` scans stuck rows on startup and flags (does not silently retry) partial DDL. |
 
@@ -2000,7 +2000,7 @@ All 73 FRs map to specific files/folders in the project structure (see Requireme
 **Important Gaps — folded inline as architecture addendums (now part of the document):**
 1. Query timeout (PRD R-6) — added to Decision 1.6 (`CommandTimeout = 5` for dynamic CRUD; 60 for admin DDL; 5 for health).
 2. Browser support (PRD §7) — added to Decision 5.6 (Vite `build.target: 'es2022'` + browserslist).
-3. Deactivated-user observability (PRD R-5) — added to Decision 5.3 (`formforge.auth.deactivated_token_use` counter).
+3. Deactivated-user observability (PRD R-5) — added to Decision 5.3 (`appforge.auth.deactivated_token_use` counter).
 4. `cascade_event_id` NULL semantics — added to Decision 1.3 (individual restore clears unconditionally; cascade restore matches by id).
 
 **Minor Gaps — tracked for implementation phase (not blockers):**
@@ -2059,7 +2059,7 @@ FR count updated 54 → 73. Decision count updated 51 → 64. Sprints S9–S12 a
 - **7.5** Identifier sanitization extended to tenant schema names (reuses `SafeIdentifier` unchanged).
 - **7.6** Cache keys extended with tenant dimension (schema registry, permission cache, dataset allowlist).
 - **7.7** Dynamic provisioning & CRUD schema qualification — explicitly **not** a `tenant_id`-column/predicate approach; isolation is structural via the schema qualifier.
-- **7.8** Dataset Manager multi-tenant isolation (per-tenant `datasets` schema, tenant-scoped allowlist/catalog, tenant-scoped `formforge_preview` grants, server-injected schema in generated SQL) — closes a real leak vector identified during impact analysis, not a mechanical pass.
+- **7.8** Dataset Manager multi-tenant isolation (per-tenant `datasets` schema, tenant-scoped allowlist/catalog, tenant-scoped `appforge_preview` grants, server-injected schema in generated SQL) — closes a real leak vector identified during impact analysis, not a mechanical pass.
 - **7.9** Remaining cross-cutting changes (MinIO prefix, per-tenant rate-limit partitioning, migration fan-out across tenant schemas); CORS explicitly confirmed unaffected (JWT-claim routing, not subdomain).
 - **7.10** Tenant isolation test gate — a dedicated Testcontainers suite treated as a release blocker for every tenant-scoped epic.
 
@@ -2145,4 +2145,4 @@ Story G-1.1 (prepended to Sprint S0): run the initialization command sequence fr
 | S9 — Dataset Foundation | H-1, H-2, H-3, H-4, H-5, H-6, H-7, H-8, H-9, H-10 | `custom_dataset` migration + `datasets` schema (provisioned per-tenant, Decision 7.8); `dataset-management` permission enforced; full CRUD API with transactional view lifecycle; name validation; Custom Query Mode with SELECT enforcement; Dataset Management UI functional; audit log populated; **tenant-scoped table allowlist verified — a tenant cannot enumerate another tenant's tables** |
 | S10 — Query Builder Canvas | I-1, I-2, I-3, I-4, I-5 | Table Palette shows allowlisted tables; multi-table drag works; column-to-column join edges; Join Inspector configures type; left/right designation controls FROM anchor |
 | S11 — Builder Config | J-1, J-2, J-3, J-4, J-5, J-6, J-7, J-8 | Column checkboxes control SELECT; aggregates + GROUP BY correct; CASE + calculated columns generate valid SQL; Filter dialog with nested groups; parameterized values confirmed; ORDER BY in declared order |
-| S12 — SQL Gen, Preview & Sync | K-1, K-2, K-3, K-4 | Server generator produces correct SQL from builder_state, with the tenant schema injected server-side (Decision 7.8); canvas restores exactly on reopen; Preview returns ≤10 rows with timeout via the tenant-scoped `formforge_preview` role; builder-mode save reuses transactional view lifecycle; **full tenant-isolation test suite (Decision 7.10) passes as the release gate for Epics 8–11** |
+| S12 — SQL Gen, Preview & Sync | K-1, K-2, K-3, K-4 | Server generator produces correct SQL from builder_state, with the tenant schema injected server-side (Decision 7.8); canvas restores exactly on reopen; Preview returns ≤10 rows with timeout via the tenant-scoped `appforge_preview` role; builder-mode save reuses transactional view lifecycle; **full tenant-isolation test suite (Decision 7.10) passes as the release gate for Epics 8–11** |

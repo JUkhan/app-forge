@@ -17,7 +17,7 @@ export interface PermissionsResponse {
   roleIds: string[]
 }
 
-// Seeded platform-admin role id (FormForge.Api: SeedData.cs). A user with this
+// Seeded platform-admin role id (AppForge.Api: SeedData.cs). A user with this
 // role bypasses per-resource checks server-side at the RequirePermission filter
 // (Story 2.6 AC-2), so the client must mirror that bypass — see usePermission.
 export const PLATFORM_ADMIN_ROLE_ID = '00000000-0000-0000-0000-000000000001' as const

@@ -49,17 +49,17 @@ So that I can build a query from real database tables.
 
 ### Task 1 — Backend: Create `DatasetAllowlist.cs` (AC-1, AC-6)
 
-Create `src/FormForge.Api/Features/Datasets/DatasetAllowlist.cs`:
+Create `src/AppForge.Api/Features/Datasets/DatasetAllowlist.cs`:
 
 ```csharp
 using Dapper;
-using FormForge.Api.Domain.ValueTypes;
-using FormForge.Api.Features.Datasets.Dtos;
-using FormForge.Api.Infrastructure.Persistence;
+using AppForge.Api.Domain.ValueTypes;
+using AppForge.Api.Features.Datasets.Dtos;
+using AppForge.Api.Infrastructure.Persistence;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 
-namespace FormForge.Api.Features.Datasets;
+namespace AppForge.Api.Features.Datasets;
 
 internal interface IDatasetAllowlist
 {
@@ -195,10 +195,10 @@ internal sealed class DatasetAllowlist : IDatasetAllowlist
 
 ### Task 2 — Backend: Create `CatalogDto.cs` (AC-1)
 
-Create `src/FormForge.Api/Features/Datasets/Dtos/CatalogDto.cs`:
+Create `src/AppForge.Api/Features/Datasets/Dtos/CatalogDto.cs`:
 
 ```csharp
-namespace FormForge.Api.Features.Datasets.Dtos;
+namespace AppForge.Api.Features.Datasets.Dtos;
 
 // Story 9.1 (FR-63 / AR-62): GET /api/datasets/catalog response shape.
 // C# naming: PascalCase properties → camelCase JSON via default serializer options.
@@ -211,7 +211,7 @@ internal sealed record CatalogDto(IReadOnlyList<CatalogTableDto> Tables);
 
 ### Task 3 — Backend: Add `GET /api/datasets/catalog` endpoint (AC-1, AC-6)
 
-Open `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs`.
+Open `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs`.
 
 **CRITICAL ordering**: the `/catalog` route must be registered **BEFORE** the `/{id:guid}` route. Currently, `/preview` is registered before POST `/`, and `/{id:guid}` is the second route. Insert the new catalog route after the existing `MapGet("/{id:guid}", ...)` block and **before** the `MapPost("/preview", ...)` block:
 
@@ -229,13 +229,13 @@ group.MapGet("/catalog", async (
      .RequireDatasetManagement();
 ```
 
-Add the necessary using: `IDatasetAllowlist` is in `FormForge.Api.Features.Datasets` — already in the file's namespace so no extra using is needed.
+Add the necessary using: `IDatasetAllowlist` is in `AppForge.Api.Features.Datasets` — already in the file's namespace so no extra using is needed.
 
 ---
 
 ### Task 4 — Backend: Configure `DatasetManager:AllowedTables` in `appsettings.json` (AC-1, AC-6)
 
-Open `src/FormForge.Api/appsettings.json`. Add the `DatasetManager` section after `"Smtp": { ... }`:
+Open `src/AppForge.Api/appsettings.json`. Add the `DatasetManager` section after `"Smtp": { ... }`:
 
 ```json
 "DatasetManager": {
@@ -250,7 +250,7 @@ The default empty array means zero tables are allowlisted out of the box — ope
 
 ### Task 5 — Backend: Integration test for catalog endpoint (AC-1, AC-6)
 
-Add `GetCatalog_ReturnsAllowlistedTables` to `src/FormForge.Api.Tests/Features/Datasets/` — follow the pattern in `DatasetMigrationTests.cs` (Testcontainers + WebApplicationFactory). The test should:
+Add `GetCatalog_ReturnsAllowlistedTables` to `src/AppForge.Api.Tests/Features/Datasets/` — follow the pattern in `DatasetMigrationTests.cs` (Testcontainers + WebApplicationFactory). The test should:
 - Configure `DatasetManager:AllowedTables` in test appsettings (with at least one known table, e.g., `custom_dataset` stripped by denylist → expect 0 tables; or a test-specific table)
 - Call `GET /api/datasets/catalog` with a `dataset-management` token → 200 with expected shape
 - Verify a non-allowlisted table is absent from the response
@@ -521,7 +521,7 @@ function PaletteEntry({ table }: { table: CatalogTable }) {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     // Serialize the full table (name + columns) so the canvas drop handler
     // can build the TableNodeData directly from dataTransfer.
-    e.dataTransfer.setData('application/formforge-table', JSON.stringify(table))
+    e.dataTransfer.setData('application/appforge-table', JSON.stringify(table))
     e.dataTransfer.effectAllowed = 'copy'
   }
 
@@ -640,7 +640,7 @@ function QueryBuilderCanvasInner({ initialState, onChange }: QueryBuilderCanvasP
     (event: React.DragEvent) => {
       event.preventDefault()
 
-      const raw = event.dataTransfer.getData('application/formforge-table')
+      const raw = event.dataTransfer.getData('application/appforge-table')
       if (!raw) return
 
       const table: CatalogTable = JSON.parse(raw)
@@ -873,7 +873,7 @@ Add this inside the existing `"datasets"` top-level object (which already has `"
 - [x] `cd web && npm install` (picks up `@xyflow/react` from package.json after Task 6) — `@xyflow/react@^12.11.0` installed
 - [x] `cd web && npx tsc -b --noEmit` → 0 errors
 - [x] `cd web && npx vitest run` → 281 passed, 1 pre-existing i18n-lint failure (`designer.inspector.placeholders.label`); no new failures, new keys not orphaned
-- [x] `dotnet build src/FormForge.Api` → 0 errors
+- [x] `dotnet build src/AppForge.Api` → 0 errors
 - [x] `dotnet test` → 918 passed, 2 pre-existing failures unchanged (SchemaAuditLog / MutationAuditLog DELETE→405)
 - [x] Manual smoke — **not run as a live browser session in this non-interactive environment.** Equivalent coverage: AC-1 + AC-6 are exercised end-to-end by the new `DatasetCatalogTests` (catalog shape, columns/types, allowlist filtering, denylist stripping, non-allowlisted absent, 401 without token), and the full Query Builder UI (palette → canvas → TableNode) type-checks and builds clean. Live drag-to-canvas verification is left for code review.
 
@@ -979,15 +979,15 @@ Npgsql resolves `string[]` to `TEXT[]` automatically. If the query fails at runt
 
 ```
 NEW (backend):
-  src/FormForge.Api/Features/Datasets/DatasetAllowlist.cs
-  src/FormForge.Api/Features/Datasets/Dtos/CatalogDto.cs
+  src/AppForge.Api/Features/Datasets/DatasetAllowlist.cs
+  src/AppForge.Api/Features/Datasets/Dtos/CatalogDto.cs
 
 MODIFIED (backend):
-  src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs
+  src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs
     — add GET /catalog handler (before /preview)
-  src/FormForge.Api/Program.cs
+  src/AppForge.Api/Program.cs
     — register IDatasetAllowlist singleton
-  src/FormForge.Api/appsettings.json
+  src/AppForge.Api/appsettings.json
     — add DatasetManager section
 
 NEW (frontend):
@@ -1018,9 +1018,9 @@ MODIFIED (frontend):
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.9 — Dataset API contract, GET /catalog]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.11 — AR-67 BuilderState canonical interface]
 - [Source: `_bmad-output/planning-artifacts/architecture.md` §6.12 — AR-68 React Flow @xyflow/react v12 integration]
-- [Source: `src/FormForge.Api/Domain/ValueTypes/DatasetName.cs` — PermanentDenylist (14 internal tables to strip from allowlist)]
-- [Source: `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — existing endpoint order to maintain]
-- [Source: `src/FormForge.Api/Program.cs:210-254` — DI registration patterns for new services]
+- [Source: `src/AppForge.Api/Domain/ValueTypes/DatasetName.cs` — PermanentDenylist (14 internal tables to strip from allowlist)]
+- [Source: `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — existing endpoint order to maintain]
+- [Source: `src/AppForge.Api/Program.cs:210-254` — DI registration patterns for new services]
 - [Source: `web/src/features/datasets/datasetApi.ts` — httpClient import path and API function pattern]
 - [Source: `web/src/features/datasets/useDatasetListQuery.ts` — TanStack Query v5 hook pattern]
 - [Source: `web/src/routes/_app/admin/datasets.tsx` — existing DatasetRow component to extend with builder nav]
@@ -1071,10 +1071,10 @@ claude-opus-4-8 (Opus 4.8, 1M context)
 ### Review Findings
 
 - [x] [Review][Decision] AC-2: PaletteEntry shows column count not column list — Accepted: compact count is sufficient; full column list visible in the TableNode after drop. [`web/src/features/datasets/TablePalette.tsx`]
-- [x] [Review][Patch] Cache stampede in GetCatalogAsync — replaced TryGetValue/Set with `IMemoryCache.GetOrCreateAsync` [`src/FormForge.Api/Features/Datasets/DatasetAllowlist.cs:78`]
+- [x] [Review][Patch] Cache stampede in GetCatalogAsync — replaced TryGetValue/Set with `IMemoryCache.GetOrCreateAsync` [`src/AppForge.Api/Features/Datasets/DatasetAllowlist.cs:78`]
 - [x] [Review][Patch] parseBuilderState unsafe cast — added shape guard checking nodes/edges are arrays before cast [`web/src/features/datasets/types/builderState.ts:106`]
 - [x] [Review][Patch] ColumnSelection declared as `interface` not `type` alias — changed to `type ColumnSelection = { ... }` [`web/src/features/datasets/types/builderState.ts:12`]
-- [x] [Review][Patch] Integration test missing 403 case — added viewer role/user seed + `GetCatalog_AuthenticatedWithoutDatasetManagement_Returns403` test [`src/FormForge.Api.Tests/Features/Datasets/DatasetCatalogTests.cs`]
+- [x] [Review][Patch] Integration test missing 403 case — added viewer role/user seed + `GetCatalog_AuthenticatedWithoutDatasetManagement_Returns403` test [`src/AppForge.Api.Tests/Features/Datasets/DatasetCatalogTests.cs`]
 - [x] [Review][Patch] Loader has no error handling — added `errorComponent` to route definition [`web/src/routes/_app/admin/datasets_.$id.tsx:14`]
 - [x] [Review][Patch] onDrop JSON.parse unguarded — wrapped in try/catch, returns early on malformed drag data [`web/src/features/datasets/QueryBuilderCanvas.tsx:55`]
 - [x] [Review][Defer] Stale initialState closure in onDrop — `onChange({ ...initialState, edges: initialState.edges })` spreads from the prop snapshot, not live state; harmless in Story 9.1 (no edges), but will silently clobber edge/filter state once Story 9.3+ edges are live; rethink in Story 11.2 when persistence is wired [`web/src/features/datasets/QueryBuilderCanvas.tsx:97`] — deferred, Story 11.2 scope
@@ -1093,14 +1093,14 @@ claude-opus-4-8 (Opus 4.8, 1M context)
 ### File List
 
 **NEW (backend):**
-- `src/FormForge.Api/Features/Datasets/DatasetAllowlist.cs`
-- `src/FormForge.Api/Features/Datasets/Dtos/CatalogDto.cs`
-- `src/FormForge.Api.Tests/Features/Datasets/DatasetCatalogTests.cs`
+- `src/AppForge.Api/Features/Datasets/DatasetAllowlist.cs`
+- `src/AppForge.Api/Features/Datasets/Dtos/CatalogDto.cs`
+- `src/AppForge.Api.Tests/Features/Datasets/DatasetCatalogTests.cs`
 
 **MODIFIED (backend):**
-- `src/FormForge.Api/Features/Datasets/DatasetEndpoints.cs` — add `GET /catalog` (before `/preview`)
-- `src/FormForge.Api/Program.cs` — register `IDatasetAllowlist` singleton
-- `src/FormForge.Api/appsettings.json` — add `DatasetManager` section
+- `src/AppForge.Api/Features/Datasets/DatasetEndpoints.cs` — add `GET /catalog` (before `/preview`)
+- `src/AppForge.Api/Program.cs` — register `IDatasetAllowlist` singleton
+- `src/AppForge.Api/appsettings.json` — add `DatasetManager` section
 
 **NEW (frontend):**
 - `web/src/features/datasets/types/builderState.ts`

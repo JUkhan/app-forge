@@ -6,7 +6,7 @@ inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-tinnitus-2026-05-22/addendum.md
   - _bmad-output/planning-artifacts/architecture.md
   - _bmad-output/planning-artifacts/epics.md
-project_name: 'FormForge (tinnitus)'
+project_name: 'AppForge (tinnitus)'
 user_name: 'jukhan'
 date: '2026-05-22'
 ---
@@ -14,7 +14,7 @@ date: '2026-05-22'
 # Implementation Readiness Assessment Report
 
 **Date:** 2026-05-22
-**Project:** FormForge (tinnitus)
+**Project:** AppForge (tinnitus)
 
 ## Step 1 — Document Inventory
 
@@ -492,7 +492,7 @@ Architecture mandates `aspire new aspire-starter` (backend) + Vite/shadcn CLI (f
 
 # 🟢 READY
 
-FormForge planning artifacts (PRD, Architecture, Epics & Stories) are aligned, complete, and traceable. **No critical or major issues block implementation start.** Sprint planning can begin immediately.
+AppForge planning artifacts (PRD, Architecture, Epics & Stories) are aligned, complete, and traceable. **No critical or major issues block implementation start.** Sprint planning can begin immediately.
 
 ### Strengths
 
@@ -531,7 +531,7 @@ None.
 2. **Run `/bmad-sprint-planning`** to generate the sprint status file the dev agents will consume. The PRD already proposes S0–S8 sequencing in §9; sprint planning formalizes this.
 3. **Then `/bmad-create-story`** to prepare Story 1.1 (or whichever sprint-plan-determined first story) with all the context the implementation agent needs.
 4. **Watch Sprint S2 closely** — Story 3.1 (Port and Refactor Designer Code) is the highest-risk story in the plan. Front-load the audit half of the sprint with the dev agent reading the ESG Platform reference codebase before any code lands. R-2 mitigation is procedural; respect the time-box.
-5. **Add a manual visual-verification step** for Story 3.1's acceptance — the AC mentions behavioral fidelity but a side-by-side visual comparison of the live designer (ESG Platform) vs. the FormForge port is a sensible additional gate. Could be added as part of the existing `bmad-checkpoint-preview` skill invocation.
+5. **Add a manual visual-verification step** for Story 3.1's acceptance — the AC mentions behavioral fidelity but a side-by-side visual comparison of the live designer (ESG Platform) vs. the AppForge port is a sensible additional gate. Could be added as part of the existing `bmad-checkpoint-preview` skill invocation.
 
 ### Final Note
 

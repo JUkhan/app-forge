@@ -1,4 +1,4 @@
-// Mirrors the backend DTOs at src/FormForge.Api/Features/Users/Dtos/.
+// Mirrors the backend DTOs at src/AppForge.Api/Features/Users/Dtos/.
 // Keep in sync when the wire shape changes.
 
 export interface UserListItem {

@@ -54,16 +54,16 @@ baseline_commit: '9a9064a6bdd3542589832356dcac2bdfe6e51989'
 
 ## Code Map
 
-- `src/FormForge.Api/Domain/Entities/Tenant.cs:8-19` -- entity fields; `FormForgeDbContext.cs:442-444` -- the `status` check constraint (`'Provisioning'/'Active'/'Suspended'` today; this story adds `'Error'`).
-- `src/FormForge.Api/Features/Users/UserService.cs` (`IPasswordHasher.Hash`) -- reuse for hashing the server-generated temporary password; no existing password-generation utility to reuse (build new).
-- `src/FormForge.Api/Features/Tenancy/ITenantProvisioningService.cs:13` (impl `TenantProvisioningService.cs`) -- `ProvisionSchemaAsync(Tenant, ct)`; validates + creates schema + replays migrations; throws on failure, never mutates status.
-- `src/FormForge.Api/Features/Tenancy/ITenantOnboardingService.cs:15-20` (impl `TenantOnboardingService.cs`) -- `OnboardTenantAsync(Tenant, adminEmail, adminDisplayName, adminTemporaryPassword, ct)`; sets `Status="Active"` only as its final step.
-- `src/FormForge.Api/Features/Tenancy/TenantProvisioningRecoveryService.cs:29-44` -- log-only startup scan for stuck `Provisioning` rows; do not change.
-- `src/FormForge.Api/Common/Endpoints/RouteGroupExtensions.cs:35-40` (`RequirePlatformSuperAdmin()`, currently unused, comment names `/api/admin/tenants/*` as its consumer), `:51-72` (`DenyPlatformSuperAdmin()`), `:98` (`"userId"` claim read pattern).
-- `src/FormForge.Api/Program.cs:709-714` -- existing `/api/admin` group; do NOT nest the new group here.
-- `src/FormForge.Api/Features/Roles/RoleEndpoints.cs`, `AdminEndpoints.cs:18` -- endpoint-group pattern to mirror (list/create handlers, `Results.Problem`, `PagedResult<T>`).
-- `src/FormForge.Api/Features/Auth/Dtos/LoginResponse.cs:10-18` -- `RefreshToken` is `string?` for platform-super-admin logins.
-- `src/FormForge.Api/Features/Auth/JwtTokenService.cs:54-62` -- `CreateAccessTokenForPlatformAdmin`.
+- `src/AppForge.Api/Domain/Entities/Tenant.cs:8-19` -- entity fields; `AppForgeDbContext.cs:442-444` -- the `status` check constraint (`'Provisioning'/'Active'/'Suspended'` today; this story adds `'Error'`).
+- `src/AppForge.Api/Features/Users/UserService.cs` (`IPasswordHasher.Hash`) -- reuse for hashing the server-generated temporary password; no existing password-generation utility to reuse (build new).
+- `src/AppForge.Api/Features/Tenancy/ITenantProvisioningService.cs:13` (impl `TenantProvisioningService.cs`) -- `ProvisionSchemaAsync(Tenant, ct)`; validates + creates schema + replays migrations; throws on failure, never mutates status.
+- `src/AppForge.Api/Features/Tenancy/ITenantOnboardingService.cs:15-20` (impl `TenantOnboardingService.cs`) -- `OnboardTenantAsync(Tenant, adminEmail, adminDisplayName, adminTemporaryPassword, ct)`; sets `Status="Active"` only as its final step.
+- `src/AppForge.Api/Features/Tenancy/TenantProvisioningRecoveryService.cs:29-44` -- log-only startup scan for stuck `Provisioning` rows; do not change.
+- `src/AppForge.Api/Common/Endpoints/RouteGroupExtensions.cs:35-40` (`RequirePlatformSuperAdmin()`, currently unused, comment names `/api/admin/tenants/*` as its consumer), `:51-72` (`DenyPlatformSuperAdmin()`), `:98` (`"userId"` claim read pattern).
+- `src/AppForge.Api/Program.cs:709-714` -- existing `/api/admin` group; do NOT nest the new group here.
+- `src/AppForge.Api/Features/Roles/RoleEndpoints.cs`, `AdminEndpoints.cs:18` -- endpoint-group pattern to mirror (list/create handlers, `Results.Problem`, `PagedResult<T>`).
+- `src/AppForge.Api/Features/Auth/Dtos/LoginResponse.cs:10-18` -- `RefreshToken` is `string?` for platform-super-admin logins.
+- `src/AppForge.Api/Features/Auth/JwtTokenService.cs:54-62` -- `CreateAccessTokenForPlatformAdmin`.
 - `Infrastructure/Persistence/Migrations/` -- naming convention `{yyyyMMddHHmmss}_{Name}.cs` + matching `.Designer.cs`.
 - `web/src/routes/_app.tsx:26-49` (`beforeLoad`/`refreshSession`), `:60,63` (`useAuthQuery`/`usePermissionsQuery`) -- do not reuse; both assume a tenant session.
 - `web/src/routes/__root.tsx:10-13` -- unguarded root; the new route sits alongside `_app.tsx`/`login.tsx` here.
@@ -78,12 +78,12 @@ baseline_commit: '9a9064a6bdd3542589832356dcac2bdfe6e51989'
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260908120120_AddTenantErrorStatus.cs` -- extend the `status` check constraint with `'Error'` -- schema change backing the new terminal state
-- [x] `src/FormForge.Api/Features/Tenancy/TemporaryPasswordGenerator.cs` (new) -- generates a random temporary password for a tenant's first admin user -- no existing generator to reuse
-- [x] `src/FormForge.Api/Features/Tenancy/TenantEndpoints.cs` (new) -- `GET`/`POST /api/admin/tenants`, mounted top-level with `RequirePlatformSuperAdmin()`; create derives `admin@{schema_name}.tenant.local` / "Tenant Admin" / a generated password, catches provisioning/onboarding failures into `status='Error'` -- new admin surface
-- [x] `src/FormForge.Api/Features/Tenancy/Dtos/TenantDto.cs`, `CreateTenantRequest.cs` (new) -- `CreateTenantRequest` is `{ name, schemaName }` only; create response includes the generated temporary password once
-- [x] `src/FormForge.Api/Program.cs` -- register the new group -- wiring only
-- [x] `src/FormForge.Api.Tests/Features/Tenancy/TenantEndpointsIntegrationTests.cs` (new) -- covers every I/O matrix row
+- [x] `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260908120120_AddTenantErrorStatus.cs` -- extend the `status` check constraint with `'Error'` -- schema change backing the new terminal state
+- [x] `src/AppForge.Api/Features/Tenancy/TemporaryPasswordGenerator.cs` (new) -- generates a random temporary password for a tenant's first admin user -- no existing generator to reuse
+- [x] `src/AppForge.Api/Features/Tenancy/TenantEndpoints.cs` (new) -- `GET`/`POST /api/admin/tenants`, mounted top-level with `RequirePlatformSuperAdmin()`; create derives `admin@{schema_name}.tenant.local` / "Tenant Admin" / a generated password, catches provisioning/onboarding failures into `status='Error'` -- new admin surface
+- [x] `src/AppForge.Api/Features/Tenancy/Dtos/TenantDto.cs`, `CreateTenantRequest.cs` (new) -- `CreateTenantRequest` is `{ name, schemaName }` only; create response includes the generated temporary password once
+- [x] `src/AppForge.Api/Program.cs` -- register the new group -- wiring only
+- [x] `src/AppForge.Api.Tests/Features/Tenancy/TenantEndpointsIntegrationTests.cs` (new) -- covers every I/O matrix row
 - [x] `web/src/routes/admin.tenants.tsx` (new, top-level) -- route + `beforeLoad` guard
 - [x] `web/src/features/admin/tenants/{types.ts,useTenantsQuery.ts,tenantMutations.ts}` (new) -- list query, create mutation, bounded-poll hook
 - [x] `web/src/features/auth/authMutations.ts` -- role-based post-login redirect
@@ -166,7 +166,7 @@ TanStack Router: the new `/admin/tenants` route must resolve independently of `_
 
 **Commands:**
 - `dotnet build` -- expected: 0 errors, 0 warnings
-- `dotnet test src/FormForge.Api.Tests --filter "FullyQualifiedName~Tenancy"` -- expected: all pass
+- `dotnet test src/AppForge.Api.Tests --filter "FullyQualifiedName~Tenancy"` -- expected: all pass
 - `npm run test` (web) -- expected: all pass
 - `npm run build` (web) -- expected: no type errors
 

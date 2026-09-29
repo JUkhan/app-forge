@@ -26,7 +26,7 @@ function fingerprint(rows: MenuListItem[]) {
 // New MIME so a stray designer-canvas drag cannot land on a menu row
 // (architecture explicitly keeps DnD contexts isolated).
 const REORDER_PAGE_SIZE = 256
-const REORDER_MIME = 'application/x-formforge-menu-reorder'
+const REORDER_MIME = 'application/x-appforge-menu-reorder'
 
 export interface ReorderableMenuListProps {
   parentId: string | null

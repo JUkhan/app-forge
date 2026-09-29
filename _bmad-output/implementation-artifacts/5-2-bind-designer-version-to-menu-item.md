@@ -45,13 +45,13 @@ So that the platform provisions the backing table and connects the CRUD UI.
 ## Tasks / Subtasks
 
 - [x] **Task 1 — EF Migration: Add binding columns to `menus` table** (AC: 1, 2, 3, 4, 5)
-  - [x] Run `dotnet ef migrations add AddMenuBindingColumns --project src/FormForge.Api --startup-project src/FormForge.Api`
+  - [x] Run `dotnet ef migrations add AddMenuBindingColumns --project src/AppForge.Api --startup-project src/AppForge.Api`
   - [x] Migration adds nullable columns: `designer_id VARCHAR(63)`, `bound_version INTEGER`, `provisioning_status VARCHAR(20)`, `provisioning_error TEXT` — all nullable (menus without a binding are section headers)
   - [x] Add index: `CREATE INDEX idx_menus_designer_id ON menus(designer_id)` (for binding-based lookups)
   - [x] Add index: `CREATE INDEX idx_menus_provisioning_status ON menus(provisioning_status) WHERE provisioning_status = 'Pending'` (for ProvisioningRecoveryService in Story 5.8)
 
 - [x] **Task 2 — Update `Menu` entity** (AC: 1, 3, 4, 5)
-  - [x] Add to `src/FormForge.Api/Domain/Entities/Menu.cs`:
+  - [x] Add to `src/AppForge.Api/Domain/Entities/Menu.cs`:
     ```csharp
     public string? DesignerId { get; set; }           // null = no binding (section header)
     public int? BoundVersion { get; set; }             // pinned version; null = no binding
@@ -60,7 +60,7 @@ So that the platform provisions the backing table and connects the CRUD UI.
     ```
   - [x] Add navigation property `ComponentSchema? BoundDesigner { get; set; }` — FK to `component_schemas.designer_id` (optional, for join queries; not loaded by default)
 
-- [x] **Task 3 — Update `FormForgeDbContext`** (AC: 1)
+- [x] **Task 3 — Update `AppForgeDbContext`** (AC: 1)
   - [x] Add 4 column mappings under `modelBuilder.Entity<Menu>(e => { ... })`:
     ```csharp
     e.Property(m => m.DesignerId).HasColumnName("designer_id").HasMaxLength(63);
@@ -84,7 +84,7 @@ So that the platform provisions the backing table and connects the CRUD UI.
   - [x] **WARNING**: The `ComponentSchema` PK is `DesignerId` (a `string`, not a `Guid`). The FK is string → string. EF will handle this correctly because `HasForeignKey(m => m.DesignerId)` and `HasKey(s => s.DesignerId)` are both configured. Verify with `dotnet build` — no CA warnings expected.
 
 - [x] **Task 4 — Update `MenuResponse` DTO** (AC: 1, 3, 4)
-  - [x] Add binding fields to `src/FormForge.Api/Features/Menus/Dtos/MenuResponse.cs`:
+  - [x] Add binding fields to `src/AppForge.Api/Features/Menus/Dtos/MenuResponse.cs`:
     ```csharp
     internal sealed record MenuResponse(
         Guid Id,
@@ -116,7 +116,7 @@ So that the platform provisions the backing table and connects the CRUD UI.
 
   **5a — `ProvisioningJob.cs`:**
   ```csharp
-  namespace FormForge.Api.Features.Provisioning;
+  namespace AppForge.Api.Features.Provisioning;
 
   internal sealed record ProvisioningJob(
       Guid MenuId,
@@ -127,7 +127,7 @@ So that the platform provisions the backing table and connects the CRUD UI.
 
   **5b — `IProvisioningService.cs`:**
   ```csharp
-  namespace FormForge.Api.Features.Provisioning;
+  namespace AppForge.Api.Features.Provisioning;
 
   internal interface IProvisioningService
   {
@@ -138,7 +138,7 @@ So that the platform provisions the backing table and connects the CRUD UI.
   **5c — `ProvisioningService.cs`:**
   ```csharp
   using System.Threading.Channels;
-  namespace FormForge.Api.Features.Provisioning;
+  namespace AppForge.Api.Features.Provisioning;
 
   [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "DI registered.")]
   internal sealed class ProvisioningService(ChannelWriter<ProvisioningJob> writer) : IProvisioningService
@@ -154,13 +154,13 @@ So that the platform provisions the backing table and connects the CRUD UI.
   **5d — `ProvisioningBackgroundService.cs`:**
   ```csharp
   using System.Threading.Channels;
-  using FormForge.Api.Infrastructure.Persistence;
+  using AppForge.Api.Infrastructure.Persistence;
   using Microsoft.EntityFrameworkCore;
   using Microsoft.Extensions.DependencyInjection;
   using Microsoft.Extensions.Hosting;
   using Microsoft.Extensions.Logging;
 
-  namespace FormForge.Api.Features.Provisioning;
+  namespace AppForge.Api.Features.Provisioning;
 
   [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Registered via AddHostedService.")]
   internal sealed class ProvisioningBackgroundService(
@@ -182,7 +182,7 @@ So that the platform provisions the backing table and connects the CRUD UI.
           // For Story 5.2: validate the version is still Published, then set Success.
           // This gives Story 5.3 a defined seam: replace the body of this method.
           using var scope = scopeFactory.CreateScope();
-          var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+          var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
 
           var menu = await db.Menus.FirstOrDefaultAsync(m => m.Id == job.MenuId, ct).ConfigureAwait(false);
           if (menu is null)
@@ -231,7 +231,7 @@ So that the platform provisions the backing table and connects the CRUD UI.
 
   **5e — `BindingDiffService.cs`** (stub — Story 5.6 fills in real diff logic):
   ```csharp
-  namespace FormForge.Api.Features.Provisioning;
+  namespace AppForge.Api.Features.Provisioning;
 
   internal sealed record BindingDiffResponse(
       BindingInfo? CurrentBinding,
@@ -272,16 +272,16 @@ So that the platform provisions the backing table and connects the CRUD UI.
   ```
 
 - [x] **Task 6 — Create `BindMenuDesignerRequest` DTO + Validator** (AC: 1, 2)
-  - [x] New `src/FormForge.Api/Features/Menus/Dtos/BindMenuDesignerRequest.cs`:
+  - [x] New `src/AppForge.Api/Features/Menus/Dtos/BindMenuDesignerRequest.cs`:
     ```csharp
-    namespace FormForge.Api.Features.Menus.Dtos;
+    namespace AppForge.Api.Features.Menus.Dtos;
     internal sealed record BindMenuDesignerRequest(string? DesignerId, int? Version);
     ```
-  - [x] New `src/FormForge.Api/Features/Menus/Validators/BindMenuDesignerRequestValidator.cs`:
+  - [x] New `src/AppForge.Api/Features/Menus/Validators/BindMenuDesignerRequestValidator.cs`:
     ```csharp
     using FluentValidation;
-    using FormForge.Api.Features.Menus.Dtos;
-    namespace FormForge.Api.Features.Menus.Validators;
+    using AppForge.Api.Features.Menus.Dtos;
+    namespace AppForge.Api.Features.Menus.Validators;
 
     internal sealed class BindMenuDesignerRequestValidator : AbstractValidator<BindMenuDesignerRequest>
     {
@@ -379,7 +379,7 @@ So that the platform provisions the backing table and connects the CRUD UI.
   **7d — Update `MenuService` constructor** to inject `IProvisioningService` and `BindingDiffService`:
   ```csharp
   internal sealed class MenuService(
-      FormForgeDbContext db,
+      AppForgeDbContext db,
       IMenuCache cache,
       IPermissionService permissions,
       IProvisioningService provisioning,
@@ -504,7 +504,7 @@ So that the platform provisions the backing table and connects the CRUD UI.
     // Bounded capacity 256: if provisioning is slower than binds arrive, this limits
     // memory growth; writes block briefly when full (acceptable — admin-only action).
     var provisioningChannel = System.Threading.Channels.Channel.CreateBounded<
-        FormForge.Api.Features.Provisioning.ProvisioningJob>(256);
+        AppForge.Api.Features.Provisioning.ProvisioningJob>(256);
     builder.Services.AddSingleton(provisioningChannel.Reader);
     builder.Services.AddSingleton(provisioningChannel.Writer);
     builder.Services.AddSingleton<IProvisioningService, ProvisioningService>();
@@ -512,8 +512,8 @@ So that the platform provisions the backing table and connects the CRUD UI.
     builder.Services.AddHostedService<ProvisioningBackgroundService>();
     builder.Services.AddScoped<IValidator<BindMenuDesignerRequest>, BindMenuDesignerRequestValidator>();
     ```
-  - [x] Add `using FormForge.Api.Features.Provisioning;` to `Program.cs` usings (or fully-qualify in the registration — pick whichever matches the surrounding file style).
-  - [x] **CRITICAL**: `ProvisioningBackgroundService` is a singleton (BackgroundService lifetime). It injects `IServiceScopeFactory` (not `FormForgeDbContext` directly — scoped services cannot be injected into singletons). The code in Task 5d already does `scopeFactory.CreateScope()` correctly. **Do NOT inject `FormForgeDbContext` or `IMenuService` directly into the BackgroundService constructor.**
+  - [x] Add `using AppForge.Api.Features.Provisioning;` to `Program.cs` usings (or fully-qualify in the registration — pick whichever matches the surrounding file style).
+  - [x] **CRITICAL**: `ProvisioningBackgroundService` is a singleton (BackgroundService lifetime). It injects `IServiceScopeFactory` (not `AppForgeDbContext` directly — scoped services cannot be injected into singletons). The code in Task 5d already does `scopeFactory.CreateScope()` correctly. **Do NOT inject `AppForgeDbContext` or `IMenuService` directly into the BackgroundService constructor.**
 
 - [x] **Task 10 — Add i18n keys to `en.json`** (AC: 1–6)
   - [x] Add under `admin.menus` block (after `"reorderNoChanges"`):
@@ -572,7 +572,7 @@ So that the platform provisions the backing table and connects the CRUD UI.
   - [x] On polling transition to Error: fire `provisioningError` toast with `provisioningError` detail; stop polling
 
 - [x] **Task 12 — Tests** (AC: 1–6)
-  - [x] Create `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`:
+  - [x] Create `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`:
     - `[IClassFixture<PostgresFixture>]` + `IAsyncLifetime`
     - Seed: admin user, a Designer with a Published version v1 and a Draft version v2, a Menu Item
     - `BindDesigner_ValidPublishedVersion_Returns202()` — verify 202, then poll GetMenu until provisioningStatus = "Success" (with timeout)
@@ -597,23 +597,23 @@ So that the platform provisions the backing table and connects the CRUD UI.
 ### What Already Exists — Read Before Writing Any Code
 
 **Domain:**
-- `src/FormForge.Api/Domain/Entities/Menu.cs` — currently has NO binding columns; this story adds them
-- `src/FormForge.Api/Domain/Entities/ComponentSchema.cs` — PK is `DesignerId: string` (not Guid!)
-- `src/FormForge.Api/Domain/Entities/ComponentSchemaVersion.cs` — has `Status: string` ("Draft"/"Published"/"Archived") and `Version: int`
+- `src/AppForge.Api/Domain/Entities/Menu.cs` — currently has NO binding columns; this story adds them
+- `src/AppForge.Api/Domain/Entities/ComponentSchema.cs` — PK is `DesignerId: string` (not Guid!)
+- `src/AppForge.Api/Domain/Entities/ComponentSchemaVersion.cs` — has `Status: string` ("Draft"/"Published"/"Archived") and `Version: int`
 
 **Persistence:**
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs` — `Menu` entity configured at lines 164-183; needs 4 new column mappings + FK
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs` — `Menu` entity configured at lines 164-183; needs 4 new column mappings + FK
 - `ComponentSchemaVersions` DbSet already exists — use it to validate the Published check in `BindDesignerAsync`
 - Last migration: `20260524054931_CreateMenusAndMenuRoleAssignments.cs` — new migration must come AFTER this one
 
 **Events:**
-- `src/FormForge.Api/Infrastructure/EventBus/IDomainEventBus.cs` — already declares `MenuBindingCreated(string DesignerId)` event with comment "MenuBindingCreated has no subscriber (Story 4.1 adds the handler). Declared now per AR-47." Story 5.2 should publish this event from `BindDesignerAsync` after `SaveChangesAsync`. This event is subscribed by `PermissionService` to do permission cache invalidation (line 377 in architecture: `MenuBindingCreated(designerId) — no eviction (new Resource defaults to false flags)`). So publishing it is correct even though there's no permission-eviction logic needed; it's a signal for future subscribers.
+- `src/AppForge.Api/Infrastructure/EventBus/IDomainEventBus.cs` — already declares `MenuBindingCreated(string DesignerId)` event with comment "MenuBindingCreated has no subscriber (Story 4.1 adds the handler). Declared now per AR-47." Story 5.2 should publish this event from `BindDesignerAsync` after `SaveChangesAsync`. This event is subscribed by `PermissionService` to do permission cache invalidation (line 377 in architecture: `MenuBindingCreated(designerId) — no eviction (new Resource defaults to false flags)`). So publishing it is correct even though there's no permission-eviction logic needed; it's a signal for future subscribers.
   - Add `IDomainEventBus eventBus` to `MenuService` constructor
   - After `SaveChangesAsync` in `BindDesignerAsync`: `eventBus.Publish(new MenuBindingCreated(designerId));`
 
 **MenuService existing constructor:**
 ```csharp
-internal sealed class MenuService(FormForgeDbContext db, IMenuCache cache, IPermissionService permissions)
+internal sealed class MenuService(AppForgeDbContext db, IMenuCache cache, IPermissionService permissions)
 ```
 This story adds `IProvisioningService provisioning`, `BindingDiffService diffService`, and `IDomainEventBus eventBus` to the constructor. Make sure DI registrations in Program.cs are correct for all three.
 
@@ -659,7 +659,7 @@ The FK `menus.designer_id → component_schemas.designer_id` is string→string.
 The BackgroundService is a singleton (ASP.NET registers hosted services as singletons). It MUST NOT inject scoped services directly. The pattern:
 ```csharp
 using var scope = scopeFactory.CreateScope();
-var db = scope.ServiceProvider.GetRequiredService<FormForgeDbContext>();
+var db = scope.ServiceProvider.GetRequiredService<AppForgeDbContext>();
 ```
 creates a new scoped lifetime per job, disposing it when the using block exits. This is the standard pattern. Do NOT reuse scopes across jobs.
 
@@ -772,15 +772,15 @@ All existing 317 tests must still pass. `dotnet build` must be clean (0 warnings
 - **AR-9/AR-37 (single-consumer Channel)**: architecture Decisions 5.2
 - **AR-23 (HTTP 202)**: architecture Decision 3.6 + Story 5.2 AC-1
 - **Epic 5 spec (Story 5.2 verbatim)**: `_bmad-output/planning-artifacts/epics.md:1151-1183`
-- **Existing MenuService**: `src/FormForge.Api/Features/Menus/MenuService.cs`
-- **Existing MenuAdminEndpoints**: `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs`
-- **Existing Menu entity (to extend)**: `src/FormForge.Api/Domain/Entities/Menu.cs`
-- **Existing FormForgeDbContext (to extend)**: `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs`
-- **Existing ComponentSchemaVersion entity**: `src/FormForge.Api/Domain/Entities/ComponentSchemaVersion.cs`
-- **Existing IDomainEventBus + MenuBindingCreated event**: `src/FormForge.Api/Infrastructure/EventBus/IDomainEventBus.cs`
+- **Existing MenuService**: `src/AppForge.Api/Features/Menus/MenuService.cs`
+- **Existing MenuAdminEndpoints**: `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs`
+- **Existing Menu entity (to extend)**: `src/AppForge.Api/Domain/Entities/Menu.cs`
+- **Existing AppForgeDbContext (to extend)**: `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs`
+- **Existing ComponentSchemaVersion entity**: `src/AppForge.Api/Domain/Entities/ComponentSchemaVersion.cs`
+- **Existing IDomainEventBus + MenuBindingCreated event**: `src/AppForge.Api/Infrastructure/EventBus/IDomainEventBus.cs`
 - **Previous story (5.1)**: `_bmad-output/implementation-artifacts/5-1-validate-designerid-as-a-safe-postgresql-identifier.md`
-- **Error envelope pattern**: `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` (copy `MenuNotFoundProblem()` shape exactly)
-- **Program.cs DI registrations**: `src/FormForge.Api/Program.cs:130-148`
+- **Error envelope pattern**: `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` (copy `MenuNotFoundProblem()` shape exactly)
+- **Program.cs DI registrations**: `src/AppForge.Api/Program.cs:130-148`
 - **i18n existing keys**: `web/src/lib/i18n/locales/en.json:125-217` (admin.menus block)
 
 ## Dev Agent Record
@@ -803,34 +803,34 @@ Claude Opus 4.7 (1M context) — `claude-opus-4-7[1m]`
 - Polling design choice: rather than a second `useQuery` observer for `usePollProvisioning`, I baked the 2-second `refetchInterval` (driven by `data?.provisioningStatus === 'Pending'`) into the existing `useMenuDetailQuery`, and `usePollProvisioning` became a side-effect-only hook that watches transitions via a `useRef`-tracked previous status. This avoids two query observers fighting for the same cache entry and makes the "no toast on initial undefined → Pending" semantics explicit (deps array alone wouldn't distinguish the initial render from a real terminal flip).
 - Retry test (AC-4) intentionally does NOT assert the transient `Pending` state directly — the BackgroundService is in-process and may drain the job between the retry HTTP response and the next `GET`. Instead, the test records `UpdatedAt` after the first Success, retries, polls for the second Success, and asserts `UpdatedAt` strictly advanced. That is race-free and a strictly stronger proof that the pipeline ran end-to-end again.
 - `MenuBindingCreated` event is published after the bind commit even though no subscriber needs eviction today — architecture line 377 (`MenuBindingCreated(designerId) — no eviction`) explicitly accepts the no-op subscriber, and declaring it now gives Story 5.3 schema-audit and any future cache-busting subscriber a defined seam.
-- `BackgroundService` injects `IServiceScopeFactory` (singleton lifetime + per-job `using var scope`), not `FormForgeDbContext` directly. The story Dev Notes called this out as CRITICAL and the implementation matches.
+- `BackgroundService` injects `IServiceScopeFactory` (singleton lifetime + per-job `using var scope`), not `AppForgeDbContext` directly. The story Dev Notes called this out as CRITICAL and the implementation matches.
 - `RetryBindingAsync` skips `cache.InvalidateAsync` — the navbar cache stores only navbar-relevant fields (name/order/icon/isActive/role-filter visibility), none of which a retry can change. Documented inline at MenuService.cs.
 - `ToggleMenuActiveRequest` / `BindMenuDesignerRequest` / `AssignMenuRolesRequest` all share the nullable-positional-record pattern so missing JSON keys deserialise to null and the FluentValidation NotNull rule returns 422 instead of the handler NRE-ing.
 
 ### File List
 
 **Backend — new files (5):**
-- `src/FormForge.Api/Features/Provisioning/ProvisioningJob.cs`
-- `src/FormForge.Api/Features/Provisioning/IProvisioningService.cs`
-- `src/FormForge.Api/Features/Provisioning/ProvisioningService.cs`
-- `src/FormForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs`
-- `src/FormForge.Api/Features/Provisioning/BindingDiffService.cs`
-- `src/FormForge.Api/Features/Menus/Dtos/BindMenuDesignerRequest.cs`
-- `src/FormForge.Api/Features/Menus/Validators/BindMenuDesignerRequestValidator.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260525051450_AddMenuBindingColumns.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260525051450_AddMenuBindingColumns.Designer.cs`
+- `src/AppForge.Api/Features/Provisioning/ProvisioningJob.cs`
+- `src/AppForge.Api/Features/Provisioning/IProvisioningService.cs`
+- `src/AppForge.Api/Features/Provisioning/ProvisioningService.cs`
+- `src/AppForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs`
+- `src/AppForge.Api/Features/Provisioning/BindingDiffService.cs`
+- `src/AppForge.Api/Features/Menus/Dtos/BindMenuDesignerRequest.cs`
+- `src/AppForge.Api/Features/Menus/Validators/BindMenuDesignerRequestValidator.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260525051450_AddMenuBindingColumns.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260525051450_AddMenuBindingColumns.Designer.cs`
 
 **Backend — modified files (6):**
-- `src/FormForge.Api/Domain/Entities/Menu.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs`
-- `src/FormForge.Api/Infrastructure/Persistence/Migrations/FormForgeDbContextModelSnapshot.cs` (regenerated by `dotnet ef migrations add`)
-- `src/FormForge.Api/Features/Menus/Dtos/MenuResponse.cs`
-- `src/FormForge.Api/Features/Menus/MenuService.cs`
-- `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs`
-- `src/FormForge.Api/Program.cs`
+- `src/AppForge.Api/Domain/Entities/Menu.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs`
+- `src/AppForge.Api/Infrastructure/Persistence/Migrations/AppForgeDbContextModelSnapshot.cs` (regenerated by `dotnet ef migrations add`)
+- `src/AppForge.Api/Features/Menus/Dtos/MenuResponse.cs`
+- `src/AppForge.Api/Features/Menus/MenuService.cs`
+- `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs`
+- `src/AppForge.Api/Program.cs`
 
 **Backend — new tests (1):**
-- `src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs` (+13 tests)
+- `src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs` (+13 tests)
 
 **Frontend — new files (5):**
 - `web/src/features/menu/usePollProvisioning.ts`
@@ -854,12 +854,12 @@ Claude Opus 4.7 (1M context) — `claude-opus-4-7[1m]`
 
 ### Review Findings
 
-- [x] [Review][Patch] **[HIGH] ProcessJobAsync passes stoppingToken to FirstOrDefaultAsync — OperationCanceledException bypasses try/catch/finally, leaving row permanently Pending** [`src/FormForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs` ProcessJobAsync pre-try block]
+- [x] [Review][Patch] **[HIGH] ProcessJobAsync passes stoppingToken to FirstOrDefaultAsync — OperationCanceledException bypasses try/catch/finally, leaving row permanently Pending** [`src/AppForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs` ProcessJobAsync pre-try block]
 - [x] [Review][Patch] **[MED] DesignerBindingSection form inputs not re-synced after successful bind — useState initializers ignored on re-render, causing stale form values** [`web/src/features/admin/menus/DesignerBindingSection.tsx:33-34`]
-- [x] [Review][Patch] **[MED] No integration test for AC-5 re-bind scenario — binding v1 then binding v2 (BoundVersion changes, pipeline reruns) has no regression guard** [`src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`]
+- [x] [Review][Patch] **[MED] No integration test for AC-5 re-bind scenario — binding v1 then binding v2 (BoundVersion changes, pipeline reruns) has no regression guard** [`src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`]
 - [x] [Review][Patch] **[LOW] useRetryBindingMutation.onSuccess missing invalidateAllMenus — inconsistent with useBindDesignerMutation cleanup pattern** [`web/src/features/admin/menus/menuAdminMutations.ts`]
 
-- [x] [Review][Defer] **EnqueueAsync failure post-commit leaves row permanently Pending** [`src/FormForge.Api/Features/Menus/MenuService.cs:453`] — deferred; spec Dev Notes explicitly accept this tradeoff ("CancellationToken.None on the enqueue: a cancellation between commit and enqueue would otherwise leave the row Pending with no consumer, requiring a Retry to recover"); Retry is the documented recovery path
-- [x] [Review][Defer] **OperationCanceledException inside the try block will be recorded as Error status** [`src/FormForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs:63-70`] — deferred to Story 5.3; stub try block has no async I/O today; fix catch-all to re-throw OCE when real DDL is wired
-- [x] [Review][Defer] **GetBindingDiffHandler accepts targetVersion=0 with no guard — story 5.6 stub ignores the value, but real pg_attribute logic will silently produce a nonsensical diff** [`src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` GetBindingDiffHandler] — deferred to Story 5.6; add `if (targetVersion <= 0) return 422` before delegating to diffService
-- [x] [Review][Defer] **Security tests (401/403) exist only for PUT /binding — POST /binding/retry and GET /binding-diff have no explicit auth-failure tests** [`src/FormForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — deferred; route group RequirePlatformAdmin enforces the constraint for all three routes; low-priority test coverage gap
+- [x] [Review][Defer] **EnqueueAsync failure post-commit leaves row permanently Pending** [`src/AppForge.Api/Features/Menus/MenuService.cs:453`] — deferred; spec Dev Notes explicitly accept this tradeoff ("CancellationToken.None on the enqueue: a cancellation between commit and enqueue would otherwise leave the row Pending with no consumer, requiring a Retry to recover"); Retry is the documented recovery path
+- [x] [Review][Defer] **OperationCanceledException inside the try block will be recorded as Error status** [`src/AppForge.Api/Features/Provisioning/ProvisioningBackgroundService.cs:63-70`] — deferred to Story 5.3; stub try block has no async I/O today; fix catch-all to re-throw OCE when real DDL is wired
+- [x] [Review][Defer] **GetBindingDiffHandler accepts targetVersion=0 with no guard — story 5.6 stub ignores the value, but real pg_attribute logic will silently produce a nonsensical diff** [`src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` GetBindingDiffHandler] — deferred to Story 5.6; add `if (targetVersion <= 0) return 422` before delegating to diffService
+- [x] [Review][Defer] **Security tests (401/403) exist only for PUT /binding — POST /binding/retry and GET /binding-diff have no explicit auth-failure tests** [`src/AppForge.Api.Tests/Features/Provisioning/ProvisioningIntegrationTests.cs`] — deferred; route group RequirePlatformAdmin enforces the constraint for all three routes; low-priority test coverage gap

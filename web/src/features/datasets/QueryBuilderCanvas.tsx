@@ -681,7 +681,7 @@ function QueryBuilderCanvasInner({ initialState, onChange }: QueryBuilderCanvasP
     (event: React.DragEvent) => {
       event.preventDefault()
 
-      const raw = event.dataTransfer.getData('application/formforge-table')
+      const raw = event.dataTransfer.getData('application/appforge-table')
       if (!raw) return
 
       let table: CatalogTable

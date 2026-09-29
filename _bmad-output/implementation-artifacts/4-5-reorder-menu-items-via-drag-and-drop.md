@@ -43,14 +43,14 @@ And this story implements only the invalidation hook + endpoint; the cache TTL i
 ## Tasks / Subtasks
 
 - [x] Task 1: Backend — `ReorderMenusRequest` + `ReorderMenuItem` DTOs (AC-1, AC-2)
-  - [x] Create `src/FormForge.Api/Features/Menus/Dtos/ReorderMenusRequest.cs`
+  - [x] Create `src/AppForge.Api/Features/Menus/Dtos/ReorderMenusRequest.cs`
     - `internal sealed record ReorderMenusRequest(IReadOnlyList<ReorderMenuItem>? Items);`
     - `internal sealed record ReorderMenuItem(Guid Id, int Order);`
     - **Why nullable `Items?`**: a missing `"items"` key in the payload deserializes to `null` on the positional record, the validator's `NotNull` rule then returns 422, and the handler's `request.Items!.…` deref is safe behind the validation filter. Mirrors `AssignMenuRolesRequest` (Story 4.4).
     - **Why an envelope (`{ items: [...] }`) and not a top-level JSON array** (which the AC literal `[{ id, order }]` suggests): (a) FluentValidation in this codebase targets a single named class per filter — a top-level array has no stable class identity to register `IValidator<List<…>>` for; (b) every other admin mutation uses an envelope (`AssignMenuRolesRequest.RoleIds`, `CreateMenuRequest.{Name, …}`) — consistency matters; (c) it leaves room to add `cause` / `version` / `optimistic` fields later without a breaking change. Document this in the dev notes (AC-1 wording is the *contract intent*, not a literal byte shape).
 
 - [x] Task 2: Backend — `ReorderMenusRequestValidator` (AC-1, AC-2)
-  - [x] Create `src/FormForge.Api/Features/Menus/Validators/ReorderMenusRequestValidator.cs`
+  - [x] Create `src/AppForge.Api/Features/Menus/Validators/ReorderMenusRequestValidator.cs`
   - [x] Mirror `AssignMenuRolesRequestValidator` defensive ordering — MaxItems gate **before** Distinct / element checks so a pathological payload is rejected before allocating same-size HashSets:
     ```csharp
     private const int MaxItems = 256;
@@ -198,7 +198,7 @@ And this story implements only the invalidation hook + endpoint; the cache TTL i
   - [x] **No domain event published**: `MenuBindingCreated` requires a `DesignerId` (Epic 5); no event corresponds to reorder today. The 5 s navbar cache invalidation in Story 4.7 is event-style enough.
 
 - [x] Task 5: Backend — integration tests (AC-1, AC-2, AC-4)
-  - [x] Append a new `// ---------- PUT /api/admin/menus/reorder (Story 4.5) ----------` section to `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` after the existing Story 4.4 block. Cover at minimum:
+  - [x] Append a new `// ---------- PUT /api/admin/menus/reorder (Story 4.5) ----------` section to `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` after the existing Story 4.4 block. Cover at minimum:
     - `ReorderMenus_Unauthenticated_Returns401`
     - `ReorderMenus_AsNonAdmin_Returns403`
     - `ReorderMenus_TopLevelScope_PersistsNewOrder` — seed 3 top-level menus with orders [0, 1, 2], PUT `[{A, 2}, {B, 0}, {C, 1}]`, then `GET /api/admin/menus?page=1&pageSize=25` and assert the returned order is `[B, C, A]`.
@@ -296,8 +296,8 @@ And this story implements only the invalidation hook + endpoint; the cache TTL i
     **Critical pattern (from Story 4.4 review P6)**: Re-sync the draft when the server query refetches after a successful save, otherwise a background refetch silently overwrites the next user reorder. Use a `key` trick on the wrapping component to remount on data change, OR effect-sync explicitly. The simpler path here is to call `setDraft(...)` inside the mutation's `onSuccess` (or after `await refetch()`).
   - [x] Implement native HTML5 DnD on each row — pattern adapted from `web/src/components/designer/DesignerCanvas.tsx`:
     - Each row: `<li draggable="true" onDragStart={…} onDragOver={…} onDrop={…} onDragEnd={…}>`
-    - `onDragStart`: `e.dataTransfer.setData('application/x-formforge-menu-reorder', JSON.stringify({ id: row.id, parentId: row.parentId ?? null }))` and `e.dataTransfer.effectAllowed = 'move'`. **Use a different MIME type from the designer canvas** (`application/x-formforge-menu-reorder` vs `application/x-formforge-designer`) — the architecture explicitly keeps DnD contexts isolated, and a shared MIME would let a designer-canvas drag accidentally drop on a menu row.
-    - `onDragOver`: read `e.dataTransfer.types` (NOT `getData` — that's protected during dragover per WHATWG); `if (!e.dataTransfer.types.includes('application/x-formforge-menu-reorder')) return;` to filter, then `e.preventDefault()` to mark the row as a valid drop target. Also check parent scope: store the dragged item's parentId in a `dragSourceParentIdRef` (set in `onDragStart`) and reject in `onDragOver` if the hover target's `parentId !== dragSourceParentIdRef.current`. This implements the AC-2 client-side scope rejection.
+    - `onDragStart`: `e.dataTransfer.setData('application/x-appforge-menu-reorder', JSON.stringify({ id: row.id, parentId: row.parentId ?? null }))` and `e.dataTransfer.effectAllowed = 'move'`. **Use a different MIME type from the designer canvas** (`application/x-appforge-menu-reorder` vs `application/x-appforge-designer`) — the architecture explicitly keeps DnD contexts isolated, and a shared MIME would let a designer-canvas drag accidentally drop on a menu row.
+    - `onDragOver`: read `e.dataTransfer.types` (NOT `getData` — that's protected during dragover per WHATWG); `if (!e.dataTransfer.types.includes('application/x-appforge-menu-reorder')) return;` to filter, then `e.preventDefault()` to mark the row as a valid drop target. Also check parent scope: store the dragged item's parentId in a `dragSourceParentIdRef` (set in `onDragStart`) and reject in `onDragOver` if the hover target's `parentId !== dragSourceParentIdRef.current`. This implements the AC-2 client-side scope rejection.
     - `onDrop`: read `e.dataTransfer.getData(MIME)` (now safe), compute insertion index from where the drop happened (above-midpoint vs below-midpoint of the target row), splice the dragged item from the draft array and insert at the new index, then reassign `order = i` for every item (0-based sequential — gaps in `order` are permitted per Story 4.1 AC-4 but unnecessary here).
     - `onDragEnd`: clear `dragSourceParentIdRef`.
   - [x] Save button → `reorderMutation.mutate(draft.map((row, i) => ({ id: row.id, order: i })))`.
@@ -377,20 +377,20 @@ And this story implements only the invalidation hook + endpoint; the cache TTL i
 
 The `menus.sort_order` column exists from the Story 4.1 migration (`20260524054931_CreateMenusAndMenuRoleAssignments.cs`):
 - `sort_order INT NOT NULL DEFAULT 0`
-- Index `idx_menus_sort_order` on `(sort_order)` — accelerates the `ORDER BY sort_order ASC` query in `GetMenusAsync` ([Source: src/FormForge.Api/Infrastructure/Persistence/Migrations/20260524054931_CreateMenusAndMenuRoleAssignments.cs:75-77])
-- Column name is `sort_order` (not `order`) because `order` is a PostgreSQL reserved keyword — this is documented in `FormForgeDbContext.OnModelCreating` line 170. The C# property is `Menu.Order : int`. **JSON wire shape is `order`** (the camelCased property name) — confirmed by the existing `MenuResponse.Order`, `MenuListItem.Order`, and the Story 4.4 round-trip assertions.
+- Index `idx_menus_sort_order` on `(sort_order)` — accelerates the `ORDER BY sort_order ASC` query in `GetMenusAsync` ([Source: src/AppForge.Api/Infrastructure/Persistence/Migrations/20260524054931_CreateMenusAndMenuRoleAssignments.cs:75-77])
+- Column name is `sort_order` (not `order`) because `order` is a PostgreSQL reserved keyword — this is documented in `AppForgeDbContext.OnModelCreating` line 170. The C# property is `Menu.Order : int`. **JSON wire shape is `order`** (the camelCased property name) — confirmed by the existing `MenuResponse.Order`, `MenuListItem.Order`, and the Story 4.4 round-trip assertions.
 
 The existing `idx_menus_sort_order` index is single-column and unfiltered. After this story, the hot query becomes `WHERE parent_id IS NULL ORDER BY sort_order, id` (or `WHERE parent_id = ? ORDER BY sort_order, id`). A composite index on `(parent_id, sort_order)` would optimize this — **but do not add it in this story**. Reasons: (1) Story 4.7 will profile the navbar query and decide; (2) the practical menu count is small (single-digit top-level, low-double-digit per parent in v1); (3) two single-column indexes are already in place. Note it in the deferred section if you observe a regression in the integration tests' query plans (run `EXPLAIN` against a real query if curious).
 
 ### Backend File Locations (Story 4.4 Conventions)
 
-- DTO: `src/FormForge.Api/Features/Menus/Dtos/ReorderMenusRequest.cs`
-- Validator: `src/FormForge.Api/Features/Menus/Validators/ReorderMenusRequestValidator.cs`
-- Service additions: extend `src/FormForge.Api/Features/Menus/MenuService.cs` (new outcome enum, result record, interface method, implementation)
-- Endpoint: extend `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` (new `MapPut("/reorder", …)` registration + handler)
-- Validator registration: `src/FormForge.Api/Program.cs` line ~135 (next to existing menu validators)
+- DTO: `src/AppForge.Api/Features/Menus/Dtos/ReorderMenusRequest.cs`
+- Validator: `src/AppForge.Api/Features/Menus/Validators/ReorderMenusRequestValidator.cs`
+- Service additions: extend `src/AppForge.Api/Features/Menus/MenuService.cs` (new outcome enum, result record, interface method, implementation)
+- Endpoint: extend `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` (new `MapPut("/reorder", …)` registration + handler)
+- Validator registration: `src/AppForge.Api/Program.cs` line ~135 (next to existing menu validators)
 
-The `MenuAdminEndpoints.MapMenuAdminEndpoints` extension is wired into `/api/admin/menus` by `AdminEndpoints.MapAdminEndpoints` at line 16 of `src/FormForge.Api/Features/Roles/AdminEndpoints.cs` — confirmed registered. No new top-level route group needed.
+The `MenuAdminEndpoints.MapMenuAdminEndpoints` extension is wired into `/api/admin/menus` by `AdminEndpoints.MapAdminEndpoints` at line 16 of `src/AppForge.Api/Features/Roles/AdminEndpoints.cs` — confirmed registered. No new top-level route group needed.
 
 ### Service Implementation Pattern — Mirror Story 4.4 (`AssignMenuRolesAsync`)
 
@@ -429,7 +429,7 @@ This is the **opposite** of the form-save / role-assignment pattern (pessimistic
 ### Native HTML5 DnD Pattern — Adapt from `DesignerCanvas.tsx`
 
 The designer canvas's DnD pipeline at `web/src/components/designer/DesignerCanvas.tsx` and `web/src/components/designer/dnd.ts` is the project's reference implementation. Adapt these patterns:
-- **MIME-based filtering** to prevent foreign drags (palette → canvas vs reorder → menu list). Use a new MIME `application/x-formforge-menu-reorder` — do NOT reuse `application/x-formforge-designer`.
+- **MIME-based filtering** to prevent foreign drags (palette → canvas vs reorder → menu list). Use a new MIME `application/x-appforge-menu-reorder` — do NOT reuse `application/x-appforge-designer`.
 - **`types` check during `dragover`** (NOT `getData` — that's protected during dragover per WHATWG; only available on `drop`).
 - **`e.preventDefault()` in `dragover`** to mark the element as a valid drop target.
 - **Explicit `<DropZone>` elements between rows** — optional for menu reorder since rows are dense. The simpler approach is "drop on row → above-midpoint inserts before, below-midpoint inserts after". The designer pattern is more complex because containers nest; menu rows are flat per scope.
@@ -458,7 +458,7 @@ Pass translated announcement strings via `t(…)` — the hook is i18n-agnostic 
 
 The AC literal wording is `[{ id, order }]` (top-level JSON array). The implementation deviates to `{ "items": [{ id, order }] }` for three reasons:
 
-1. **FluentValidation registration target**: `IValidator<List<ReorderMenuItem>>` is technically registrable but awkward — the existing validation pipeline at `src/FormForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs:9` is typed `ValidationFilter<T> where T : class`, and `List<T>` is a class but not a domain-modelled one. Every other endpoint in the codebase uses a named DTO record. Inconsistency here would diverge for no benefit.
+1. **FluentValidation registration target**: `IValidator<List<ReorderMenuItem>>` is technically registrable but awkward — the existing validation pipeline at `src/AppForge.Api/Common/Endpoints/EndpointFilters/ValidationFilter.cs:9` is typed `ValidationFilter<T> where T : class`, and `List<T>` is a class but not a domain-modelled one. Every other endpoint in the codebase uses a named DTO record. Inconsistency here would diverge for no benefit.
 
 2. **Forward compatibility**: adding a `cause: "drag" | "keyboard"` (observability), `version: int` (optimistic concurrency), or `dryRun: bool` (validation-only) field later is a non-breaking change to an envelope; it would be a breaking change to a raw array.
 
@@ -551,7 +551,7 @@ Distilled from `_bmad-output/implementation-artifacts/4-4-assign-roles-to-menu-i
 - Backend: `dotnet build` clean, `dotnet test` 100% pass — record actual count (expect ~284). Run from `src/` directory.
 - Frontend: `npm run build` (Vite + `tsc --noEmit`) clean, `npm run test` 100% pass — record actual count (expect ~80).
 - Lint: `npm run lint` — expect 32 errors baseline (Story 4.4 close). +1-2 additional `react-refresh/only-export-components` from new co-located components is acceptable per convention. Do **not** add new lint suppressions; surface deltas.
-- Manual smoke (if Docker is available locally): start Postgres + MinIO via Aspire, run `dotnet run` on `FormForge.Api`, hit `https://localhost:5001/openapi/v1.json` to confirm the new `PUT /api/admin/menus/reorder` route shows up with `204` + `422` documented.
+- Manual smoke (if Docker is available locally): start Postgres + MinIO via Aspire, run `dotnet run` on `AppForge.Api`, hit `https://localhost:5001/openapi/v1.json` to confirm the new `PUT /api/admin/menus/reorder` route shows up with `204` + `422` documented.
 
 ### Project Structure Notes
 
@@ -574,12 +574,12 @@ This matches the architecture's "Module / Feature Folder Structure" (Decision 4.
 - Story 3.10 `useKeyboardDnD` hook (reuse target): `web/src/components/designer/useKeyboardDnD.ts`
 - Story 4.4 patch playbook (reference for all defensive patterns): `_bmad-output/implementation-artifacts/4-4-assign-roles-to-menu-item.md` (Review Findings section)
 - Native HTML5 DnD reference implementation: `web/src/components/designer/DesignerCanvas.tsx` + `web/src/components/designer/dnd.ts`
-- Menu domain entity: `src/FormForge.Api/Domain/Entities/Menu.cs`
-- Menu service contract (extend this): `src/FormForge.Api/Features/Menus/MenuService.cs`
-- Menu admin endpoints (extend this): `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs`
-- Menu cache contract (call `InvalidateAsync`): `src/FormForge.Api/Features/Menus/MenuCache.cs`
-- Story 4.1 migration (no migration needed in 4.5): `src/FormForge.Api/Infrastructure/Persistence/Migrations/20260524054931_CreateMenusAndMenuRoleAssignments.cs`
-- DbContext entity config (column name `sort_order` rationale): `src/FormForge.Api/Infrastructure/Persistence/FormForgeDbContext.cs:164-184`
+- Menu domain entity: `src/AppForge.Api/Domain/Entities/Menu.cs`
+- Menu service contract (extend this): `src/AppForge.Api/Features/Menus/MenuService.cs`
+- Menu admin endpoints (extend this): `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs`
+- Menu cache contract (call `InvalidateAsync`): `src/AppForge.Api/Features/Menus/MenuCache.cs`
+- Story 4.1 migration (no migration needed in 4.5): `src/AppForge.Api/Infrastructure/Persistence/Migrations/20260524054931_CreateMenusAndMenuRoleAssignments.cs`
+- DbContext entity config (column name `sort_order` rationale): `src/AppForge.Api/Infrastructure/Persistence/AppForgeDbContext.cs:164-184`
 - Existing menu admin route page (extend this): `web/src/routes/_app/admin/menus.tsx`
 - Existing menu detail page (extend `SubMenusSection`): `web/src/routes/_app/admin/menus.$menuId.tsx`
 - Existing mutations module (extend this): `web/src/features/admin/menus/menuAdminMutations.ts`
@@ -622,14 +622,14 @@ claude-opus-4-7[1m]
 ### File List
 
 **Backend (new):**
-- `src/FormForge.Api/Features/Menus/Dtos/ReorderMenusRequest.cs` (new)
-- `src/FormForge.Api/Features/Menus/Validators/ReorderMenusRequestValidator.cs` (new)
+- `src/AppForge.Api/Features/Menus/Dtos/ReorderMenusRequest.cs` (new)
+- `src/AppForge.Api/Features/Menus/Validators/ReorderMenusRequestValidator.cs` (new)
 
 **Backend (modified):**
-- `src/FormForge.Api/Features/Menus/MenuService.cs` — added `ReorderMenusOutcome` enum, `ReorderMenusResult` record, `IMenuService.ReorderMenusAsync` signature, and the implementation.
-- `src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs` — added `PUT /reorder` route registration and `ReorderMenusHandler` private static method.
-- `src/FormForge.Api/Program.cs` — registered `IValidator<ReorderMenusRequest>` next to the other menu validators.
-- `src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — added 12 Story 4.5 tests in a new `// ---------- PUT /api/admin/menus/reorder (Story 4.5) ----------` block.
+- `src/AppForge.Api/Features/Menus/MenuService.cs` — added `ReorderMenusOutcome` enum, `ReorderMenusResult` record, `IMenuService.ReorderMenusAsync` signature, and the implementation.
+- `src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs` — added `PUT /reorder` route registration and `ReorderMenusHandler` private static method.
+- `src/AppForge.Api/Program.cs` — registered `IValidator<ReorderMenusRequest>` next to the other menu validators.
+- `src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs` — added 12 Story 4.5 tests in a new `// ---------- PUT /api/admin/menus/reorder (Story 4.5) ----------` block.
 
 **Frontend (new):**
 - `web/src/features/admin/menus/ReorderableMenuList.tsx` (new) — outer (data-fetch + key-remount) and inner (draft state + pointer/keyboard DnD + save) components.
@@ -656,15 +656,15 @@ claude-opus-4-7[1m]
 - [x] [Review][Patch] P2 — Keyboard ArrowDown/ArrowUp announces `row.name` from the event-target `<li>` instead of the picked item's name. When focus has moved to a different row while an item is picked up, the announcement says the wrong item name. Fixed: `draft.find(m => m.id === picked.id)?.name ?? row.name` [`web/src/features/admin/menus/ReorderableMenuList.tsx`]
 - [x] [Review][Patch] P3 — Sub-menu reorder fetched `useMenusAdminQuery(1, 256)` (global all-menus, no parentId filter) and filtered client-side. If total system menus > 256, sub-menus whose parent sorts after global position 256 are silently absent. Fixed: `ReorderableMenuList` now routes to `TopLevelReorderList` (uses `useMenusAdminQuery`) or `SubMenuReorderList` (uses `useMenuChildrenQuery(parentId, 1, 256)` — API-level filter). [`web/src/features/admin/menus/ReorderableMenuList.tsx`]
 - [x] [Review][Patch] P4 — `void reorderMutation.mutateAsync(items)` in `onSave` discarded the rejected promise — fired a spurious `unhandledrejection` event even though `onError` handled the rollback and toast. Fixed: `reorderMutation.mutate(items)`. [`web/src/features/admin/menus/ReorderableMenuList.tsx`]
-- [x] [Review][Patch] P5 — `ReorderMenus_OnlyMutatesUpdatedAtOnChangedRows` test asserted `Assert.NotNull(afterB)` — vacuous because `UpdatedAt` is set at creation time. Fixed: added `beforeB` capture before the request and `Assert.NotEqual(beforeB, afterB)` after. [`src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs`]
+- [x] [Review][Patch] P5 — `ReorderMenus_OnlyMutatesUpdatedAtOnChangedRows` test asserted `Assert.NotNull(afterB)` — vacuous because `UpdatedAt` is set at creation time. Fixed: added `beforeB` capture before the request and `Assert.NotEqual(beforeB, afterB)` after. [`src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs`]
 - [x] [Review][Patch] P6 — Save button was not disabled when `kbdDnD.pickedUp !== null`. A failed mutation during active keyboard pickup left the pickup highlight live while the draft reverted. Fixed: `saveDisabled = reorderMutation.isPending || unchanged || kbdDnD.pickedUp !== null`. [`web/src/features/admin/menus/ReorderableMenuList.tsx`]
 
 ### Deferred
 
 - [x] [Review][Defer] W1 — `useEffect` dependency includes `kbdDnD.insertedIdRef` (a stable ref object, not its `.current`) — works correctly as long as `useKeyboardDnD.commit()` writes `insertedIdRef.current` synchronously before calling `setPickedUp(null)`; tied to hook internals, not a Story 4.5 regression. [`web/src/features/admin/menus/ReorderableMenuList.tsx:720`] — deferred, pre-existing coupling to hook internals
-- [x] [Review][Defer] W2 — `request.Items!` null-forgiving operator in `ReorderMenusHandler` — if the validation filter is misconfigured, service's `ArgumentNullException.ThrowIfNull` produces a 500. Established pattern matching `AssignRolesHandler`. [`src/FormForge.Api/Features/Menus/MenuAdminEndpoints.cs:421`] — deferred, pre-existing codebase pattern
+- [x] [Review][Defer] W2 — `request.Items!` null-forgiving operator in `ReorderMenusHandler` — if the validation filter is misconfigured, service's `ArgumentNullException.ThrowIfNull` produces a 500. Established pattern matching `AssignRolesHandler`. [`src/AppForge.Api/Features/Menus/MenuAdminEndpoints.cs:421`] — deferred, pre-existing codebase pattern
 - [x] [Review][Defer] W3 — `onMutate` optimistic update touches all `['admin', 'menus', ...]` cache entries including child-scoped queries for unrelated parentIds; `onSettled` invalidation corrects any drift. [`web/src/features/admin/menus/menuAdminMutations.ts:104`] — deferred, design choice; onSettled corrects
-- [x] [Review][Defer] W4 — `ReorderMenus_TopLevelScope_PersistsNewOrder` asserts `body.Total == 3` — fragile if DB not isolated per test, but consistent with the existing test fixture patterns for this suite. [`src/FormForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs:67`] — deferred, pre-existing fixture pattern
+- [x] [Review][Defer] W4 — `ReorderMenus_TopLevelScope_PersistsNewOrder` asserts `body.Total == 3` — fragile if DB not isolated per test, but consistent with the existing test fixture patterns for this suite. [`src/AppForge.Api.Tests/Features/Menus/MenuIntegrationTests.cs:67`] — deferred, pre-existing fixture pattern
 
 ## Change Log
 
@@ -672,4 +672,4 @@ claude-opus-4-7[1m]
 |------------|---------------------------------------------------------------------------------------------------------------|----------|
 | 2026-05-25 | Story 4.5 created via `bmad-create-story`. Status → ready-for-dev. Comprehensive context bundle for the dev agent: backend reorder endpoint shape + validator defensive ordering + race-window catches; frontend optimistic mutation with cache rollback + native HTML5 DnD pattern adapted from DesignerCanvas + `useKeyboardDnD` hook reuse + scope-confinement client gate + i18n keys. Distilled Story 4.4 review patches into "Previous-Story Intelligence" section so the defensive patterns (MaxItems-before-Distinct, 23503/23505 catches, invalidIds JsonDocument assertions, re-sync local draft on refetch) apply proactively. | claude-opus-4-7 |
 | 2026-05-25 | Story 4.5 code review via `bmad-code-review`. D1 (ReorderableMenuList file location) ratified as authorized tactical deviation. 6 patches applied: P1 fingerprint now includes order values; P2 ArrowDown announcement uses picked item's name not event-target row's name; P3 sub-menu scope switched from global all-menus query + client filter to `useMenuChildrenQuery(parentId, 1, 256)` (API-level filter, avoids >256-menu truncation); P4 `mutateAsync` → `mutate` to avoid spurious unhandledrejection; P5 test assertion strengthened to `Assert.NotEqual(beforeB, afterB)`; P6 Save disabled while keyboard pickup active. 4 deferred. Status → done. | claude-sonnet-4-6 |
-| 2026-05-25 | Story 4.5 implemented via `bmad-dev-story`. Backend: `PUT /api/admin/menus/reorder` accepts `{ items: [{ id, order }] }` envelope (validator + DTO + endpoint + `MenuService.ReorderMenusAsync` with scope-invariant check, no-op UpdatedAt-on-unchanged, 23503/23505 → Conflict catches, `cache.InvalidateAsync` post-save). Frontend: `useReorderMenusMutation` with optimistic cache write + per-`code` error toasts + onSettled refetch, shared `ReorderableMenuList` component using native HTML5 DnD (new MIME `application/x-formforge-menu-reorder` isolated from designer-canvas) + `useKeyboardDnD` hook reused unmodified per Story 3.10 AC-6 contract. Outer/inner component split with `key={fingerprint(serverList)}` to satisfy `react-hooks/set-state-in-effect` (key-remount variant from Story 4.4 P6). 16 new i18n keys. 12 new backend integration tests (Unauthenticated/AsNonAdmin/TopLevelScope/SubMenuScope/MixedScopes/UnknownId/EmptyItems/DuplicateIds/TooManyItems/LiteralSegmentDoesNotCollideWithIdRoute/DoesNotMutateUpdatedAtOnUnchangedRows/OnlyMutatesUpdatedAtOnChangedRows). 6 new frontend smoke tests (render order, save-disabled, drag-drop payload, cross-scope rejection, keyboard pickup-move-commit, Escape cancel). Backend 286/286; frontend 84/84; lint 32 baseline preserved (0 net new); TypeScript clean; production build clean (ReorderableMenuList chunk 6.63 kB / gzipped 2.58 kB; menus._menuId 12.23 → 13.85 kB / 3.28 → 3.69 kB). Status → review. | claude-opus-4-7 |
+| 2026-05-25 | Story 4.5 implemented via `bmad-dev-story`. Backend: `PUT /api/admin/menus/reorder` accepts `{ items: [{ id, order }] }` envelope (validator + DTO + endpoint + `MenuService.ReorderMenusAsync` with scope-invariant check, no-op UpdatedAt-on-unchanged, 23503/23505 → Conflict catches, `cache.InvalidateAsync` post-save). Frontend: `useReorderMenusMutation` with optimistic cache write + per-`code` error toasts + onSettled refetch, shared `ReorderableMenuList` component using native HTML5 DnD (new MIME `application/x-appforge-menu-reorder` isolated from designer-canvas) + `useKeyboardDnD` hook reused unmodified per Story 3.10 AC-6 contract. Outer/inner component split with `key={fingerprint(serverList)}` to satisfy `react-hooks/set-state-in-effect` (key-remount variant from Story 4.4 P6). 16 new i18n keys. 12 new backend integration tests (Unauthenticated/AsNonAdmin/TopLevelScope/SubMenuScope/MixedScopes/UnknownId/EmptyItems/DuplicateIds/TooManyItems/LiteralSegmentDoesNotCollideWithIdRoute/DoesNotMutateUpdatedAtOnUnchangedRows/OnlyMutatesUpdatedAtOnChangedRows). 6 new frontend smoke tests (render order, save-disabled, drag-drop payload, cross-scope rejection, keyboard pickup-move-commit, Escape cancel). Backend 286/286; frontend 84/84; lint 32 baseline preserved (0 net new); TypeScript clean; production build clean (ReorderableMenuList chunk 6.63 kB / gzipped 2.58 kB; menus._menuId 12.23 → 13.85 kB / 3.28 → 3.69 kB). Status → review. | claude-opus-4-7 |

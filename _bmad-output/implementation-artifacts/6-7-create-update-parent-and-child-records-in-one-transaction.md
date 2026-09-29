@@ -109,7 +109,7 @@ The 201 (POST) and 200 (PUT) response bodies contain the parent record only, wit
 ## Tasks / Subtasks
 
 - [x] **Task 1 — Add `BuildChildInsertQuery` to `DynamicQueryBuilder.cs`** (AC: 1, 3, 5, 7, 15)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs`
   - Add after `BuildRestoreCascadeChildrenQuery` (last method before `BuildFkColumnName`):
 
   ```csharp
@@ -174,18 +174,18 @@ The 201 (POST) and 200 (PUT) response bodies contain the parent record only, wit
   ```
 
 - [x] **Task 2 — Create `RepeaterWriteCoordinator.cs`** (AC: 1, 3–7, 9–13, 15)
-  - [x] Create `src/FormForge.Api/Features/DynamicCrud/RepeaterWriteCoordinator.cs`
+  - [x] Create `src/AppForge.Api/Features/DynamicCrud/RepeaterWriteCoordinator.cs`
 
   ```csharp
   using System.Text.Json;
   using Dapper;
-  using FormForge.Api.Common;
-  using FormForge.Api.Features.Designer;
-  using FormForge.Api.Features.SchemaRegistry;
+  using AppForge.Api.Common;
+  using AppForge.Api.Features.Designer;
+  using AppForge.Api.Features.SchemaRegistry;
   using Microsoft.AspNetCore.Http;
   using Npgsql;
 
-  namespace FormForge.Api.Features.DynamicCrud;
+  namespace AppForge.Api.Features.DynamicCrud;
 
   // Story 6.7 — orchestrates transactional nested writes for POST and PUT
   // /api/data/{parentDesignerId}[/{id}] when the payload includes a `children` key.
@@ -451,7 +451,7 @@ The 201 (POST) and 200 (PUT) response bodies contain the parent record only, wit
   ```
 
 - [x] **Task 3 — Extend `CreateRecordHandler` in `DynamicDataEndpoints.cs`** (AC: 1–3, 9–11, 13–16)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
 
   **3a — Add `Problems.ChildNotFound()` to the `Problems` inner class** (after `RecordNotDeleted()`):
   ```csharp
@@ -609,7 +609,7 @@ The 201 (POST) and 200 (PUT) response bodies contain the parent record only, wit
   **Important:** The `conn` returned by `connectionFactory.CreateOpenConnectionAsync` is a `NpgsqlConnection` at runtime (see Dev Notes §1). Cast is needed only for `BeginTransactionAsync`. Follow the same pattern as `RestoreRecordHandler`/`DeleteRecordHandler`.
 
 - [x] **Task 4 — Extend `UpdateRecordHandler` in `DynamicDataEndpoints.cs`** (AC: 4–8, 12–16)
-  - [x] Modify `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
+  - [x] Modify `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs`
 
   **Structure change in `UpdateRecordHandler`:** after the parent-level payload validation and before the DB section, add the same children extraction + schema loading + child payload validation block (same pattern as Task 3 above).
 
@@ -795,7 +795,7 @@ The 201 (POST) and 200 (PUT) response bodies contain the parent record only, wit
   ```
 
 - [x] **Task 5 — Unit tests for `BuildChildInsertQuery`** (AC: 1, 5, 15)
-  - [x] Modify `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
+  - [x] Modify `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs`
   - Add 2 unit tests after the `BuildRestoreCascadeChildrenQuery` region:
 
   ```csharp
@@ -860,7 +860,7 @@ The 201 (POST) and 200 (PUT) response bodies contain the parent record only, wit
   Estimated: +2 unit tests → running total ~504
 
 - [x] **Task 6 — Create `RepeaterWriteIntegrationTests.cs`** (AC: 1–16)
-  - [x] Create `src/FormForge.Api.Tests/Features/DynamicCrud/RepeaterWriteIntegrationTests.cs`
+  - [x] Create `src/AppForge.Api.Tests/Features/DynamicCrud/RepeaterWriteIntegrationTests.cs`
   - Class signature: `[Collection("DynamicCrudTests")] public sealed class RepeaterWriteIntegrationTests : IClassFixture<PostgresFixture>, IAsyncLifetime`
   - `InitializeAsync`/`DisposeAsync`: **copy verbatim** from `SoftDeleteIntegrationTests` (same TRUNCATE statement including `mutation_audit_log`, same dynamic-table DROP loop, same `ReseedSystemRolesAsync`+`SeedTestUsersAsync`)
   - Copy all helpers from `SoftDeleteIntegrationTests`: `LoginAsync`, `PostRecordAsync`, `CreateRecordAndGetIdAsync`, `GetRecordAsync`, `CreateMenuViaApiAsync`, `CreateDesignerViaApiAsync`, `PutVersionStatusAsync`, `CreateAndPublishDesignerWithFieldsAsync`, `PutBindingAsync`, `PollUntilTerminalAsync`, `InsertParentRowAsync`, `InsertChildRowAsync`, `GetUserIdFromToken`
@@ -1066,8 +1066,8 @@ The `SchemaRegistryEntry` constructor takes `(string designerId, int version, IR
 
 | File | Path |
 |---|---|
-| `RepeaterWriteCoordinator.cs` | `src/FormForge.Api/Features/DynamicCrud/RepeaterWriteCoordinator.cs` |
-| `RepeaterWriteIntegrationTests.cs` | `src/FormForge.Api.Tests/Features/DynamicCrud/RepeaterWriteIntegrationTests.cs` |
+| `RepeaterWriteCoordinator.cs` | `src/AppForge.Api/Features/DynamicCrud/RepeaterWriteCoordinator.cs` |
+| `RepeaterWriteIntegrationTests.cs` | `src/AppForge.Api.Tests/Features/DynamicCrud/RepeaterWriteIntegrationTests.cs` |
 
 ### File locations — modified files
 
@@ -1081,7 +1081,7 @@ The `SchemaRegistryEntry` constructor takes `(string designerId, int version, IR
 | `useCreateRecord.ts` | Update `mutationFn` param type to `RecordPayloadWithChildren` |
 | `useUpdateRecord.ts` | Update `mutationFn` param type to `RecordPayloadWithChildren` |
 
-No new EF migration. No changes to: `SoftDeleteCascade.cs`, `DynamicPayloadValidator.cs`, `DynamicRecord.cs`, `DynamicRecordJsonConverter.cs`, `Program.cs`, `MutationAuditLogEntry.cs`, `FormForgeDbContext.cs`.
+No new EF migration. No changes to: `SoftDeleteCascade.cs`, `DynamicPayloadValidator.cs`, `DynamicRecord.cs`, `DynamicRecordJsonConverter.cs`, `Program.cs`, `MutationAuditLogEntry.cs`, `AppForgeDbContext.cs`.
 
 ---
 
@@ -1124,7 +1124,7 @@ Opus 4.7 (1M context) via `/bmad-dev-story` skill.
 - Initial backend build: 0 warnings / 0 errors.
 - Unit tests: `dotnet test --filter "FullyQualifiedName~DynamicQueryBuilderTests"` → 41/41 passing (2 new for `BuildChildInsertQuery`).
 - Integration tests: `dotnet test --filter "FullyQualifiedName~RepeaterWriteIntegrationTests"` → 10/10 passing.
-- Full backend suite: `dotnet test src/FormForge.Api.Tests/FormForge.Api.Tests.csproj` → 514/514 passing (was 502 prior to this story).
+- Full backend suite: `dotnet test src/AppForge.Api.Tests/AppForge.Api.Tests.csproj` → 514/514 passing (was 502 prior to this story).
 - Frontend type-check: `npx tsc --noEmit` exit 0.
 
 ### Completion Notes List
@@ -1155,11 +1155,11 @@ Opus 4.7 (1M context) via `/bmad-dev-story` skill.
 
 ### File List
 
-- **NEW** `src/FormForge.Api/Features/DynamicCrud/RepeaterWriteCoordinator.cs`
-- **NEW** `src/FormForge.Api.Tests/Features/DynamicCrud/RepeaterWriteIntegrationTests.cs`
-- **MODIFIED** `src/FormForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs` — added `BuildChildInsertQuery`.
-- **MODIFIED** `src/FormForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` — extended `CreateRecordHandler`, extended `UpdateRecordHandler`, added shared `TryLoadChildSchemasAsync` helper, added `Problems.ChildNotFound()`.
-- **MODIFIED** `src/FormForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` — 2 unit tests for `BuildChildInsertQuery`.
+- **NEW** `src/AppForge.Api/Features/DynamicCrud/RepeaterWriteCoordinator.cs`
+- **NEW** `src/AppForge.Api.Tests/Features/DynamicCrud/RepeaterWriteIntegrationTests.cs`
+- **MODIFIED** `src/AppForge.Api/Features/DynamicCrud/DynamicQueryBuilder.cs` — added `BuildChildInsertQuery`.
+- **MODIFIED** `src/AppForge.Api/Features/DynamicCrud/DynamicDataEndpoints.cs` — extended `CreateRecordHandler`, extended `UpdateRecordHandler`, added shared `TryLoadChildSchemasAsync` helper, added `Problems.ChildNotFound()`.
+- **MODIFIED** `src/AppForge.Api.Tests/Features/DynamicCrud/DynamicQueryBuilderTests.cs` — 2 unit tests for `BuildChildInsertQuery`.
 - **MODIFIED** `web/src/features/data-entry/createRecordApi.ts` — added `ChildRecordPayload`, `RecordPayloadWithChildren`, updated `createRecord` signature.
 - **MODIFIED** `web/src/features/data-entry/updateRecordApi.ts` — re-uses `RecordPayloadWithChildren`.
 - **MODIFIED** `web/src/features/data-entry/useCreateRecord.ts` — `mutationFn` typed with `RecordPayloadWithChildren`.
@@ -1167,8 +1167,8 @@ Opus 4.7 (1M context) via `/bmad-dev-story` skill.
 
 ### Review Findings
 
-- [x] [Review][Patch] AC-13 audit test: missing row-count assertion and SQL operator-precedence bug in `Put_WithChildren_AuditLog_AllOperationsRecorded` [`src/FormForge.Api.Tests/Features/DynamicCrud/RepeaterWriteIntegrationTests.cs`]
-- [x] [Review][Patch] AC-8 backward-compat: no PUT-without-children test exercises the new `hasChildren=false` branch in the 6.7 `UpdateRecordHandler` extension [`src/FormForge.Api.Tests/Features/DynamicCrud/RepeaterWriteIntegrationTests.cs`]
+- [x] [Review][Patch] AC-13 audit test: missing row-count assertion and SQL operator-precedence bug in `Put_WithChildren_AuditLog_AllOperationsRecorded` [`src/AppForge.Api.Tests/Features/DynamicCrud/RepeaterWriteIntegrationTests.cs`]
+- [x] [Review][Patch] AC-8 backward-compat: no PUT-without-children test exercises the new `hasChildren=false` branch in the 6.7 `UpdateRecordHandler` extension [`src/AppForge.Api.Tests/Features/DynamicCrud/RepeaterWriteIntegrationTests.cs`]
 - [x] [Review][Defer] Child UPDATE 0-rowsAffected silently swallowed in `UpsertAndPruneChildrenAsync` — pre-existing deferred item #7
 - [x] [Review][Defer] Pre-flight child-ID SELECT TOCTOU (SELECT→UPDATE race in `UpdateRecordHandler`) — pre-existing deferred item #2
 - [x] [Review][Defer] No integration test for AC-11 TABLE_NOT_PROVISIONED via child designer — pre-existing deferred item #9

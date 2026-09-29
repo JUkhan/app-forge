@@ -1,5 +1,5 @@
 {
   "appHost": {
-    "path": "src/FormForge.AppHost/FormForge.AppHost.csproj"
+    "path": "src/AppForge.AppHost/AppForge.AppHost.csproj"
   }
 }
