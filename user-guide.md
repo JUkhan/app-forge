@@ -1,4 +1,4 @@
-# FormForge User Guide
+# AppForge User Guide
 
 **Version 1.3 · June 2026**
 
@@ -93,9 +93,37 @@
 
 ## 1. Introduction
 
-**FormForge** is a low-code application builder that lets administrators and power-users create data-entry forms, organise them into menus, control who can see and use each form, and work with the resulting data — all without writing database schemas or backend code by hand.
+# AppForge
 
-**What FormForge does for you:**
+### **Forge Business Ideas into Powerful Applications.**
+
+AppForge is a no-code application development platform that empowers you to visually build complete, data-driven business applications — from user experiences and data models to dashboards, permissions, and deployment — without writing a single line of code.
+
+Visually design application interfaces, automatically provision database structures, manage relationships, and create powerful CRUD experiences without repetitive development.
+
+Build reusable datasets and transform your business data into interactive tables, charts, and dashboards.
+
+Model complex business scenarios using relational components, repeaters, tree views, cascading selections, and configurable data sources.
+
+Control exactly who can access applications and what they can do through role-based permissions.
+
+Safely evolve applications with version management while maintaining control over your underlying data structures.
+
+Protect data quality with validation, database constraints, auditing, and administrative controls.
+
+Manage applications, users, roles, menus, datasets, schemas, and security from one centralized platform.
+
+AppForge bridges the gap between **business requirements and production-ready internal applications**.
+
+Instead of repeatedly building forms, CRUD APIs, database tables, permissions, dashboards, and administration screens from scratch, focus on what makes your application unique.
+
+Whether you're building an inventory system, CRM, approval application, operational dashboard, data-management tool, or another internal business solution, AppForge gives you the foundation.
+
+**Design visually. Model your data. Build faster. Evolve safely.**
+
+### **AppForge — Build applications, not boilerplate.**
+
+**What AppForge does for you:**
 
 | Capability | Description |
 |---|---|
@@ -120,21 +148,21 @@ This guide is written for **platform administrators** who configure the system a
 
 ![Sign In screen](docs/screenshots/01-login.png)
 
-1. Open the FormForge URL provided by your administrator.
+1. Open the AppForge URL provided by your administrator.
 2. Enter your **email address** and **password** on the login screen.
 3. Click **Sign in**.
 
-When an administrator creates your account, FormForge sends you a **welcome email** containing your email address, a temporary password, and a link to the login page. Sign in with the temporary password, then change it to one of your own from **Account Settings** (see [Section 13.1](#131-changing-your-password)).
+When an administrator creates your account, AppForge sends you a **welcome email** containing your email address, a temporary password, and a link to the login page. Sign in with the temporary password, then change it to one of your own from **Account Settings** (see [Section 13.1](#131-changing-your-password)).
 
-> **Session management:** Your session is kept alive automatically for as long as you remain active. If you close the browser and return later, FormForge silently refreshes your session in the background — including when you return to a tab that has been idle or asleep. If the session cannot be restored (e.g. after a long period of inactivity), you are redirected to the login page and returned to where you were after signing in again.
+> **Session management:** Your session is kept alive automatically for as long as you remain active. If you close the browser and return later, AppForge silently refreshes your session in the background — including when you return to a tab that has been idle or asleep. If the session cannot be restored (e.g. after a long period of inactivity), you are redirected to the login page and returned to where you were after signing in again.
 
 ### Two-Factor Authentication at Login
 
-If you have enabled two-factor authentication (MFA) on your account, FormForge prompts you for a second factor **after** your email and password are accepted:
+If you have enabled two-factor authentication (MFA) on your account, AppForge prompts you for a second factor **after** your email and password are accepted:
 
 1. Enter your email and password and click **Sign in** as usual.
 2. A **Two-factor authentication** screen appears with an **Authentication code** field.
-3. Open your authenticator app (e.g. Google Authenticator, Authy), read the current 6-digit code for FormForge, and enter it.
+3. Open your authenticator app (e.g. Google Authenticator, Authy), read the current 6-digit code for AppForge, and enter it.
 4. Click **Verify**. On success you are signed in and taken to your original destination.
 
 **If you don't have your authenticator app:**
@@ -155,7 +183,7 @@ If you can't sign in because you've forgotten your password, you can reset it yo
 
 1. On the login screen, click the **Forgot your password?** link.
 2. On the **Forgot Password** page, enter your email address and click **Send Reset Link**.
-3. FormForge shows: *"If that email is registered, a reset link has been sent. Check your inbox."* For privacy, this same message appears whether or not the email is registered.
+3. AppForge shows: *"If that email is registered, a reset link has been sent. Check your inbox."* For privacy, this same message appears whether or not the email is registered.
 4. Open the email and click the reset link (valid for **1 hour**, single use).
 5. On the **Reset Password** page, enter and confirm a new password (at least 8 characters), then click **Reset Password**.
 6. You are returned to the login screen with a success message. Sign in with your new password.
@@ -244,7 +272,7 @@ Each row shows the designer ID, display name, a **mode badge** (CRUD or VIEW —
 
 5. Click **Create**.
 
-FormForge creates a new schema with **Version 1** in **Draft** status and opens the canvas editor immediately.
+AppForge creates a new schema with **Version 1** in **Draft** status and opens the canvas editor immediately.
 
 > **Important:** The Designer ID cannot be changed after creation. Choose it carefully.
 
@@ -289,7 +317,7 @@ The **form name** is shown at the top of the canvas and is editable inline — c
 
 Click **Save** in the canvas toolbar. If there are unsaved changes, the Save button shows a badge indicator.
 
-FormForge validates field keys before saving:
+AppForge validates field keys before saving:
 - No duplicate field keys within the same schema.
 - No PostgreSQL reserved keywords as field keys.
 
@@ -809,7 +837,7 @@ The embedded form displays all fields from the target designer and allows the us
 
 By default, a CRUD designer's record list reads rows from its own provisioned database table. You can optionally bind a **Custom Dataset** to a specific version so that the list (and its export) reads from the dataset's backing VIEW instead — useful when the VIEW applies joins, computed columns, or business-logic filters that you want to expose in the list without changing the underlying table schema. Create, edit, and delete operations always write to the base table by `id`, so the VIEW does not need to be updatable.
 
-**Convention:** The dataset VIEW must expose one column per field key in the designer plus the record ID as `<designerID>_id` (e.g. `customer_id`). FormForge maps that column back to `id` automatically for update and delete operations.
+**Convention:** The dataset VIEW must expose one column per field key in the designer plus the record ID as `<designerID>_id` (e.g. `customer_id`). AppForge maps that column back to `id` automatically for update and delete operations.
 
 **How to bind a dataset to a version:**
 
@@ -877,17 +905,17 @@ If there are no datasets yet, the list shows *"No datasets yet"* with a prompt t
 3. Choose the **Mode** — **Custom Query** or **Query Builder**.
 4. Then:
    - **Custom Query:** type your `SELECT` statement in the SQL editor (see [Section 5.3](#53-custom-query-mode-sql)) and click **Save**.
-   - **Query Builder:** click **Save** to create the empty dataset first. FormForge reminds you: *"Save the dataset first, then open it to build your query in the visual Query Builder."* Then use **Open Builder** from the list to compose the query (see [Section 5.4](#54-the-visual-query-builder)).
+   - **Query Builder:** click **Save** to create the empty dataset first. AppForge reminds you: *"Save the dataset first, then open it to build your query in the visual Query Builder."* Then use **Open Builder** from the list to compose the query (see [Section 5.4](#54-the-visual-query-builder)).
 
 Switching between modes while editing preserves any SQL you have typed. On success you'll see a *"Dataset created."* confirmation.
 
-> If you choose a name that is already taken, FormForge shows *"A dataset with this name already exists."*
+> If you choose a name that is already taken, AppForge shows *"A dataset with this name already exists."*
 
 ### 5.3 Custom Query Mode (SQL)
 
 In Custom Query mode you write the query directly in a SQL editor (placeholder: `SELECT id, name FROM my_table WHERE …`).
 
-FormForge enforces that the query is **a single, read-only `SELECT`**:
+AppForge enforces that the query is **a single, read-only `SELECT`**:
 
 - Only one statement is allowed.
 - `INSERT`, `UPDATE`, `DELETE`, `SELECT INTO`, and data-modifying CTEs are rejected.
@@ -936,7 +964,7 @@ The following example builds a dataset that joins a `customer` table to an `orde
 
 10. **Preview.** Click **Preview** to run the query and inspect a sample of the results before saving (see [Section 5.5](#55-previewing-query-results)).
 
-11. **Save.** Click **Save**. FormForge validates the query (Left table designated, at least one column selected, all CASE/calculated columns have aliases) and creates or updates the backing database view.
+11. **Save.** Click **Save**. AppForge validates the query (Left table designated, at least one column selected, all CASE/calculated columns have aliases) and creates or updates the backing database view.
 
 #### Validation rules
 
@@ -955,7 +983,7 @@ In either mode, click **Preview** to run the query and see a sample of the resul
 
 Saving a dataset creates (or updates) its backing database **view**. You'll see *"Dataset saved."* on success.
 
-To change a dataset later, use **Edit** (Custom Query) or **Open Builder** (Query Builder) from the list. If someone else changed the dataset since you opened it, FormForge warns: *"This dataset was modified by someone else. Reload to see the latest version."*
+To change a dataset later, use **Edit** (Custom Query) or **Open Builder** (Query Builder) from the list. If someone else changed the dataset since you opened it, AppForge warns: *"This dataset was modified by someone else. Reload to see the latest version."*
 
 ### 5.7 The Dataset Audit Log
 
@@ -977,7 +1005,7 @@ Opening the **Admin → Datasets** page requires the `platform-admin` role. Crea
 
 **[Admin]** Menu management is found under **Admin → Menus**.
 
-Menus organise form links in the sidebar. FormForge supports a two-level hierarchy: **top-level menus** and **sub-menus** (children of a top-level menu). Sub-menus cannot have further children.
+Menus organise form links in the sidebar. AppForge supports a two-level hierarchy: **top-level menus** and **sub-menus** (children of a top-level menu). Sub-menus cannot have further children.
 
 ### 6.1 Viewing the Menu List
 
@@ -1032,7 +1060,7 @@ Sub-menus can also be created from within a top-level menu's detail page:
 
 ### 6.5 Binding a Designer to a Menu
 
-Binding connects a menu item to a form schema and causes FormForge to create the backing database table automatically.
+Binding connects a menu item to a form schema and causes AppForge to create the backing database table automatically.
 
 1. Open the menu detail page.
 2. Scroll to the **Designer Binding** section.
@@ -1148,7 +1176,7 @@ To edit:
 
 ### 7.4 System Roles
 
-FormForge ships with two built-in system roles that cannot be modified or deleted:
+AppForge ships with two built-in system roles that cannot be modified or deleted:
 
 | Role | Description |
 |---|---|
@@ -1230,7 +1258,7 @@ Once a menu item is bound to a published designer and its provisioning status is
 
 ### 9.1 Accessing a Data Form
 
-Click the menu item in the sidebar. FormForge opens the **record list** for that form. The columns shown correspond to the fields defined in the bound designer (and to each field's *Show in table* setting — see [Section 4.12](#412-conditional-visibility-and-field-options)).
+Click the menu item in the sidebar. AppForge opens the **record list** for that form. The columns shown correspond to the fields defined in the bound designer (and to each field's *Show in table* setting — see [Section 4.12](#412-conditional-visibility-and-field-options)).
 
 ### 9.2 Creating a Record
 
@@ -1285,7 +1313,7 @@ Click **Export** on the record list page and choose **CSV**, **Excel**, or **PDF
 
 ![Audit Logs page](docs/screenshots/13-audit-logs.png)
 
-FormForge maintains several audit trails:
+AppForge maintains several audit trails:
 
 | Log type | What it records |
 |---|---|
@@ -1352,7 +1380,7 @@ The constraint is removed from the database immediately. Duplicate values are pe
 
 ### Which columns are available?
 
-Only user-authored columns appear in the column picker. Columns created automatically by FormForge — such as `id`, `created_at`, and tree parent-link columns — are excluded.
+Only user-authored columns appear in the column picker. Columns created automatically by AppForge — such as `id`, `created_at`, and tree parent-link columns — are excluded.
 
 > Constraints can only be configured on CRUD designers that have been provisioned (their database table must exist). VIEW-mode designers and unprovisioned CRUD designers do not appear in the designer dropdown. To provision a table, see [Section 12](#12-table-provisioning).
 
@@ -1362,7 +1390,7 @@ Only user-authored columns appear in the column picker. Columns created automati
 
 **[Admin]** Navigate to **Admin → Table Provisioning**.
 
-Every CRUD designer needs a backing database table before users can create records. Normally, FormForge creates that table automatically when you bind the designer to a menu (see [Section 6.5](#65-binding-a-designer-to-a-menu)). **Table Provisioning** lets an administrator create or re-synchronise that table directly — without needing a menu binding.
+Every CRUD designer needs a backing database table before users can create records. Normally, AppForge creates that table automatically when you bind the designer to a menu (see [Section 6.5](#65-binding-a-designer-to-a-menu)). **Table Provisioning** lets an administrator create or re-synchronise that table directly — without needing a menu binding.
 
 ### When to use direct table provisioning
 
@@ -1382,7 +1410,7 @@ The page shows a searchable, paginated list of all CRUD designers. Use the searc
 | Column | What it shows |
 |---|---|
 | **Component** | The designer's display name (top) and designer ID (bottom, in monospace) |
-| **Table** | The database table name that FormForge will create or has created for this designer |
+| **Table** | The database table name that AppForge will create or has created for this designer |
 | **Status** | **Provisioned** (green) — the table exists. **Not Provisioned** (grey) — no table exists yet. |
 | **Last Provisioned** | The version number and timestamp of the most recent provision or re-sync operation |
 | **Actions** | A version dropdown (showing all published versions) plus a **Provision** or **Re-sync** button |
@@ -1391,7 +1419,7 @@ The page shows a searchable, paginated list of all CRUD designers. Use the searc
 
 1. Find the designer in the list (search if needed).
 2. In the **Actions** column, use the version dropdown to select the published version to provision. Only published versions appear.
-3. Click **Provision**. FormForge creates the database table immediately. The **Status** badge changes to **Provisioned** and the **Last Provisioned** column updates.
+3. Click **Provision**. AppForge creates the database table immediately. The **Status** badge changes to **Provisioned** and the **Last Provisioned** column updates.
 
 > A first-time provision runs immediately without a confirmation step — creating a brand-new table cannot affect existing data.
 
@@ -1403,7 +1431,7 @@ If the designer's schema has changed since the table was first provisioned — f
 2. Click **Re-sync**.
 3. A confirmation dialog appears warning that this operation will alter a live database table. Review the details and click **Confirm** to proceed.
 
-FormForge adds any new columns defined in the chosen version to the database table. **Columns that no longer appear in the designer are not automatically dropped** — this protects data that may still be in those columns. Use **Schema Drift** (in [Audit Logs](#10-audit-logs)) to identify and manually drop orphaned columns when you are ready.
+AppForge adds any new columns defined in the chosen version to the database table. **Columns that no longer appear in the designer are not automatically dropped** — this protects data that may still be in those columns. Use **Schema Drift** (in [Audit Logs](#10-audit-logs)) to identify and manually drop orphaned columns when you are ready.
 
 > **Relationship to menu-binding provisioning:** Table Provisioning and menu-binding provisioning (Section 6.5) are the same underlying operation — both run CREATE TABLE or ALTER TABLE on the database. The difference is only where you trigger it: Table Provisioning gives you direct control independent of menu bindings.
 
@@ -1455,7 +1483,7 @@ You'll need an authenticator app such as **Google Authenticator**, **Microsoft A
 
    **Step 2 — Verify Code.** Enter the current **6-digit code** from your authenticator app and click **Verify**. If the code is wrong or expired you'll see *"Invalid or expired code. Please try again."* — read the latest code from the app and retry. (Codes rotate roughly every 30 seconds.)
 
-   **Step 3 — Save Backup Codes.** FormForge shows a grid of **backup codes**. Save them somewhere safe (see [Section 13.3](#133-backup-codes)) — they will **not** be shown again. Tick **I have saved my backup codes in a safe place**, then click **Done**.
+   **Step 3 — Save Backup Codes.** AppForge shows a grid of **backup codes**. Save them somewhere safe (see [Section 13.3](#133-backup-codes)) — they will **not** be shown again. Tick **I have saved my backup codes in a safe place**, then click **Done**.
 
 3. The Security section now reads **Status: Enabled**. From your next sign-in onward, you'll be asked for a code (see [Two-Factor Authentication at Login](#two-factor-authentication-at-login)).
 
@@ -1625,4 +1653,4 @@ A concise summary of which properties are specific to each component type. All c
 
 ---
 
-*FormForge User Guide · Generated June 2026*
+*AppForge User Guide · Generated June 2026*
