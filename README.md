@@ -12,10 +12,12 @@ App run(Aspire AppHost):
 dotnet run --project src/AppForge.AppHost
 ```
 
-## Admin credentials
-```
-adminEmail:admin@appforge.local
-adminPassword:Admin1234!
+## Super Admin credentials(appsettings.json)
+```json
+{
+  "SuperAdminEmail": "admin@appforge.local",
+  "SuperAdminPassword": "Admin1234!"
+}
 ```
 
 
