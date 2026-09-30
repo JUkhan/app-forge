@@ -8,13 +8,14 @@ internal sealed record CreateTenantRequest(string Name, string SchemaName);
 // The generated temporary password is returned exactly once, in the create response —
 // it is never persisted in plaintext beyond its BCrypt hash (written by
 // ITenantOnboardingService via IPasswordHasher). The platform-super-admin relays it to
-// the tenant out-of-band.
+// the tenant out-of-band. AdminEmail is the server-derived login it belongs to.
 //
 // DevUserEmail/DevUserPassword are the hidden per-tenant platform-dev login. The password
 // is persisted only as Data Protection ciphertext on the tenants row and is surfaced
 // exclusively here — TenantDto (list/get) never carries either field.
 internal sealed record CreateTenantResponse(
     TenantDto Tenant,
+    string AdminEmail,
     string TemporaryPassword,
     string DevUserEmail,
     string DevUserPassword);

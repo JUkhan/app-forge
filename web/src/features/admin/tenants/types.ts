@@ -23,6 +23,8 @@ export interface CreateTenantRequest {
 // out-of-band.
 export interface CreateTenantResponse {
   tenant: TenantListItem
+  // Server-derived login the temporary password belongs to.
+  adminEmail: string
   temporaryPassword: string
   // Hidden per-tenant platform-dev login. Present only in the create response; the
   // tenant list never exposes either field (the password is stored encrypted server-side).

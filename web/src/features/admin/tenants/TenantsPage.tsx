@@ -83,6 +83,11 @@ export function TenantsPage() {
           <p className="text-muted-foreground">{t('admin.tenants.temporaryPasswordNotice')}</p>
           <div className="flex items-center gap-2">
             <p className="flex-1 rounded bg-muted px-2 py-1.5 font-mono text-sm break-all">
+              {justCreated.adminEmail}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <p className="flex-1 rounded bg-muted px-2 py-1.5 font-mono text-sm break-all">
               {justCreated.temporaryPassword}
             </p>
             <CopyPasswordButton password={justCreated.temporaryPassword} />

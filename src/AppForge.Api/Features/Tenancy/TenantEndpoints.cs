@@ -214,6 +214,7 @@ internal static partial class TenantEndpoints
             $"/api/admin/tenants/{tenant.Id}",
             new CreateTenantResponse(
                 new TenantDto(tenant.Id, tenant.Name, tenant.SchemaName, tenant.Status, tenant.CreatedAt),
+                adminEmail,
                 temporaryPassword,
                 devEmail,
                 devPassword));
