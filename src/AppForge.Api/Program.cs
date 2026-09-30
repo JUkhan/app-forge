@@ -627,14 +627,19 @@ try
 
     // Story 12.4 — bootstrap: create a default platform-super-admin account into
     // public.platform_admins (never into any `users` table — architecture.md §7.4) if
-    // none exists yet. Credentials are emitted as a startup warning so the operator can
-    // retrieve them. Skipped on every subsequent restart once any platform_admins row
+    // none exists yet. Credentials come from configuration (SuperAdminEmail /
+    // SuperAdminPassword). Skipped on every subsequent restart once any platform_admins row
     // exists.
     if (!db.PlatformAdmins.Any())
     {
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-        const string adminEmail = "admin@appforge.local";
-        const string adminPassword = "Admin1234!";
+        var adminEmail = builder.Configuration["SuperAdminEmail"];
+        var adminPassword = builder.Configuration["SuperAdminPassword"];
+        if (string.IsNullOrWhiteSpace(adminEmail) || string.IsNullOrWhiteSpace(adminPassword))
+        {
+            throw new InvalidOperationException(
+                "SuperAdminEmail and SuperAdminPassword must be configured to bootstrap the platform super admin.");
+        }
         var platformAdmin = new AppForge.Api.Domain.Entities.PlatformAdmin
         {
             Id = Guid.NewGuid(),
@@ -644,7 +649,7 @@ try
         };
         db.PlatformAdmins.Add(platformAdmin);
         db.SaveChanges();
-        StartupLog.BootstrapPlatformAdminCreated(app.Logger, adminEmail, adminPassword);
+        StartupLog.BootstrapPlatformAdminCreated(app.Logger, adminEmail);
     }
 }
 #pragma warning disable CA1031
@@ -858,8 +863,8 @@ internal static partial class StartupLog
 
     [Microsoft.Extensions.Logging.LoggerMessage(
         Level = Microsoft.Extensions.Logging.LogLevel.Warning,
-        Message = "Bootstrap: created default platform-super-admin account. Email={Email} Password={Password} — change after first login.")]
-    public static partial void BootstrapPlatformAdminCreated(Microsoft.Extensions.Logging.ILogger logger, string email, string password);
+        Message = "Bootstrap: created default platform-super-admin account. Email={Email} — password is taken from configuration (SuperAdminPassword); change it after first login.")]
+    public static partial void BootstrapPlatformAdminCreated(Microsoft.Extensions.Logging.ILogger logger, string email);
 
     [Microsoft.Extensions.Logging.LoggerMessage(
         Level = Microsoft.Extensions.Logging.LogLevel.Critical,
