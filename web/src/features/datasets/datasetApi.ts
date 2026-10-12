@@ -1,6 +1,5 @@
 import { httpClient } from '../auth/httpClient'
-import { refreshSession } from '../auth/refreshCoordinator'
-import { tokenStore } from '../auth/tokenStore'
+import { authedFetch } from '../auth/authedFetch'
 import { generateCorrelationId } from '../../lib/correlationId'
 import { ApiError } from '../../lib/api/apiError'
 
@@ -317,28 +316,17 @@ export async function downloadDatasetExport(
   body: DatasetExportRequest,
 ): Promise<void> {
   const url = `/api/datasets/${id}/rows/export?format=${format}`
-  const send = () =>
+  const response = await authedFetch((token) =>
     fetch(url, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${tokenStore.get() ?? ''}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
         'X-Correlation-ID': generateCorrelationId(),
       },
       body: JSON.stringify(body),
-    })
-
-  let response = await send()
-  if (response.status === 401) {
-    const refreshed = await refreshSession()
-    if (refreshed) {
-      tokenStore.set(refreshed.accessToken)
-      response = await send()
-    } else {
-      tokenStore.clear()
-      window.location.replace('/login')
-    }
-  }
+    }),
+  )
   if (!response.ok) {
     let messageKey = 'errors.exportFailed'
     let code = 'EXPORT_FAILED'

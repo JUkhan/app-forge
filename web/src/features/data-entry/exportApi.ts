@@ -1,5 +1,4 @@
-import { tokenStore } from '../auth/tokenStore'
-import { refreshSession } from '../auth/refreshCoordinator'
+import { authedFetch } from '../auth/authedFetch'
 import { generateCorrelationId } from '../../lib/correlationId'
 import { ApiError } from '../../lib/api/apiError'
 import type { RecordListParams } from './recordListApi'
@@ -39,29 +38,14 @@ function extractFilename(disposition: string, fallback: string): string {
 }
 
 async function fetchExport(url: string): Promise<Response> {
-  const headers = {
-    Authorization: `Bearer ${tokenStore.get() ?? ''}`,
-    'X-Correlation-ID': generateCorrelationId(),
-  }
-  let response = await fetch(url, { headers })
-  // Same 401 → refresh → retry once shape as httpClient. We can't reuse that
-  // module directly because it parses every response as JSON.
-  if (response.status === 401) {
-    const refreshed = await refreshSession()
-    if (refreshed) {
-      tokenStore.set(refreshed.accessToken)
-      response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${tokenStore.get() ?? ''}`,
-          'X-Correlation-ID': generateCorrelationId(),
-        },
-      })
-    } else {
-      tokenStore.clear()
-      window.location.replace('/login')
-    }
-  }
-  return response
+  return authedFetch((token) =>
+    fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'X-Correlation-ID': generateCorrelationId(),
+      },
+    }),
+  )
 }
 
 export async function downloadRecordExport(
