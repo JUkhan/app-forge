@@ -122,3 +122,35 @@ describe('httpClient — 401 silent refresh and retry', () => {
     expect(replaceMock).toHaveBeenCalledWith('/login')
   })
 })
+
+describe('httpClient — anonymous public menu pages', () => {
+  const replaceMock = vi.fn()
+  const originalLocation = window.location
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    replaceMock.mockReset()
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...originalLocation, pathname: '/acme/public_menu/menu-1', replace: replaceMock },
+    })
+  })
+
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('surfaces a 401 as an ApiError without refreshing or redirecting to /login', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+    fetchMock.mockResolvedValueOnce(fakeResponse({ status: 401 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { httpClient } = await import('../httpClient')
+
+    await expect(httpClient.get('/api/data/orders')).rejects.toBeInstanceOf(ApiError)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(replaceMock).not.toHaveBeenCalled()
+  })
+})

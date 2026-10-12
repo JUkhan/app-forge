@@ -339,6 +339,57 @@ public sealed class PublicMenuRecordsIntegrationTests : IClassFixture<PostgresFi
         await AssertNotServableAsync(Url("pmr_viewnone", menuId));
     }
 
+    private static string SchemaUrl(string tenant, Guid menuId) =>
+        $"/api/public/{tenant}/menus/{menuId}/schema";
+
+    [Fact]
+    public async Task Schema_ServablePublicViewMenu_ReturnsPublishedRootElement()
+    {
+        var tenant = await ProvisionTenantAsync("pms_ok");
+        var menuId = await SeedBoundMenuAsync(
+            tenant, "pms_ok_view", provisioningStatus: "NotApplicable", mode: "VIEW");
+
+        var (status, body) = await GetAsync(SchemaUrl("pms_ok", menuId));
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+        Assert.Equal("pms_ok_view", root.GetProperty("designerId").GetString());
+        Assert.Equal("VIEW", root.GetProperty("mode").GetString());
+        Assert.Equal("Published", root.GetProperty("status").GetString());
+        Assert.Equal(1, root.GetProperty("latestVersion").GetInt32());
+        Assert.Equal("Stack", root.GetProperty("rootElement").GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public async Task Schema_NotServableCases_AllReturnTheSame404()
+    {
+        var tenant = await ProvisionTenantAsync("pms_deny");
+        var privateMenu = await SeedBoundMenuAsync(
+            tenant, "pms_deny_private", isPublic: false, provisioningStatus: "NotApplicable", mode: "VIEW");
+        var inactiveMenu = await SeedBoundMenuAsync(
+            tenant, "pms_deny_inactive", isActive: false, provisioningStatus: "NotApplicable", mode: "VIEW");
+        var unboundMenu = await SeedBoundMenuAsync(
+            tenant, "pms_deny_unbound", bound: false, provisioningStatus: "NotApplicable", mode: "VIEW");
+        var okMenu = await SeedBoundMenuAsync(
+            tenant, "pms_deny_ok", provisioningStatus: "NotApplicable", mode: "VIEW");
+        var otherTenant = await ProvisionTenantAsync("pms_deny_other");
+        await ProvisionTenantAsync("pms_deny_suspended", status: "Suspended");
+
+        await AssertNotServableAsync(SchemaUrl("pms_deny", privateMenu));
+        await AssertNotServableAsync(SchemaUrl("pms_deny", inactiveMenu));
+        await AssertNotServableAsync(SchemaUrl("pms_deny", unboundMenu));
+        await AssertNotServableAsync(SchemaUrl("pms_deny", Guid.NewGuid()));
+        await AssertNotServableAsync("/api/public/pms_deny/menus/not-a-guid/schema");
+        await AssertNotServableAsync(SchemaUrl("pms_deny_other", okMenu));
+        await AssertNotServableAsync(SchemaUrl("pms_missing", okMenu));
+        await AssertNotServableAsync(SchemaUrl("pms_deny_suspended", okMenu));
+        Assert.NotNull(otherTenant);
+
+        var (status, _) = await GetAsync(SchemaUrl("pms_deny", okMenu));
+        Assert.Equal(HttpStatusCode.OK, status);
+    }
+
     [Fact]
     public async Task Records_MenuFromAnotherTenant_Returns404()
     {

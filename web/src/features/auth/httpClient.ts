@@ -54,9 +54,15 @@ async function request<T>(
   // must refresh on ANY non-HTML 401; requiring problem+json here silently
   // skipped the refresh and forced users to reload the page by hand.
   const contentType = response.headers.get('content-type') ?? ''
+  // Anonymous /{tenant}/public_menu pages have no session to refresh or lose. A 401 from a
+  // widget there must surface as an ordinary error, never as a refresh attempt + hard
+  // redirect to /login.
+  const onAnonymousPublicPage =
+    typeof window !== 'undefined' && /^\/[^/]+\/public_menu(\/|$)/.test(window.location.pathname)
   if (
     response.status === 401 &&
     !isRetry &&
+    !onAnonymousPublicPage &&
     path !== '/api/auth/login' &&
     path !== '/api/auth/refresh' &&
     // Story 2.14 — a 401 here means a wrong MFA code or an expired MFA session,

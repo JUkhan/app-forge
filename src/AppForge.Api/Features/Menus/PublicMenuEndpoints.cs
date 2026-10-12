@@ -1,6 +1,7 @@
 using AppForge.Api.Features.Datasets;
 using AppForge.Api.Features.Datasets.Dtos;
 using AppForge.Api.Features.Designer;
+using AppForge.Api.Features.Designer.Dtos;
 using AppForge.Api.Features.DynamicCrud;
 using AppForge.Api.Features.Menus.Dtos;
 using AppForge.Api.Features.SchemaRegistry;
@@ -32,6 +33,12 @@ internal static class PublicMenuEndpoints
              .AllowAnonymous()
              .WithSummary("Anonymous, read-only, paged records of a public designer-bound menu item.")
              .Produces<PublicMenuRecordsResult>(StatusCodes.Status200OK)
+             .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/{tenant}/menus/{menuId}/schema", GetPublicMenuSchemaHandler)
+             .AllowAnonymous()
+             .WithSummary("Anonymous, read-only designer schema (Published only) of a public bound menu item.")
+             .Produces<DesignerResponse>(StatusCodes.Status200OK)
              .Produces(StatusCodes.Status404NotFound);
 
         return group;
@@ -81,6 +88,54 @@ internal static class PublicMenuEndpoints
 
         tenantContext.Set(row.Id, row.SchemaName);
         return true;
+    }
+
+    // Anonymous read of the Published schema (component layout) behind a public designer-bound
+    // menu item. Designer id and version come only from the menu row; every "not servable"
+    // case returns the same 404. Per-version auth-filter / dataset ids are not disclosed.
+    private static async Task<IResult> GetPublicMenuSchemaHandler(
+        string tenant,
+        string menuId,
+        AppForgeDbContext db,
+        ITenantContext tenantContext,
+        IDesignerService designerService,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(tenantContext);
+        ArgumentNullException.ThrowIfNull(designerService);
+
+        if (!Guid.TryParse(menuId, out var menuGuid)
+            || !await TryResolveTenantAsync(tenant, db, tenantContext, ct).ConfigureAwait(false))
+        {
+            return NotFound();
+        }
+
+        var menu = await db.Menus
+            .AsNoTracking()
+            .Where(m => m.Id == menuGuid
+                     && m.IsActive
+                     && m.IsPublic
+                     && m.DesignerId != null
+                     && m.BoundVersion != null
+                     && (m.ProvisioningStatus == "Success" || m.ProvisioningStatus == "NotApplicable"))
+            .Select(m => new { m.DesignerId, m.BoundVersion })
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+
+        if (menu is null)
+        {
+            return NotFound();
+        }
+
+        var schema = await designerService
+            .GetVersionAsync(menu.DesignerId!, menu.BoundVersion!.Value, ct).ConfigureAwait(false);
+        if (schema is null || !string.Equals(schema.Status, "Published", StringComparison.Ordinal))
+        {
+            return NotFound();
+        }
+
+        return Results.Ok(schema with { AuthFilterFieldKey = null, DatasetId = null, Versions = null });
     }
 
     // Anonymous read-only list of a public, designer-bound menu's records. The designer id and
