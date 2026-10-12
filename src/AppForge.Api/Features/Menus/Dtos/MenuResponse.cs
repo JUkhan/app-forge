@@ -22,4 +22,5 @@ internal sealed record MenuResponse(
     string? ProvisioningError,    // null unless ProvisioningStatus == "Error"
     // Custom route path — mutually exclusive with the Designer binding above. When
     // non-null, DesignerId and the provisioning fields are all null.
-    string? RoutePath);
+    string? RoutePath,
+    bool IsPublic = false);

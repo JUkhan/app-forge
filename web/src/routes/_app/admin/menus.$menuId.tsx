@@ -34,6 +34,7 @@ const updateMenuSchema = z.object({
   name: z.string().min(1, { message: 'admin.menus.nameRequired' }).max(200, { message: 'admin.menus.nameMaxLength' }),
   order: z.number().int().min(0),
   isActive: z.boolean(),
+  isPublic: z.boolean(),
 })
 type UpdateMenuFormValues = z.infer<typeof updateMenuSchema>
 
@@ -68,6 +69,7 @@ interface MenuDetailContentProps {
     name: string
     order: number
     isActive: boolean
+    isPublic?: boolean
     parentId: string | null
     icon: MenuIcon | null
     allowedRoleIds: string[]
@@ -103,7 +105,7 @@ function MenuDetailContent({ menu, menuId }: MenuDetailContentProps) {
   } = useForm<UpdateMenuFormValues>({
     resolver: zodResolver(updateMenuSchema),
     mode: 'onChange',
-    defaultValues: { name: menu.name, order: menu.order, isActive: menu.isActive },
+    defaultValues: { name: menu.name, order: menu.order, isActive: menu.isActive, isPublic: menu.isPublic ?? false },
   })
 
   const submit = async (values: UpdateMenuFormValues) => {
@@ -113,6 +115,7 @@ function MenuDetailContent({ menu, menuId }: MenuDetailContentProps) {
         order: values.order,
         icon: pendingIcon,
         isActive: values.isActive,
+        isPublic: values.isPublic,
       })
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
@@ -203,6 +206,14 @@ function MenuDetailContent({ menu, menuId }: MenuDetailContentProps) {
             {t('admin.menus.isActiveLabel')}
           </Label>
           <p className="text-xs text-muted-foreground">{t('admin.menus.isActiveHelp')}</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="cursor-pointer">
+            <input type="checkbox" {...register('isPublic')} className="h-4 w-4 rounded border-field-border" />
+            {t('admin.menus.isPublicLabel')}
+          </Label>
+          <p className="text-xs text-muted-foreground">{t('admin.menus.isPublicHelp')}</p>
         </div>
 
         <IconPickerSection icon={pendingIcon} onChange={setPendingIcon} />

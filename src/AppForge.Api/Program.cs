@@ -506,6 +506,18 @@ builder.Services.AddRateLimiter(options =>
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0,
             }));
+    // /api/public/* — anonymous; partitioned by client IP only. 60 req/min.
+    options.AddPolicy("public-menu", httpContext =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+            }));
     // /api/data/{designerId} — AR-15: POST (write) 60 req/min, all others 300 req/min.
     options.AddPolicy("data-write", httpContext =>
         RateLimitPartition.GetSlidingWindowLimiter(
@@ -805,6 +817,14 @@ app.MapGroup("/api/menus")
    .RequireRateLimiting("admin")
    .WithTags("Menus")
    .MapMenuEndpoints();
+
+// /api/public/{tenant}/menus — anonymous list of a tenant's active public menu items.
+// Tenant is resolved from the URL (schema_name) inside the handler; no JWT involved.
+app.MapGroup("/api/public")
+   .AllowAnonymous()
+   .RequireRateLimiting("public-menu")
+   .WithTags("Public")
+   .MapPublicMenuEndpoints();
 
 // /api/data/{designerId} — group default is "data-read" (300/min). Story 3.x POST
 // handlers will override individually with "data-write" (60/min).

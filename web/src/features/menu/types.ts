@@ -15,6 +15,7 @@ export interface MenuItem {
   order: number
   icon: MenuIcon | null
   isActive: boolean
+  isPublic: boolean   // listed on the anonymous /{tenant}/public_menu page when also active
   parentId: string | null
   allowedRoleIds: string[]  // populated by Story 4.4; always [] for now
   createdAt: string
@@ -69,6 +70,7 @@ export interface MenuListItem {
   name: string
   order: number
   isActive: boolean
+  isPublic?: boolean
   parentId: string | null
   createdAt: string
 }
@@ -78,6 +80,7 @@ export interface CreateMenuRequest {
   order: number
   icon?: MenuIcon | null
   isActive?: boolean   // defaults to true server-side
+  isPublic?: boolean   // defaults to false server-side
   parentId?: string | null   // null or omitted = top-level (Story 4.2)
 }
 
@@ -86,4 +89,17 @@ export interface UpdateMenuRequest {
   order: number
   icon: MenuIcon | null
   isActive: boolean
+  isPublic?: boolean   // omitted = leave unchanged
+}
+
+// GET /api/public/{tenant}/menus — anonymous node: no role ids, isActive or audit fields.
+export interface PublicMenuItem {
+  id: string
+  name: string
+  order: number
+  icon: MenuIcon | null
+  parentId: string | null
+  designerId: string | null
+  routePath: string | null
+  children: PublicMenuItem[]
 }

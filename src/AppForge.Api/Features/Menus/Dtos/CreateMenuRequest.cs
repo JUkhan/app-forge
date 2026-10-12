@@ -7,4 +7,5 @@ internal sealed record CreateMenuRequest(
     int Order,
     JsonElement? Icon,
     bool IsActive = true,
-    Guid? ParentId = null);
+    Guid? ParentId = null,
+    bool IsPublic = false);

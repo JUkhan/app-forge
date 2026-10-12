@@ -6,4 +6,6 @@ internal sealed record UpdateMenuRequest(
     string Name,
     int Order,
     JsonElement? Icon,
-    bool IsActive);
+    bool IsActive,
+    // null = leave the current value unchanged (omitting the field must not silently unpublish).
+    bool? IsPublic = null);

@@ -924,3 +924,7 @@ Items deferred during code review and other workflows. Each entry links to the s
 - source_spec: `_bmad-output/implementation-artifacts/spec-platform-dev-role-seeding.md`
   summary: Add an AppLayout test for the gear link target per role.
   evidence: Gear visibility and homePath are only covered indirectly by the admin-layout guard tests.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-public-menu-is-public-flag.md`
+  summary: Migration `AddMenuIsPublic` only reaches new tenant schemas; already-provisioned tenant schemas need migrations replayed before `is_public` exists.
+  evidence: multi-tenant.md states startup migration fan-out to existing tenant schemas is not implemented; applies to every tenant migration, not just this one.

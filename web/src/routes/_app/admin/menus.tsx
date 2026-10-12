@@ -46,6 +46,7 @@ const createMenuSchema = z.object({
   name: z.string().min(1, { message: 'admin.menus.nameRequired' }).max(200, { message: 'admin.menus.nameMaxLength' }),
   order: z.number().int().min(0),
   isActive: z.boolean(),
+  isPublic: z.boolean(),
   // Empty string from the native <select> means "top-level"; we translate to
   // null before sending to the server (which treats null/omitted as top-level).
   parentId: z.string().optional(),
@@ -356,7 +357,9 @@ interface CreateMenuFormProps {
   topLevelMenus: MenuListItem[]
 }
 
-function CreateMenuForm({ onDone, topLevelMenus }: CreateMenuFormProps) {
+// Exported for the payload-mapping test.
+// eslint-disable-next-line react-refresh/only-export-components
+export function CreateMenuForm({ onDone, topLevelMenus }: CreateMenuFormProps) {
   const { t } = useTranslation()
   const createMutation = useCreateMenuMutation()
   // Icon is form-local state (not in react-hook-form's tree because MenuIcon
@@ -371,7 +374,7 @@ function CreateMenuForm({ onDone, topLevelMenus }: CreateMenuFormProps) {
   } = useForm<CreateMenuFormValues>({
     resolver: zodResolver(createMenuSchema),
     mode: 'onChange',
-    defaultValues: { order: 0, isActive: true, parentId: '' },
+    defaultValues: { order: 0, isActive: true, isPublic: false, parentId: '' },
   })
 
   const onSubmit = async (values: CreateMenuFormValues) => {
@@ -380,6 +383,7 @@ function CreateMenuForm({ onDone, topLevelMenus }: CreateMenuFormProps) {
         name: values.name,
         order: values.order,
         isActive: values.isActive,
+        isPublic: values.isPublic,
         icon: pendingIcon,
         // Empty string from the native <select> means "no parent" — translate
         // to null. Server treats null/omitted as top-level (Story 4.2).
@@ -463,6 +467,14 @@ function CreateMenuForm({ onDone, topLevelMenus }: CreateMenuFormProps) {
           <input type="checkbox" {...register('isActive')} className="h-4 w-4 rounded border-field-border" />
           {t('admin.menus.isActiveLabel')}
         </Label>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="cursor-pointer">
+          <input type="checkbox" {...register('isPublic')} className="h-4 w-4 rounded border-field-border" />
+          {t('admin.menus.isPublicLabel')}
+        </Label>
+        <p className="text-xs text-muted-foreground">{t('admin.menus.isPublicHelp')}</p>
       </div>
 
       <IconPickerSection icon={pendingIcon} onChange={setPendingIcon} />

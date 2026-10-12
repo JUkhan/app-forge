@@ -546,6 +546,82 @@ public sealed class MenuIntegrationTests : IClassFixture<PostgresFixture>, IAsyn
         Assert.StartsWith("menus/icons/", iconEl.GetProperty("objectKey").GetString(), StringComparison.Ordinal);
     }
 
+    // ---------- IsPublic round-trip ----------
+
+    private async Task<MenuResponseDto> GetMenuByIdAsync(string token, Guid id)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"/api/admin/menus/{id}");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var resp = await _client!.SendAsync(req);
+        resp.EnsureSuccessStatusCode();
+        return (await resp.Content.ReadFromJsonAsync<MenuResponseDto>())!;
+    }
+
+    private async Task PutMenuAsync(string token, Guid id, object body)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Put, $"/api/admin/menus/{id}")
+        {
+            Content = JsonContent.Create(body),
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var resp = await _client!.SendAsync(req);
+        Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateMenu_WithIsPublicTrue_RoundTripsViaCreateGetAndList()
+    {
+        var token = await LoginAsync("admin@example.com", "Password1!");
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/admin/menus")
+        {
+            Content = JsonContent.Create(new { name = "Public One", order = 1, isPublic = true }),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var response = await _client!.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<MenuResponseDto>();
+        Assert.True(created!.IsPublic);
+
+        Assert.True((await GetMenuByIdAsync(token, created.Id)).IsPublic);
+
+        using var listReq = new HttpRequestMessage(HttpMethod.Get, "/api/admin/menus");
+        listReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var listResp = await _client!.SendAsync(listReq);
+        var list = await listResp.Content.ReadFromJsonAsync<PagedResultDto<MenuListItemDto>>();
+        Assert.True(list!.Data.Single(m => m.Id == created.Id).IsPublic);
+    }
+
+    [Fact]
+    public async Task CreateMenu_WithoutIsPublic_DefaultsToFalse()
+    {
+        var token = await LoginAsync("admin@example.com", "Password1!");
+        var id = await CreateMenuViaApiAsync(token, "Default Private", 0);
+        Assert.False((await GetMenuByIdAsync(token, id)).IsPublic);
+    }
+
+    [Fact]
+    public async Task UpdateMenu_IsPublicPublishUnpublishAndOmit()
+    {
+        var token = await LoginAsync("admin@example.com", "Password1!");
+        var id = await CreateMenuViaApiAsync(token, "Toggle", 0);
+
+        await PutMenuAsync(token, id, new { name = "Toggle", order = 0, isActive = true, isPublic = true });
+        Assert.True((await GetMenuByIdAsync(token, id)).IsPublic);
+
+        // Omitting isPublic must leave a public menu public.
+        await PutMenuAsync(token, id, new { name = "Toggle renamed", order = 0, isActive = true });
+        var afterOmit = await GetMenuByIdAsync(token, id);
+        Assert.Equal("Toggle renamed", afterOmit.Name);
+        Assert.True(afterOmit.IsPublic);
+
+        await PutMenuAsync(token, id, new { name = "Toggle renamed", order = 0, isActive = true, isPublic = false });
+        Assert.False((await GetMenuByIdAsync(token, id)).IsPublic);
+
+        await PutMenuAsync(token, id, new { name = "Toggle renamed", order = 0, isActive = true, isPublic = true });
+        Assert.True((await GetMenuByIdAsync(token, id)).IsPublic);
+    }
+
     // ---------- PUT /api/admin/menus/{id} ----------
 
     [Fact]
@@ -1950,7 +2026,7 @@ public sealed class MenuIntegrationTests : IClassFixture<PostgresFixture>, IAsyn
 
     [SuppressMessage("Performance", "CA1812",
         Justification = "Instantiated by System.Text.Json deserialization.")]
-    private sealed record MenuListItemDto(Guid Id, string Name, int Order, bool IsActive, Guid? ParentId, DateTimeOffset CreatedAt);
+    private sealed record MenuListItemDto(Guid Id, string Name, int Order, bool IsActive, Guid? ParentId, DateTimeOffset CreatedAt, bool IsPublic = false);
 
     [SuppressMessage("Performance", "CA1812",
         Justification = "Instantiated by System.Text.Json deserialization.")]
@@ -1968,7 +2044,8 @@ public sealed class MenuIntegrationTests : IClassFixture<PostgresFixture>, IAsyn
         int? BoundVersion,
         string? ProvisioningStatus,
         string? ProvisioningError,
-        string? RoutePath);
+        string? RoutePath,
+        bool IsPublic = false);
 
     [SuppressMessage("Performance", "CA1812",
         Justification = "Instantiated by System.Text.Json deserialization.")]

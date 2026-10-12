@@ -237,6 +237,7 @@ internal sealed class AppForgeDbContext(DbContextOptions<AppForgeDbContext> opti
             e.Property(m => m.Order).HasColumnName("sort_order").HasDefaultValue(0);
             e.Property(m => m.Icon).HasColumnName("icon").HasColumnType("jsonb");
             e.Property(m => m.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            e.Property(m => m.IsPublic).HasColumnName("is_public").HasDefaultValue(false);
             e.Property(m => m.ParentId).HasColumnName("parent_id");
             e.Property(m => m.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             e.Property(m => m.UpdatedAt).HasColumnName("updated_at");

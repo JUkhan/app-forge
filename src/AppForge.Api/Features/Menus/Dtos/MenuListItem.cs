@@ -6,4 +6,5 @@ internal sealed record MenuListItem(
     int Order,
     bool IsActive,
     Guid? ParentId,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    bool IsPublic = false);

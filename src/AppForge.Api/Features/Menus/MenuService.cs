@@ -74,6 +74,8 @@ internal interface IMenuService
     Task<BindingDiffResponse?> GetBindingDiffAsync(Guid menuId, int targetVersion, CancellationToken ct);
     // Custom route path — alternative to a Designer binding (mutually exclusive).
     Task<SetRoutePathResult> SetRoutePathAsync(Guid menuId, string? routePath, CancellationToken ct);
+    // Anonymous list of active + public items for the tenant schema already set on ITenantContext.
+    Task<IReadOnlyList<PublicMenuItem>> GetPublicMenusAsync(CancellationToken ct);
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
@@ -122,7 +124,7 @@ internal sealed class MenuService(
         var items = await ApplySort(query, sort)
             .Skip(skip)
             .Take(pageSize)
-            .Select(m => new MenuListItem(m.Id, m.Name, m.Order, m.IsActive, m.ParentId, m.CreatedAt))
+            .Select(m => new MenuListItem(m.Id, m.Name, m.Order, m.IsActive, m.ParentId, m.CreatedAt, m.IsPublic))
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
@@ -197,6 +199,7 @@ internal sealed class MenuService(
             Order = request.Order,
             Icon = request.Icon is { ValueKind: System.Text.Json.JsonValueKind.Null } ? null : request.Icon?.ToString(),
             IsActive = request.IsActive,
+            IsPublic = request.IsPublic,
             ParentId = request.ParentId,
             CreatedAt = DateTimeOffset.UtcNow,
         };
@@ -223,7 +226,7 @@ internal sealed class MenuService(
             menu.Id, menu.Name, menu.Order, ParseIcon(menu.Icon), menu.IsActive, menu.ParentId,
             [], menu.CreatedAt, menu.UpdatedAt,
             DesignerId: null, BoundVersion: null, ProvisioningStatus: null, ProvisioningError: null,
-            RoutePath: null));
+            RoutePath: null, IsPublic: menu.IsPublic));
     }
 
     public async Task<UpdateMenuResult> UpdateMenuAsync(Guid id, UpdateMenuRequest request, CancellationToken ct)
@@ -243,6 +246,7 @@ internal sealed class MenuService(
         menu.Order = request.Order;
         menu.Icon = request.Icon is { ValueKind: System.Text.Json.JsonValueKind.Null } ? null : request.Icon?.ToString();
         menu.IsActive = request.IsActive;
+        if (request.IsPublic.HasValue) menu.IsPublic = request.IsPublic.Value;
         menu.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -782,6 +786,40 @@ internal sealed class MenuService(
         return roots;
     }
 
+    // Public-ness is per item: a public child under a non-public (or inactive) parent is
+    // surfaced at top level. Only id/name/order/icon/parentId/designerId/routePath leave the
+    // server. Not cached: the per-user IMenuCache is keyed by user, not tenant.
+    public async Task<IReadOnlyList<PublicMenuItem>> GetPublicMenusAsync(CancellationToken ct)
+    {
+        var menus = await db.Menus
+            .AsNoTracking()
+            .Where(m => m.IsActive && m.IsPublic)
+            .OrderBy(m => m.Order)
+            .ThenBy(m => m.Id)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var childLists = menus.ToDictionary(m => m.Id, _ => new List<PublicMenuItem>());
+        var roots = new List<PublicMenuItem>();
+        foreach (var menu in menus)
+        {
+            var node = new PublicMenuItem(
+                menu.Id, menu.Name, menu.Order, ParseIcon(menu.Icon), menu.ParentId,
+                menu.DesignerId, menu.RoutePath, childLists[menu.Id]);
+
+            if (menu.ParentId is { } pid && childLists.TryGetValue(pid, out var siblings))
+            {
+                siblings.Add(node);
+            }
+            else
+            {
+                roots.Add(node);
+            }
+        }
+
+        return roots;
+    }
+
     private static MenuResponse ToResponse(Menu menu) =>
         new(
             menu.Id,
@@ -801,7 +839,8 @@ internal sealed class MenuService(
             menu.BoundVersion,
             menu.ProvisioningStatus,
             menu.ProvisioningError,
-            menu.RoutePath);
+            menu.RoutePath,
+            menu.IsPublic);
 
     // Menu.Icon is stored as a JSON string (TEXT column). MenuResponse.Icon is JsonElement? so the
     // serialized response is a JSON object — not an escaped string — matching the frontend MenuIcon type.
