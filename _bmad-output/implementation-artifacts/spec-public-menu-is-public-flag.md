@@ -82,3 +82,15 @@ context: ['{project-root}/multi-tenant.md']
 | Role-restricted item exposed once public (EC) | low | rejected | Intended: public means no authorization; help text wording only |
 | Client slug guard, Cache-Control, rate-limit test, non-en locales, TRUNCATE race, route shape in 401 test | low | rejected | Cosmetic/unlikely; fixes add complexity |
 | ValueGeneratedOnAdd + HasDefaultValue footgun (BH) | false | rejected | Harmless for a bool defaulting to false |
+
+## Spec Change Log
+
+### 2026-10-12 — human renegotiated access scope (list only → read-only data)
+
+User reported a public designer-bound menu redirects to login on click and chose anonymous read access to the bound data ("only 2"; fixing existing tenant schemas explicitly NOT requested). Amended intent:
+
+- Add `GET /api/public/{tenant}/menus/{menuId}/records?page&pageSize` (anonymous, `public-menu` rate limit). designerId is derived server-side from the menu; never taken from the client.
+- Served only when the menu is `IsActive && IsPublic`, has a DesignerId with ProvisioningStatus Success, in an Active tenant. Anything else → the same 404.
+- Read-only list, paged (max 100), default sort, soft-deleted rows excluded, no client filter/sort params. Designers with an AuthFilterFieldKey (user-scoped) or a dataset binding are NOT served anonymously (404). Only user-defined columns plus `id` are returned.
+- Public page: clicking a bound item opens `/{tenant}/public_menu/{menuId}`, a read-only table of those records; no link to `/data/{designerId}`.
+- Out of scope: backfilling `is_public` into existing tenant schemas (deferred item stands).

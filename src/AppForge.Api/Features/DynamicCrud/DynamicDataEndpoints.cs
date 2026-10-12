@@ -2269,7 +2269,7 @@ internal static class DynamicDataEndpoints
     // Resolves the schema-registry entry for (designerId, version), populating it from
     // EF on a cache miss (Decision 1.4 — registry is the column source of truth). Mirrors
     // the inline pattern used across the list/create/update handlers.
-    private static async Task<SchemaRegistryEntry> GetOrPopulateEntryAsync(
+    internal static async Task<SchemaRegistryEntry> GetOrPopulateEntryAsync(
         AppForgeDbContext db, ISchemaRegistry schemaRegistry, string designerId, int version, CancellationToken ct)
     {
         var entry = schemaRegistry.TryGet(designerId, version);
@@ -3145,7 +3145,7 @@ internal static class DynamicDataEndpoints
     //
     // The returned dictionary is always a fresh instance — the input is treated
     // as immutable.
-    private static IReadOnlyDictionary<string, string> ApplyDefaultSoftDeleteFilter(
+    internal static IReadOnlyDictionary<string, string> ApplyDefaultSoftDeleteFilter(
         IReadOnlyDictionary<string, string> filters, bool includeDeleted, bool isAdmin)
     {
         if (!isAdmin)
@@ -3169,7 +3169,7 @@ internal static class DynamicDataEndpoints
     // auth filter). Fetched fresh — NOT cached in the schema registry — so an admin
     // toggling the filter from the Component Library takes effect on the next request
     // without a version bump or cache invalidation.
-    private static async Task<string?> GetAuthFilterFieldKeyAsync(
+    internal static async Task<string?> GetAuthFilterFieldKeyAsync(
         AppForgeDbContext db, string designerId, int version, CancellationToken ct) =>
         await db.ComponentSchemaVersions
             .AsNoTracking()
@@ -3181,7 +3181,7 @@ internal static class DynamicDataEndpoints
     // Reads the per-version dataset binding (null when the version is bound to no dataset).
     // Fetched fresh — NOT cached in the schema registry — so an admin binding/unbinding from
     // the Component Library takes effect on the next request without a version bump.
-    private static async Task<Guid?> GetDatasetIdAsync(
+    internal static async Task<Guid?> GetDatasetIdAsync(
         AppForgeDbContext db, string designerId, int version, CancellationToken ct) =>
         await db.ComponentSchemaVersions
             .AsNoTracking()

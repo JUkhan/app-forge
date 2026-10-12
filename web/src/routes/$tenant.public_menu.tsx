@@ -10,19 +10,21 @@ import type { PublicMenuItem } from '../features/menu/types'
 // Anonymous top-level route (sibling of login.tsx, outside _app) — no beforeLoad
 // guard. Lists the tenant's active public menu items from
 // GET /api/public/{tenant}/menus. Route-path items link out; designer-bound items
-// are listed and link to /data/{designerId}, whose data still requires login.
+// link to /{tenant}/public_menu/{menuId}, an anonymous read-only table of the records.
 export const Route = createFileRoute('/$tenant/public_menu')({
   component: PublicMenuPage,
 })
 
-function itemHref(item: PublicMenuItem): string | null {
+function itemHref(tenant: string, item: PublicMenuItem): string | null {
   if (item.routePath) return item.routePath
-  if (item.designerId) return `/data/${encodeURIComponent(item.designerId)}`
+  if (item.designerId) {
+    return `/${encodeURIComponent(tenant)}/public_menu/${encodeURIComponent(item.id)}`
+  }
   return null
 }
 
-function PublicMenuNode({ item }: { item: PublicMenuItem }) {
-  const href = itemHref(item)
+function PublicMenuNode({ tenant, item }: { tenant: string; item: PublicMenuItem }) {
+  const href = itemHref(tenant, item)
   const iconName = item.icon?.type === 'lucide' ? item.icon.name : undefined
   const label = (
     <span className="flex items-center gap-2">
@@ -42,7 +44,7 @@ function PublicMenuNode({ item }: { item: PublicMenuItem }) {
       {item.children.length > 0 && (
         <ul className="ml-6 mt-2 space-y-2">
           {item.children.map((c) => (
-            <PublicMenuNode key={c.id} item={c} />
+            <PublicMenuNode key={c.id} tenant={tenant} item={c} />
           ))}
         </ul>
       )}
@@ -81,7 +83,7 @@ function PublicMenuPage() {
         ) : (
           <ul className="space-y-2">
             {query.data.map((item) => (
-              <PublicMenuNode key={item.id} item={item} />
+              <PublicMenuNode key={item.id} tenant={tenant} item={item} />
             ))}
           </ul>
         )}

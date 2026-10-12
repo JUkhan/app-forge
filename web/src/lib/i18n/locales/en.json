@@ -12,7 +12,19 @@
     "loading": "Loading menu",
     "empty": "There are no public menu items.",
     "notFound": "This page could not be found.",
-    "loadError": "The menu could not be loaded. Please try again later."
+    "loadError": "The menu could not be loaded. Please try again later.",
+    "records": {
+      "title": "Records",
+      "back": "Back to menu",
+      "loading": "Loading records",
+      "empty": "There are no records to show.",
+      "notFound": "This page could not be found.",
+      "loadError": "The records could not be loaded. Please try again later.",
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "Page {{page}} of {{totalPages}}",
+      "total": "{{count}} records"
+    }
   },
   "app": {
     "home": "App Forge"
