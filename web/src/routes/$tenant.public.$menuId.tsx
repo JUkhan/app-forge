@@ -37,10 +37,7 @@ function formatCell(value: unknown): string {
 
 function Page({ title, wide, children }: { title: string; wide?: boolean; children: React.ReactNode }) {
   return (
-    <div
-      className={`mx-auto w-full ${wide ? 'max-w-5xl' : 'max-w-3xl'} rounded-xl border border-border bg-card p-6 shadow-sm`}
-    >
-      <h1 className="mb-4 text-2xl font-bold tracking-tight text-foreground">{title}</h1>
+    <div>
       {children}
     </div>
   )
