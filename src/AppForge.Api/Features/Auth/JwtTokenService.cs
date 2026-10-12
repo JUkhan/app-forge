@@ -15,6 +15,11 @@ internal interface IJwtTokenService
     // because PlatformAdmin is not a User: no RBAC role lookup (the single "roles"
     // claim is always the hardcoded literal below) and never a tenantId claim.
     string CreateAccessTokenForPlatformAdmin(Guid platformAdminId, string email);
+
+    // Public-guest session token: userId + email + tenantId, the single hidden `public-guest`
+    // role and a `guest=true` claim, with a caller-supplied (short) lifetime. Never paired
+    // with a refresh token.
+    string CreateGuestAccessToken(Guid userId, string email, Guid tenantId, TimeSpan lifetime);
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
@@ -65,7 +70,23 @@ internal sealed class JwtTokenService(IOptions<JwtOptions> jwtOptions) : IJwtTok
         return BuildToken(claims);
     }
 
-    private string BuildToken(List<Claim> claims)
+    public string CreateGuestAccessToken(Guid userId, string email, Guid tenantId, TimeSpan lifetime)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(email);
+
+        var claims = new List<Claim>
+        {
+            new("userId", userId.ToString()),
+            new("email", email),
+            new("roles", "public-guest"),
+            new("tenantId", tenantId.ToString()),
+            new("guest", "true"),
+        };
+
+        return BuildToken(claims, lifetime);
+    }
+
+    private string BuildToken(List<Claim> claims, TimeSpan? lifetime = null)
     {
         var options = jwtOptions.Value;
 
@@ -89,7 +110,7 @@ internal sealed class JwtTokenService(IOptions<JwtOptions> jwtOptions) : IJwtTok
             audience: options.Audience,
             claims: claims,
             notBefore: now,
-            expires: now.AddMinutes(options.AccessTokenTtlMinutes),
+            expires: lifetime is { } l ? now.Add(l) : now.AddMinutes(options.AccessTokenTtlMinutes),
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);

@@ -144,17 +144,99 @@ describe('httpClient — anonymous public menu pages', () => {
     vi.unstubAllGlobals()
   })
 
-  it('surfaces a 401 as an ApiError without refreshing or redirecting to /login', async () => {
+  function headerOf(call: unknown[], name: string): string | undefined {
+    const init = call[1] as RequestInit
+    return (init.headers as Record<string, string>)[name]
+  }
+
+  it('uses ONLY the guest token (never the real session token) on an anonymous page', async () => {
     const fetchMock = vi.fn<typeof fetch>()
-    fetchMock.mockResolvedValueOnce(fakeResponse({ status: 401 }))
     vi.stubGlobal('fetch', fetchMock)
 
     const { httpClient } = await import('../httpClient')
     const { enterAnonymousPage } = await import('../anonymousPage')
+    const guest = await import('../guestSession')
+    guest.setGuestTenant('acme')
+    leave = enterAnonymousPage()
+
+    // Seed a guest token via a successful session fetch (no cookies/credentials).
+    fetchMock.mockResolvedValueOnce(
+      fakeResponse({ status: 200, data: { accessToken: 'guest-token', expiresIn: 900 } }),
+    )
+    await guest.refreshGuestToken()
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/public/acme/session')
+    expect((fetchMock.mock.calls[0][1] as RequestInit).credentials).toBe('omit')
+
+    fetchMock.mockResolvedValueOnce(fakeResponse({ status: 200, data: { ok: true } }))
+    await httpClient.get('/api/datasets/x/options')
+
+    // The mocked tokenStore holds a stale real token; it must not be what is sent.
+    expect(headerOf(fetchMock.mock.calls[1] as unknown[], 'Authorization')).toBe('Bearer guest-token')
+    guest.clearGuestSession()
+  })
+
+  it('re-fetches the guest token and retries exactly once on 401, never redirecting to /login', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+    fetchMock
+      .mockResolvedValueOnce(fakeResponse({ status: 401 })) // expired guest token
+      .mockResolvedValueOnce(
+        fakeResponse({ status: 200, data: { accessToken: 'fresh-guest', expiresIn: 900 } }),
+      ) // POST session
+      .mockResolvedValueOnce(fakeResponse({ status: 200, data: { value: 7 } })) // retry
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { httpClient } = await import('../httpClient')
+    const { enterAnonymousPage } = await import('../anonymousPage')
+    const guest = await import('../guestSession')
+    guest.setGuestTenant('acme')
+    leave = enterAnonymousPage()
+
+    await expect(httpClient.get<{ value: number }>('/api/data/orders')).resolves.toEqual({ value: 7 })
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/public/acme/session')
+    expect(headerOf(fetchMock.mock.calls[2] as unknown[], 'Authorization')).toBe('Bearer fresh-guest')
+    expect(replaceMock).not.toHaveBeenCalled()
+    guest.clearGuestSession()
+  })
+
+  it('surfaces an ApiError (no loop, no /login) when the retried call is still 401', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+    fetchMock
+      .mockResolvedValueOnce(fakeResponse({ status: 401 }))
+      .mockResolvedValueOnce(
+        fakeResponse({ status: 200, data: { accessToken: 'fresh-guest', expiresIn: 900 } }),
+      )
+      .mockResolvedValueOnce(fakeResponse({ status: 401 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { httpClient } = await import('../httpClient')
+    const { enterAnonymousPage } = await import('../anonymousPage')
+    const guest = await import('../guestSession')
+    guest.setGuestTenant('acme')
     leave = enterAnonymousPage()
 
     await expect(httpClient.get('/api/data/orders')).rejects.toBeInstanceOf(ApiError)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
     expect(replaceMock).not.toHaveBeenCalled()
+    guest.clearGuestSession()
+  })
+
+  it('surfaces a plain ApiError when no guest session can be obtained', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+    fetchMock
+      .mockResolvedValueOnce(fakeResponse({ status: 401 }))
+      .mockResolvedValueOnce(fakeResponse({ status: 404 })) // session endpoint refuses
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { httpClient } = await import('../httpClient')
+    const { enterAnonymousPage } = await import('../anonymousPage')
+    const guest = await import('../guestSession')
+    guest.setGuestTenant('acme')
+    leave = enterAnonymousPage()
+
+    await expect(httpClient.get('/api/data/orders')).rejects.toBeInstanceOf(ApiError)
+    expect(replaceMock).not.toHaveBeenCalled()
+    guest.clearGuestSession()
   })
 })

@@ -75,7 +75,7 @@ internal sealed class UserService(
     // user (holder of WellKnownRoles.PlatformDevId) is invisible to, and immutable by, admins.
     // Sort keys/counts are applied on top of this, so listings and totals exclude it too.
     private IQueryable<User> VisibleUsers =>
-        db.Users.Where(u => !u.UserRoles.Any(ur => ur.RoleId == WellKnownRoles.PlatformDevId));
+        db.Users.Where(u => !u.UserRoles.Any(ur => WellKnownRoles.HiddenIds.Contains(ur.RoleId)));
 
     private static bool IsEmailUniqueViolation(PostgresException pg) =>
         string.Equals(pg.ConstraintName, "uq_users_email", StringComparison.Ordinal)
@@ -106,7 +106,7 @@ internal sealed class UserService(
         {
             // The hidden platform-dev role is treated exactly like a nonexistent role.
             var foundRoleIds = await db.Roles
-                .Where(r => distinctRoleIds.Contains(r.Id) && r.Id != WellKnownRoles.PlatformDevId)
+                .Where(r => distinctRoleIds.Contains(r.Id) && !WellKnownRoles.HiddenIds.Contains(r.Id))
                 .Select(r => r.Id)
                 .ToListAsync(ct)
                 .ConfigureAwait(false);
@@ -252,7 +252,7 @@ internal sealed class UserService(
                 u.Email,
                 u.DisplayName,
                 u.IsActive,
-                u.UserRoles.Count(ur => ur.RoleId != WellKnownRoles.PlatformDevId),
+                u.UserRoles.Count(ur => !WellKnownRoles.HiddenIds.Contains(ur.RoleId)),
                 u.CreatedAt))
             .ToListAsync(ct)
             .ConfigureAwait(false);
@@ -307,7 +307,7 @@ internal sealed class UserService(
                 u.CreatedAt,
                 u.UpdatedAt,
                 u.UserRoles
-                    .Where(ur => ur.RoleId != WellKnownRoles.PlatformDevId)
+                    .Where(ur => !WellKnownRoles.HiddenIds.Contains(ur.RoleId))
                     .OrderBy(ur => ur.Role.Name)
                     .Select(ur => new UserRoleItem(ur.RoleId, ur.Role.Name))
                     .ToList(),

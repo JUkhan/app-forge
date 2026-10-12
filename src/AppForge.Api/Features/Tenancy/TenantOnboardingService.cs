@@ -184,6 +184,14 @@ internal sealed partial class TenantOnboardingService(
                 });
 
                 await tenantDb.SaveChangesAsync(ct).ConfigureAwait(false);
+
+                // The hidden public-guest user (backs /{tenant}/public sessions). Same ensure
+                // routine the session endpoint uses lazily for pre-existing tenants. It is
+                // intentionally NOT added to public.tenant_user_index below, so no login can
+                // ever resolve it and the platform-admin/tenant email collision logic is untouched.
+                await AppForge.Api.Features.PublicGuest.PublicGuestIdentity
+                    .EnsureGuestUserAsync(tenantDb, schemaName, passwordHasher, ct)
+                    .ConfigureAwait(false);
             }
             finally
             {

@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PublicMenuItem } from '../features/menu/types'
 import { isAnonymousPageActive } from '../features/auth/anonymousPage'
 
@@ -36,6 +37,13 @@ vi.mock('@tanstack/react-router', () => ({
     )
   },
 }))
+
+const guestMocks = vi.hoisted(() => ({
+  refreshGuestToken: vi.fn(),
+  setGuestTenant: vi.fn(),
+  clearGuestSession: vi.fn(),
+}))
+vi.mock('../features/auth/guestSession', () => guestMocks)
 
 vi.mock('../lib/theme/ThemeProvider', () => ({
   useTheme: () => ({ theme: 'light', setTheme: () => {} }),
@@ -77,13 +85,29 @@ function item(over: Partial<PublicMenuItem> & { id: string; name: string }): Pub
   }
 }
 
+function renderShell() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={qc}>
+      <PublicShell />
+    </QueryClientProvider>,
+  )
+}
+
+beforeEach(() => {
+  guestMocks.refreshGuestToken.mockReset()
+  guestMocks.refreshGuestToken.mockResolvedValue('guest-token')
+  guestMocks.setGuestTenant.mockReset()
+  guestMocks.clearGuestSession.mockReset()
+})
+
 afterEach(() => {
   cleanup()
   queryStub = { data: [], isPending: false, isError: false }
 })
 
 describe('PublicShell', () => {
-  it('renders the sidebar tree, outlet, theme selector and sign-in link — no user chip/logout', () => {
+  it('renders the sidebar tree, outlet, theme selector and sign-in link — no user chip/logout', async () => {
     queryStub = {
       data: [
         item({ id: 'm1', name: 'Home page', designerId: 'public_view' }),
@@ -97,10 +121,10 @@ describe('PublicShell', () => {
       isError: false,
     }
 
-    const { getByText, queryByText, getByTestId, getByRole } = render(<PublicShell />)
+    const { getByText, queryByText, findByTestId, getByTestId, getByRole } = renderShell()
 
     expect(getByText('acme')).toBeTruthy()
-    expect(getByTestId('outlet')).toBeTruthy()
+    expect(await findByTestId('outlet')).toBeTruthy()
     expect(getByTestId('theme-select')).toBeTruthy()
     expect(getByRole('link', { name: /publicMenu\.signIn/ }).getAttribute('href')).toBe('/login')
     expect(queryByText('auth.logout.button')).toBeNull()
@@ -115,10 +139,36 @@ describe('PublicShell', () => {
   })
 
   it('marks the page anonymous while mounted so a 401 never redirects to /login', () => {
-    const { unmount } = render(<PublicShell />)
+    const { unmount } = renderShell()
     expect(isAnonymousPageActive()).toBe(true)
     unmount()
     expect(isAnonymousPageActive()).toBe(false)
+  })
+
+  it('obtains the guest token for the tenant BEFORE rendering content, and clears it on unmount', async () => {
+    let resolveToken: (v: string) => void = () => {}
+    guestMocks.refreshGuestToken.mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveToken = resolve
+      }),
+    )
+
+    const { queryByTestId, findByTestId, unmount } = renderShell()
+
+    await waitFor(() => expect(guestMocks.setGuestTenant).toHaveBeenCalledWith('acme'))
+    expect(queryByTestId('outlet')).toBeNull() // content waits for the token
+
+    resolveToken('guest-token')
+    expect(await findByTestId('outlet')).toBeTruthy()
+
+    unmount()
+    expect(guestMocks.clearGuestSession).toHaveBeenCalled()
+  })
+
+  it('still renders content when the guest session cannot be obtained', async () => {
+    guestMocks.refreshGuestToken.mockResolvedValue(null)
+    const { findByTestId } = renderShell()
+    expect(await findByTestId('outlet')).toBeTruthy()
   })
 })
 

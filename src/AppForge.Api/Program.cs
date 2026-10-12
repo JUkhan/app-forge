@@ -324,6 +324,8 @@ builder.Services.AddScoped<IDatasetDropdownService, DatasetDropdownService>();
 // DatasetComponent runtime data-view — serves a dataset VIEW's rows (paginated, filtered,
 // sorted) and the same result set as a CSV/XLSX/PDF export. Auth-only, privileged pool.
 builder.Services.AddScoped<IDatasetRowQueryService, DatasetRowQueryService>();
+// Public guest sessions - per-tenant allowlist derived from published public layouts.
+builder.Services.AddScoped<AppForge.Api.Features.PublicGuest.IPublicGuestAllowlist, AppForge.Api.Features.PublicGuest.PublicGuestAllowlist>();
 
 // JWT bearer authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -495,7 +497,7 @@ builder.Services.AddRateLimiter(options =>
     // will be rejected by the auth layer anyway, so IP fallback is defensive only).
     options.AddPolicy("admin", httpContext =>
         RateLimitPartition.GetSlidingWindowLimiter(
-            partitionKey: httpContext.User.FindFirst("userId")?.Value
+            partitionKey: (httpContext.User.FindFirst("guest")?.Value == "true" ? null : httpContext.User.FindFirst("userId")?.Value)
                           ?? httpContext.Connection.RemoteIpAddress?.ToString()
                           ?? "unknown",
             factory: _ => new SlidingWindowRateLimiterOptions
@@ -518,10 +520,24 @@ builder.Services.AddRateLimiter(options =>
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0,
             }));
+    // POST /api/public/{tenant}/session — anonymous guest-token issuance; stricter than the
+    // public list: 20 req/min per client IP. (Guest-token traffic on the shared guest user is
+    // partitioned per IP by the admin/data policies below, not per userId.)
+    options.AddPolicy("public-session", httpContext =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+            }));
     // /api/data/{designerId} — AR-15: POST (write) 60 req/min, all others 300 req/min.
     options.AddPolicy("data-write", httpContext =>
         RateLimitPartition.GetSlidingWindowLimiter(
-            partitionKey: httpContext.User.FindFirst("userId")?.Value
+            partitionKey: (httpContext.User.FindFirst("guest")?.Value == "true" ? null : httpContext.User.FindFirst("userId")?.Value)
                           ?? httpContext.Connection.RemoteIpAddress?.ToString()
                           ?? "unknown",
             factory: _ => new SlidingWindowRateLimiterOptions
@@ -534,7 +550,7 @@ builder.Services.AddRateLimiter(options =>
             }));
     options.AddPolicy("data-read", httpContext =>
         RateLimitPartition.GetSlidingWindowLimiter(
-            partitionKey: httpContext.User.FindFirst("userId")?.Value
+            partitionKey: (httpContext.User.FindFirst("guest")?.Value == "true" ? null : httpContext.User.FindFirst("userId")?.Value)
                           ?? httpContext.Connection.RemoteIpAddress?.ToString()
                           ?? "unknown",
             factory: _ => new SlidingWindowRateLimiterOptions
@@ -732,6 +748,9 @@ app.UseAuthentication();
 // is not immediately after CorrelationIdMiddleware despite architecture.md's looser
 // phrasing.
 app.UseMiddleware<TenantContextMiddleware>();
+// Guest (public-session) tokens: single allowlist choke point, after tenant resolution and
+// before any endpoint authorization/handler runs.
+app.UseMiddleware<AppForge.Api.Features.PublicGuest.PublicGuestAccessMiddleware>();
 app.UseAuthorization();
 // Rate limiter must run AFTER authentication so the "admin" policy's partition
 // factory can read the authenticated userId claim. Otherwise httpContext.User

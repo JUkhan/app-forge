@@ -224,7 +224,7 @@ internal static partial class TenantEndpoints
     // regex), but schemaName may start/end with '_' (-> '-' after substitution). Pad with
     // a digit rather than trimming, so distinct schema names can't collapse onto the same
     // derived email.
-    private static string ToEmailDomainLabel(string schemaName)
+    internal static string ToEmailDomainLabel(string schemaName)
     {
         var label = schemaName.Replace('_', '-');
         if (label[0] == '-')

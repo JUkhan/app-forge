@@ -94,3 +94,12 @@ User reported a public designer-bound menu redirects to login on click and chose
 - Read-only list, paged (max 100), default sort, soft-deleted rows excluded, no client filter/sort params. Designers with an AuthFilterFieldKey (user-scoped) or a dataset binding are NOT served anonymously (404). Only user-defined columns plus `id` are returned.
 - Public page: clicking a bound item opens `/{tenant}/public_menu/{menuId}`, a read-only table of those records; no link to `/data/{designerId}`.
 - Out of scope: backfilling `is_public` into existing tenant schemas (deferred item stands).
+
+### 2026-10-12 — human requested hidden guest user + auto-login for /{tenant}/public (allowlist-scoped)
+
+Widgets on public layouts call auth-only APIs (`/api/files/presign`, `POST /api/datasets/{id}/rows`) and 401. Human chose: hidden per-tenant guest user auto-logged-in on `/{tenant}/public`, scoped by an allowlist (not a plain user).
+
+- Hidden role `public-guest` + hidden guest user per tenant, created at tenant onboarding (lazily ensured for existing tenants). Hidden from Users/Roles/Menu-role surfaces, not assignable, cannot log in with a password.
+- `POST /api/public/{tenant}/session` (anonymous, rate-limited) issues a short-lived access-only JWT with a `guest` claim and the tenant id. No refresh token.
+- Guest enforcement is a single choke point: guest tokens may only call an explicit route allowlist, all writes denied, and datasets/rows (+export/chart if used), files/presign, data reads and options only for datasets/file keys/designers referenced by the Published layouts of active public menus (including nested child designers), cached briefly per tenant.
+- Frontend: public shell obtains and keeps a guest token (separate from the real session), refreshes on 401 once; httpClient uses it only on public pages.

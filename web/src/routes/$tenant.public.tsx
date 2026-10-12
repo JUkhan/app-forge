@@ -1,10 +1,13 @@
 import { useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Loader2 } from 'lucide-react'
 import { createFileRoute, Link, Outlet } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { LogIn } from 'lucide-react'
 import { NavSidebar, type NavItemLinkProps } from '../components/shared/NavSidebar'
 import { usePublicMenuQuery } from '../features/menu/usePublicMenuQuery'
 import { enterAnonymousPage } from '../features/auth/anonymousPage'
+import { clearGuestSession, refreshGuestToken, setGuestTenant } from '../features/auth/guestSession'
 import { useTheme } from '../lib/theme/ThemeProvider'
 import { THEMES, THEME_LABELS, type Theme } from '../lib/theme/themes'
 import { Button } from '../components/ui/button'
@@ -68,8 +71,32 @@ export function PublicShell() {
   const { theme, setTheme } = useTheme()
   const { data, isPending, isError } = usePublicMenuQuery(tenant)
 
-  // While mounted, a 401 from any widget must not refresh/redirect to /login (see httpClient).
-  useEffect(() => enterAnonymousPage(), [])
+  // While mounted: httpClient uses the separate guest token (never the real session) and a 401
+  // never refreshes the user session or redirects to /login.
+  useEffect(() => {
+    const leave = enterAnonymousPage()
+    setGuestTenant(tenant)
+    return () => {
+      leave()
+      clearGuestSession()
+    }
+  }, [tenant])
+
+  // Obtain the guest token before any content mounts, so widgets that call auth-only APIs
+  // (files/presign, datasets/rows, ...) never fire a tokenless request. A failed session
+  // still renders the content (anonymous endpoints keep working; widgets surface errors).
+  const sessionQuery = useQuery({
+    queryKey: ['guest-session', tenant],
+    queryFn: async () => {
+      setGuestTenant(tenant) // idempotent; guarantees the tenant is registered before the fetch
+      return (await refreshGuestToken()) !== null
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+  })
+  const sessionReady = !sessionQuery.isPending
 
   return (
     <div className="flex h-screen overflow-hidden md:flex">
@@ -111,7 +138,11 @@ export function PublicShell() {
           </Button>
         </header>
         <div className="relative min-h-0 flex-1 overflow-y-auto p-4">
-          <Outlet />
+          {sessionReady ? (
+            <Outlet />
+          ) : (
+            <Loader2 role="status" aria-label={t('publicMenu.loading')} className="h-5 w-5 animate-spin" />
+          )}
         </div>
       </main>
     </div>

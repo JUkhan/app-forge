@@ -1,8 +1,10 @@
+using AppForge.Api.Features.Auth;
 using AppForge.Api.Features.Datasets;
 using AppForge.Api.Features.Datasets.Dtos;
 using AppForge.Api.Features.Designer;
 using AppForge.Api.Features.Designer.Dtos;
 using AppForge.Api.Features.DynamicCrud;
+using AppForge.Api.Features.PublicGuest;
 using AppForge.Api.Features.Menus.Dtos;
 using AppForge.Api.Features.SchemaRegistry;
 using AppForge.Api.Features.Tenancy;
@@ -33,6 +35,13 @@ internal static class PublicMenuEndpoints
              .AllowAnonymous()
              .WithSummary("Anonymous, read-only, paged records of a public designer-bound menu item.")
              .Produces<PublicMenuRecordsResult>(StatusCodes.Status200OK)
+             .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPost("/{tenant}/session", CreateGuestSessionHandler)
+             .AllowAnonymous()
+             .RequireRateLimiting("public-session")
+             .WithSummary("Anonymous: issue a short-lived, access-only guest token for the tenant's public pages.")
+             .Produces<GuestSessionResponse>(StatusCodes.Status200OK)
              .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/{tenant}/menus/{menuId}/schema", GetPublicMenuSchemaHandler)
@@ -88,6 +97,42 @@ internal static class PublicMenuEndpoints
 
         tenantContext.Set(row.Id, row.SchemaName);
         return true;
+    }
+
+    internal sealed record GuestSessionResponse(string AccessToken, int ExpiresIn);
+
+    // Issues the guest session token. Same tenant resolution + identical 404 as every other
+    // public endpoint. No refresh token and no cookie: the SPA simply re-requests on 401.
+    private static async Task<IResult> CreateGuestSessionHandler(
+        string tenant,
+        HttpContext httpContext,
+        AppForgeDbContext db,
+        ITenantContext tenantContext,
+        IPasswordHasher passwordHasher,
+        IJwtTokenService jwtTokenService,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(httpContext);
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(tenantContext);
+        ArgumentNullException.ThrowIfNull(passwordHasher);
+        ArgumentNullException.ThrowIfNull(jwtTokenService);
+
+        if (!await TryResolveTenantAsync(tenant, db, tenantContext, ct).ConfigureAwait(false)
+            || tenantContext.TenantId is not { } tenantId
+            || tenantContext.SchemaName is not { } schemaName)
+        {
+            return NotFound();
+        }
+
+        var guestId = await PublicGuestIdentity.EnsureGuestUserAsync(db, schemaName, passwordHasher, ct)
+            .ConfigureAwait(false);
+
+        var token = jwtTokenService.CreateGuestAccessToken(
+            guestId, PublicGuestIdentity.EmailFor(schemaName), tenantId, PublicGuestIdentity.SessionLifetime);
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+        return Results.Ok(new GuestSessionResponse(token, (int)PublicGuestIdentity.SessionLifetime.TotalSeconds));
     }
 
     // Anonymous read of the Published schema (component layout) behind a public designer-bound

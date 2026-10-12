@@ -205,6 +205,33 @@ internal sealed class PermissionService : IPermissionService
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
+        // Public guest: never reads role_permissions. Read-only access to exactly the designers
+        // the published public layouts reference (PublicGuestAllowlist); nothing else, and no
+        // dataset-management. The route/resource allowlist is enforced separately in
+        // PublicGuestAccessMiddleware; this makes RequirePermission("read") agree with it.
+        if (roleIds.Contains(WellKnownRoles.PublicGuestId))
+        {
+            var access = await scope.ServiceProvider
+                .GetRequiredService<AppForge.Api.Features.PublicGuest.IPublicGuestAllowlist>()
+                .GetAsync(ct)
+                .ConfigureAwait(false);
+
+            var guestFlags = new Dictionary<string, CrudFlags>(StringComparer.OrdinalIgnoreCase);
+            foreach (var designerId in access.DesignerIds)
+            {
+                guestFlags[designerId] = new CrudFlags(
+                    CanCreate: false, CanRead: true, CanUpdate: false, CanDelete: false, CanExport: false);
+            }
+
+            return new EffectivePermissions(
+                UserId: userId,
+                ComputedAt: DateTimeOffset.UtcNow,
+                IsActive: isActive,
+                PerResource: guestFlags,
+                RoleIds: new HashSet<Guid> { WellKnownRoles.PublicGuestId },
+                CanManageDatasets: false);
+        }
+
         // OrdinalIgnoreCase so a future non-API DB writer that stored mixed-case
         // resource_id (e.g., a migration backfill) doesn't silently make the row
         // unreachable from the lowercase-normalizing API path. (Patch #7.)

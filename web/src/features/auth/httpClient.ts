@@ -3,6 +3,7 @@ import { generateCorrelationId } from '../../lib/correlationId'
 import { ApiError } from '../../lib/api/apiError'
 import { refreshSession } from './refreshCoordinator'
 import { isAnonymousPageActive } from './anonymousPage'
+import { getGuestToken, refreshGuestToken } from './guestSession'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
@@ -16,7 +17,10 @@ async function request<T>(
   isRetry = false,
 ): Promise<T> {
   const correlationId = generateCorrelationId()
-  const token = tokenStore.get()
+  // On an anonymous /{tenant}/public page the ONLY credential ever sent is the separate,
+  // allowlist-scoped guest token - never the real session token, even if one exists.
+  const onAnonymousPublicPage = isAnonymousPageActive()
+  const token = onAnonymousPublicPage ? getGuestToken() : tokenStore.get()
 
   const headers: Record<string, string> = {
     'X-Correlation-ID': correlationId,
@@ -55,9 +59,13 @@ async function request<T>(
   // must refresh on ANY non-HTML 401; requiring problem+json here silently
   // skipped the refresh and forced users to reload the page by hand.
   const contentType = response.headers.get('content-type') ?? ''
-  // The anonymous /{tenant}/public shell has no session to refresh or lose. A 401 from a widget
-  // there must surface as an ordinary error, never as a refresh attempt + hard redirect.
-  const onAnonymousPublicPage = isAnonymousPageActive()
+  // The anonymous /{tenant}/public shell has no user session to refresh or lose. A 401 there
+  // means the guest token expired: fetch a new one and retry exactly once; otherwise surface an
+  // ordinary error. Never the silent user refresh, never a redirect to /login.
+  if (response.status === 401 && onAnonymousPublicPage && !isRetry) {
+    const fresh = await refreshGuestToken()
+    if (fresh) return request<T>(method, path, body, true)
+  }
   if (
     response.status === 401 &&
     !isRetry &&

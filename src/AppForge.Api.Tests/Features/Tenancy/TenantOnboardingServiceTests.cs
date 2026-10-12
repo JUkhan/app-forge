@@ -119,11 +119,12 @@ public sealed class TenantOnboardingServiceTests : IClassFixture<PostgresFixture
         // carries the bulk SELECT grant.
         Assert.True(await HasTablePrivilegeAsync(conn, $"\"{tenant.SchemaName}\".menus"));
 
-        // AC-2: two users — the tenant admin (tenant-admin role) and the hidden developer
-        // (platform-dev role) — each with exactly one UserRole.
+        // AC-2: three users — the tenant admin (tenant-admin role), the hidden developer
+        // (platform-dev role) and the hidden public-guest — each with exactly one UserRole.
+        // Only the admin and developer are routed through tenant_user_index (asserted below).
         var userCount = await conn.ExecuteScalarAsync<int>(
             $"""SELECT COUNT(*) FROM "{tenant.SchemaName}".users""");
-        Assert.Equal(2, userCount);
+        Assert.Equal(3, userCount);
 
         var adminRoleIds = (await conn.QueryAsync<Guid>(
             $"""
@@ -319,7 +320,7 @@ public sealed class TenantOnboardingServiceTests : IClassFixture<PostgresFixture
             await conn.OpenAsync();
             var userCount = await conn.ExecuteScalarAsync<int>(
                 $"""SELECT COUNT(*) FROM "{tenant.SchemaName}".users""");
-            Assert.Equal(2, userCount); // tenant admin + hidden developer
+            Assert.Equal(3, userCount); // tenant admin + hidden developer + hidden public-guest
         }
         finally
         {

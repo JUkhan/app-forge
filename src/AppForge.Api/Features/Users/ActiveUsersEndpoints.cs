@@ -34,7 +34,7 @@ internal static class ActiveUsersEndpoints
         // tracking) and never materializes the password hash / MFA secret columns.
         var users = await db.Users
             .Where(u => u.IsActive
-                && !u.UserRoles.Any(ur => ur.RoleId == WellKnownRoles.PlatformDevId))
+                && !u.UserRoles.Any(ur => WellKnownRoles.HiddenIds.Contains(ur.RoleId)))
             .OrderBy(u => u.DisplayName)
             .ThenBy(u => u.Email)
             .Select(u => new ActiveUserDto(u.Id, u.Email, u.DisplayName))

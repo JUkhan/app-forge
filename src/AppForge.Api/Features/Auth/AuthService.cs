@@ -277,6 +277,18 @@ internal sealed partial class AuthService(
                     return new AuthServiceResult(AuthLoginOutcome.InvalidCredentials);
                 }
 
+                // The hidden public-guest identity can never log in with a password.
+                var isPublicGuest = await tenantDb.UserRoles
+                    .AnyAsync(
+                        ur => ur.UserId == user.Id
+                              && ur.RoleId == AppForge.Api.Features.Permissions.WellKnownRoles.PublicGuestId,
+                        ct)
+                    .ConfigureAwait(false);
+                if (isPublicGuest)
+                {
+                    return new AuthServiceResult(AuthLoginOutcome.InvalidCredentials);
+                }
+
                 if (!user.IsActive)
                 {
                     return new AuthServiceResult(AuthLoginOutcome.AccountInactive);

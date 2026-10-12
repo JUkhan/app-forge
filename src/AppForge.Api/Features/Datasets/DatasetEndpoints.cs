@@ -41,11 +41,17 @@ internal static class DatasetEndpoints
         // Story 8.7 (FR-62 / AR-65) — get by id; auth-only (no RequireDatasetManagement).
         group.MapGet("/{id:guid}", async (
             Guid id,
+            HttpContext httpContext,
             IDatasetService datasetService,
             CancellationToken ct) =>
         {
             var dto = await datasetService.GetByIdAsync(id, ct).ConfigureAwait(false);
-            return dto is null ? Results.NotFound() : Results.Ok(dto);
+            if (dto is null) return Results.NotFound();
+
+            // Public guest sessions may read a dataset's identity, never its SQL/builder state.
+            return AppForge.Api.Features.PublicGuest.PublicGuestIdentity.IsGuest(httpContext.User)
+                ? Results.Ok(dto with { Query = null, BuilderState = null })
+                : Results.Ok(dto);
         })
              .WithSummary("Get dataset (Story 8.7 — FR-62)");
 
