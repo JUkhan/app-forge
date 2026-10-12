@@ -8,13 +8,13 @@ import { ApiError } from '../lib/api/apiError'
 import DynamicComponent from '../components/designer/DynamicComponent'
 import type { ComponentSchemaDto } from '../types/designer'
 
-// Anonymous top-level route (outside _app, no beforeLoad guard). The menu's Published schema is
-// loaded from GET /api/public/{tenant}/menus/{menuId}/schema. A VIEW-mode designer renders
-// read-only through DynamicComponent (no onSave); anything else falls back to a paged read-only
-// table from GET /api/public/{tenant}/menus/{menuId}/records. The trailing underscore on
-// `public_menu_` keeps this route un-nested from the /$tenant/public_menu list page.
+// Content of the anonymous public shell ($tenant.public.tsx): the selected menu item, rendered in
+// the shell's content area. The menu's Published schema is loaded from
+// GET /api/public/{tenant}/menus/{menuId}/schema. A VIEW-mode designer renders read-only through
+// DynamicComponent (no onSave); anything else falls back to a paged read-only table from
+// GET /api/public/{tenant}/menus/{menuId}/records.
 // eslint-disable-next-line react-refresh/only-export-components
-export const Route = createFileRoute('/$tenant/public_menu_/$menuId')({
+export const Route = createFileRoute('/$tenant/public/$menuId')({
   component: PublicMenuRecordsPage,
 })
 
@@ -35,29 +35,13 @@ function formatCell(value: unknown): string {
   return String(value)
 }
 
-function Shell({ title, tenant, wide, children }: {
-  title: string
-  tenant: string
-  wide?: boolean
-  children: React.ReactNode
-}) {
-  const { t } = useTranslation()
+function Page({ title, wide, children }: { title: string; wide?: boolean; children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-start justify-center bg-gradient-to-br from-background to-muted px-4 py-12">
-      <div
-        className={`w-full ${wide ? 'max-w-4xl' : 'max-w-2xl'} rounded-xl border border-border bg-card p-6 shadow-sm`}
-      >
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">{title}</h1>
-          <a
-            href={`/${encodeURIComponent(tenant)}/public_menu`}
-            className="text-sm font-medium text-primary hover:underline"
-          >
-            {t('publicMenu.records.back')}
-          </a>
-        </div>
-        {children}
-      </div>
+    <div
+      className={`mx-auto w-full ${wide ? 'max-w-5xl' : 'max-w-3xl'} rounded-xl border border-border bg-card p-6 shadow-sm`}
+    >
+      <h1 className="mb-4 text-2xl font-bold tracking-tight text-foreground">{title}</h1>
+      {children}
     </div>
   )
 }
@@ -181,42 +165,42 @@ export function PublicMenuRecordsPage() {
 
   if (schemaQuery.isPending) {
     return (
-      <Shell title={t('publicMenu.records.title')} tenant={tenant}>
+      <Page title={t('publicMenu.records.title')}>
         <Loader2
           role="status"
           aria-label={t('publicMenu.records.loading')}
           className="h-5 w-5 animate-spin"
         />
-      </Shell>
+      </Page>
     )
   }
 
   if (schemaQuery.isError || !schema) {
     const notFound = schemaQuery.error instanceof ApiError && schemaQuery.error.status === 404
     return (
-      <Shell title={t('publicMenu.records.title')} tenant={tenant}>
+      <Page title={t('publicMenu.records.title')}>
         <p
           role="alert"
           className={`text-sm ${notFound ? 'text-muted-foreground' : 'text-destructive'}`}
         >
           {notFound ? t('publicMenu.records.notFound') : t('publicMenu.records.loadError')}
         </p>
-      </Shell>
+      </Page>
     )
   }
 
   if (schema.mode === 'VIEW') {
     return (
-      <Shell title={schema.displayName} tenant={tenant}>
+      <Page title={schema.displayName}>
         {/* No onSave → read-only render (same as the authenticated VIEW-mode page). */}
         <DynamicComponent designerId={schema.designerId} schema={schema} />
-      </Shell>
+      </Page>
     )
   }
 
   return (
-    <Shell title={schema.displayName || t('publicMenu.records.title')} tenant={tenant} wide>
+    <Page title={schema.displayName || t('publicMenu.records.title')} wide>
       <RecordsTable tenant={tenant} menuId={menuId} />
-    </Shell>
+    </Page>
   )
 }

@@ -132,11 +132,13 @@ describe('httpClient — anonymous public menu pages', () => {
     replaceMock.mockReset()
     Object.defineProperty(window, 'location', {
       configurable: true,
-      value: { ...originalLocation, pathname: '/acme/public_menu/menu-1', replace: replaceMock },
+      value: { ...originalLocation, replace: replaceMock },
     })
   })
 
+  let leave: (() => void) | undefined
   afterEach(() => {
+    leave?.()
     Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
@@ -148,6 +150,8 @@ describe('httpClient — anonymous public menu pages', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const { httpClient } = await import('../httpClient')
+    const { enterAnonymousPage } = await import('../anonymousPage')
+    leave = enterAnonymousPage()
 
     await expect(httpClient.get('/api/data/orders')).rejects.toBeInstanceOf(ApiError)
     expect(fetchMock).toHaveBeenCalledTimes(1)

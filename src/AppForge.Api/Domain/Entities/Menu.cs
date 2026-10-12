@@ -7,7 +7,7 @@ internal sealed class Menu
     public int Order { get; set; }
     public string? Icon { get; set; }           // stored as jsonb; full type validation in Story 4.3
     public bool IsActive { get; set; } = true;
-    // When true (and IsActive) the item is listed on the anonymous /{tenant}/public_menu page.
+    // When true (and IsActive) the item is listed on the anonymous /{tenant}/public page.
     public bool IsPublic { get; set; }
     public Guid? ParentId { get; set; }         // null = top-level; Story 4.2 enables sub-menus
     public DateTimeOffset CreatedAt { get; set; }

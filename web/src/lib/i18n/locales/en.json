@@ -8,14 +8,14 @@
     "catppuccinLatte": "Catppuccin Latte"
   },
   "publicMenu": {
-    "title": "Menu",
     "loading": "Loading menu",
     "empty": "There are no public menu items.",
+    "selectItem": "Select an item from the menu.",
+    "signIn": "Sign in",
     "notFound": "This page could not be found.",
     "loadError": "The menu could not be loaded. Please try again later.",
     "records": {
       "title": "Records",
-      "back": "Back to menu",
       "loading": "Loading records",
       "empty": "There are no records to show.",
       "notFound": "This page could not be found.",

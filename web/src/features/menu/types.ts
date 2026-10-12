@@ -15,7 +15,7 @@ export interface MenuItem {
   order: number
   icon: MenuIcon | null
   isActive: boolean
-  isPublic: boolean   // listed on the anonymous /{tenant}/public_menu page when also active
+  isPublic: boolean   // listed on the anonymous /{tenant}/public page when also active
   parentId: string | null
   allowedRoleIds: string[]  // populated by Story 4.4; always [] for now
   createdAt: string

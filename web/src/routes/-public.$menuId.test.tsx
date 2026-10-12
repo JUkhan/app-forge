@@ -30,7 +30,7 @@ vi.mock('../components/designer/DynamicComponent', () => ({
   ),
 }))
 
-import { PublicMenuRecordsPage } from './$tenant.public_menu_.$menuId'
+import { PublicMenuRecordsPage } from './$tenant.public.$menuId'
 import { ApiError } from '../lib/api/apiError'
 
 const SCHEMA_URL = '/api/public/acme/menus/menu-1/schema'
