@@ -182,6 +182,12 @@ internal sealed partial class TenantOnboardingService(
                     RoleId = PlatformDevRoleId,
                     CreatedAt = DateTimeOffset.UtcNow,
                 });
+                tenantDb.UserRoles.Add(new UserRole
+                {
+                    User = devUser,
+                    RoleId = TenantAdminRoleId,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                });
 
                 await tenantDb.SaveChangesAsync(ct).ConfigureAwait(false);
 
