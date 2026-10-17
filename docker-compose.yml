@@ -55,6 +55,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Compose
       ASPNETCORE_URLS: http://+:8080
+      SuperAdminEmail: ${SUPER_ADMIN_EMAIL}
+      SuperAdminPassword: ${SUPER_ADMIN_PASSWORD}
       # Connection strings point at the external/production Postgres (override appsettings.Compose.json).
       ConnectionStrings__appforge: "Host=${POSTGRES_HOST};Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       ConnectionStrings__appforge_preview: "Host=${POSTGRES_HOST};Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${PREVIEW_DB_USER};Password=${PREVIEW_DB_PASSWORD};Maximum Pool Size=5"
