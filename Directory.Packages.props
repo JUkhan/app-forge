@@ -29,6 +29,13 @@
          named a non-existent "PgQuery.NET 2.1.2"; pgsqlparser is the real protobuf-AST
          libpg_query binding (namespace PgSqlParser) chosen as the substitute. -->
     <PackageVersion Include="pgsqlparser" Version="1.0.0" />
+    <!-- Transitive pin: 10.0.0 has GHSA-2fmv-rv2c-59x7 (moderate) + GHSA-846f-f764-76mx (high);
+         both fixed in the 10.0.x servicing line — pin the latest 10.0.x. With
+         CentralPackageTransitivePinningEnabled, this entry pins the transitive dep. -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <!-- Transitive pin: 10.0.8 has multiple high-severity advisories (GHSA-23rf-6693-g89p et al.);
+         fixed in the 10.0.x servicing line — pin the latest 10.0.x. -->
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.13" />
     <PackageVersion Include="QRCoder" Version="1.6.0" />
     <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.1.7" />
     <PackageVersion Include="Ulid" Version="1.4.1" />
@@ -36,8 +43,9 @@
     <!-- AppHost -->
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.3.5" />
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.NodeJS.Extensions" Version="9.9.0" />
-    <!-- Pin patched version to fix GHSA-hv8m-jj95-wg3x (transitive via StreamJsonRpc) -->
-    <PackageVersion Include="MessagePack" Version="2.5.301" />
+    <!-- Pin patched version to fix GHSA-hv8m-jj95-wg3x (transitive via StreamJsonRpc);
+         2.5.301 → 2.5.307 to also clear GHSA-qhrr-8q5h-9q3h (moderate) -->
+    <PackageVersion Include="MessagePack" Version="2.5.307" />
 
     <!-- ServiceDefaults -->
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.5.0" />
@@ -50,6 +58,9 @@
 
     <!-- Test project -->
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <!-- Transitive pin: 2025.1.0 has GHSA-mggc-4xg6-vcxf + GHSA-q939-rpr3-3284 (high);
+         fixed in 2026.0.0. -->
+    <PackageVersion Include="SSH.NET" Version="2026.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.8" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.12.0" />

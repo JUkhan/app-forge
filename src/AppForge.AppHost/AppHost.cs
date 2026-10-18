@@ -9,7 +9,15 @@ var postgres = builder.AddPostgres("postgres")
 
 var appforgeDb = postgres.AddDatabase("appforge");
 
-var minio = builder.AddContainer("minio", "minio/minio", "RELEASE.2025-09-07T16-13-09Z")
+// MinIO distribution note: Docker Hub DELETED the minio/minio repository (MinIO
+// dropped Docker Hub in 2025) and quay.io/minio/minio is now private for
+// anonymous pulls, so `minio/minio:RELEASE.2025-09-07T16-13-09Z` can no longer
+// be pulled anywhere. RELEASE.2025-09-07T16-13-09Z is the final public community
+// release and is present in the local Docker cache — reference it via its
+// quay.io path (same as docker-compose.yml) so `docker create` resolves the
+// cached image without a registry round-trip. On machines without the cached
+// image, seed the cache once (e.g. from an internal mirror) before first run.
+var minio = builder.AddContainer("minio", "quay.io/minio/minio", "RELEASE.2025-09-07T16-13-09Z")
     .WithArgs("server", "/data", "--console-address", ":9001")
     .WithEnvironment("MINIO_ROOT_USER", "minioadmin")
     .WithEnvironment("MINIO_ROOT_PASSWORD", "minioadmin")
